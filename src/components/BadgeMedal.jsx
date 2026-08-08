@@ -2,15 +2,45 @@ import { View } from "react-native";
 import Svg, { Circle, Polygon } from "react-native-svg";
 
 /**
+ * Relative luminance (WCAG). Used to choose the glyph colour inside a coloured
+ * medallion — a white glyph is illegible on the lighter hues (yellow, aqua), so
+ * the fill decides rather than an assumption.
+ */
+function luminance(hex) {
+  const channel = (v) => {
+    const c = parseInt(v, 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const r = channel(hex.slice(1, 3));
+  const g = channel(hex.slice(3, 5));
+  const b = channel(hex.slice(5, 7));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+const INK = "#09090B";
+
+function glyphOn(fill) {
+  // Contrast against white vs against ink; take the better of the two.
+  const l = luminance(fill);
+  const vsWhite = 1.05 / (l + 0.05);
+  const vsInk = (l + 0.05) / 0.05;
+  return vsWhite >= vsInk ? "#FFFFFF" : INK;
+}
+
+/**
  * Custom badge medallion: a rounded hexagon holding a glyph.
  *
  * Built here rather than pulled from an icon set — a bare icon reads as a
  * button, a medallion reads as something earned. Corners are rounded by
  * stroking the polygon in its own fill colour with a round line-join, which
  * avoids hand-writing arc segments for every vertex.
+ *
+ * Earned badges wear their colour as a fill; locked ones stay white with the
+ * colour showing only in the progress ring, so the two states never read alike.
  */
 export default function BadgeMedal({
   Icon,
+  color = INK,
   earned = false,
   progress = 0,
   size = 64,
@@ -38,8 +68,8 @@ export default function BadgeMedal({
       <Svg width={size} height={size}>
         <Polygon
           points={points}
-          fill={earned ? "#09090B" : "#FFFFFF"}
-          stroke={earned ? "#09090B" : "#E5E7EB"}
+          fill={earned ? color : "#FFFFFF"}
+          stroke={earned ? color : "#E5E7EB"}
           strokeWidth={7}
           strokeLinejoin="round"
         />
@@ -49,8 +79,8 @@ export default function BadgeMedal({
             cx={centre}
             cy={centre}
             r={ringRadius}
-            stroke="#09090B"
-            strokeWidth={2}
+            stroke={color}
+            strokeWidth={2.5}
             strokeLinecap="round"
             strokeDasharray={`${circumference * progress} ${circumference}`}
             // Start the arc at twelve o'clock.
@@ -63,7 +93,7 @@ export default function BadgeMedal({
       <View className="absolute inset-0 items-center justify-center">
         <Icon
           size={Math.round(size * 0.36)}
-          color={earned ? "#FFFFFF" : "#A1A1AA"}
+          color={earned ? glyphOn(color) : "#A1A1AA"}
           strokeWidth={2}
         />
       </View>

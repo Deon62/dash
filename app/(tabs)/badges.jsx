@@ -1,9 +1,13 @@
 import { Text, View } from "react-native";
+import { Flame } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import BadgeMedal from "@/components/BadgeMedal";
 import { BADGES } from "@/theme/badges";
 import { useTransitStore } from "@/store/useTransitStore";
+
+/** Warm hue for the streak flame — the one colour on the page's header row. */
+const STREAK_COLOR = "#eb6834";
 
 export default function BadgesScreen() {
   const streakDays = useTransitStore((state) => state.profile.streakDays);
@@ -23,8 +27,9 @@ export default function BadgesScreen() {
       </View>
 
       {/* Streak — a figure, not a card */}
-      <View className="flex-row items-baseline mt-1">
-        <Text className="font-jk-black text-brand-black text-[40px] leading-[44px]">
+      <View className="flex-row items-center mt-1">
+        <Flame size={30} color={STREAK_COLOR} fill={STREAK_COLOR} strokeWidth={1.6} />
+        <Text className="font-jk-black text-brand-black text-[40px] leading-[44px] ml-1.5">
           {streakDays}
         </Text>
         <Text className="font-jk-semi text-brand-slate text-[14px] ml-2">
@@ -56,6 +61,7 @@ function BadgeGrid({ badges, label }) {
           <View key={badge.id} className="w-1/3 items-center mb-7 px-1">
             <BadgeMedal
               Icon={badge.Icon}
+              color={badge.color}
               earned={badge.earned}
               progress={badge.progress}
             />
