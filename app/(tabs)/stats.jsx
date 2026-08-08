@@ -2,128 +2,200 @@ import { useMemo } from "react";
 import { Text, View } from "react-native";
 
 import Screen from "@/components/Screen";
-import SectionHeading from "@/components/SectionHeading";
-import StatCard from "@/components/StatCard";
+import DonutChart from "@/components/DonutChart";
+import PeriodPicker from "@/components/PeriodPicker";
+import TrendChart from "@/components/TrendChart";
 import { MODE_KEYS, TRANSIT_MODES } from "@/theme/transitModes";
+import { getPeriod } from "@/theme/periods";
 import { useTransitStore } from "@/store/useTransitStore";
 
-// Greyscale ramp for the split bar — mode identity comes from the icon and
-// label beneath it, so the chart itself stays monochrome.
-const SPLIT_TONES = ["#09090B", "#52525B", "#A1A1AA", "#D4D4D8"];
+function formatHours(minutes) {
+  if (minutes < 60) return `${minutes}m`;
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return m ? `${h}h ${m}m` : `${h}h`;
+}
+
+/** Label + value, no container. */
+function Figure({ label, value, unit }) {
+  return (
+    <View className="flex-1 items-center">
+      <Text className="font-jk-bold text-brand-muted text-[9px] tracking-[1.5px]">
+        {label}
+      </Text>
+      <View className="flex-row items-baseline mt-1.5">
+        <Text className="font-jk-black text-brand-black text-[19px]">{value}</Text>
+        {unit ? (
+          <Text className="font-jk-semi text-brand-muted text-[11px] ml-1">
+            {unit}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+}
 
 export default function StatsScreen() {
   const recentRides = useTransitStore((state) => state.recentRides);
+  const statsPeriod = useTransitStore((state) => state.statsPeriod);
+  const setStatsPeriod = useTransitStore((state) => state.setStatsPeriod);
 
-  const summary = useMemo(() => {
-    const totals = { minutes: 0, km: 0, fare: 0 };
-    const byMode = Object.fromEntries(MODE_KEYS.map((key) => [key, 0]));
+  const period = getPeriod(statsPeriod);
 
-    for (const ride of recentRides) {
-      totals.minutes += ride.durationMin;
-      totals.km += ride.distanceKm;
-      totals.fare += ride.fare;
-      if (byMode[ride.vehicleType] !== undefined) byMode[ride.vehicleType] += 1;
+  const rides = useMemo(() => {
+    const cutoff = Date.now() - period.days * 86400000;
+    return recentRides.filter((ride) => ride.startTime.getTime() >= cutoff);
+  }, [recentRides, period.days]);
+
+  const { totals, byMode, count } = useMemo(() => {
+    const t = { minutes: 0, km: 0, fare: 0 };
+    const m = Object.fromEntries(
+      MODE_KEYS.map((key) => [key, { rides: 0, minutes: 0, km: 0, fare: 0 }])
+    );
+
+    for (const ride of rides) {
+      t.minutes += ride.durationMin;
+      t.km += ride.distanceKm;
+      t.fare += ride.fare;
+
+      const bucket = m[ride.vehicleType] ?? m.other;
+      bucket.rides += 1;
+      bucket.minutes += ride.durationMin;
+      bucket.km += ride.distanceKm;
+      bucket.fare += ride.fare;
     }
 
-    return { totals, byMode, count: recentRides.length };
-  }, [recentRides]);
+    return { totals: t, byMode: m, count: rides.length };
+  }, [rides]);
+
+  // Colour follows the mode, so both charts and the list agree by construction.
+  const series = MODE_KEYS.map((key) => ({
+    key,
+    label: TRANSIT_MODES[key].label,
+    color: TRANSIT_MODES[key].color,
+    rides: byMode[key].rides,
+  }));
+
+  const activeModes = series.filter((s) => s.rides > 0).length;
+
+  // Bucket the window into a handful of equal slices — enough shape to read a
+  // trend, few enough that the x-axis stays legible on a phone.
+  const trend = useMemo(() => {
+    const buckets = period.days <= 7 ? 7 : 6;
+    const span = (period.days * 86400000) / buckets;
+    const start = Date.now() - period.days * 86400000;
+
+    const totals = new Array(buckets).fill(0);
+    for (const ride of rides) {
+      const index = Math.min(
+        buckets - 1,
+        Math.floor((ride.startTime.getTime() - start) / span)
+      );
+      if (index >= 0) totals[index] += ride.durationMin;
+    }
+
+    const fmt = new Intl.DateTimeFormat("en-GB", { day: "numeric", month: "short" });
+
+    return {
+      bucketLabel: period.days <= 7 ? "day" : `${Math.round(period.days / buckets)} days`,
+      points: totals.map((minutes, i) => ({
+        label: fmt.format(new Date(start + i * span)),
+        value: Number((minutes / 60).toFixed(1)),
+      })),
+    };
+  }, [rides, period.days]);
 
   return (
     <Screen>
-      <SectionHeading eyebrow="This month" title="Your commute, measured" />
-
-      <View className="flex-row gap-x-3">
-        <StatCard
-          label="Time moving"
-          value={Math.round(summary.totals.minutes / 60)}
-          unit="hrs"
-          caption={`${summary.totals.minutes} min across ${summary.count} rides`}
-        />
-        <StatCard
-          label="Distance"
-          value={summary.totals.km.toFixed(1)}
-          unit="km"
-          caption="Enough to cross the city 4×"
-        />
+      {/* One filter, above everything it scopes. */}
+      <View className="flex-row items-start justify-between">
+        <View className="flex-1 pr-3">
+          <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[2px]">
+            YOUR COMMUTE
+          </Text>
+          <Text className="font-jk-black text-brand-black text-[23px] leading-[29px] mt-1.5">
+            {period.heading}
+          </Text>
+        </View>
+        <PeriodPicker value={statsPeriod} onChange={setStatsPeriod} />
       </View>
 
-      <View className="flex-row gap-x-3">
-        <StatCard
-          label="Spend"
-          value={summary.totals.fare}
-          unit="KES"
-          caption="Fares logged so far"
-        />
-        <StatCard
-          label="Avg leg"
-          value={
-            summary.count
-              ? Math.round(summary.totals.minutes / summary.count)
-              : 0
-          }
-          unit="min"
-          caption="Door to door"
-        />
+      <View className="flex-row mt-1">
+        <Figure label="TIME" value={formatHours(totals.minutes)} />
+        <Figure label="DISTANCE" value={totals.km.toFixed(1)} unit="km" />
+        <Figure label="SPEND" value={totals.fare} unit="KES" />
       </View>
 
-      {/* Mode split */}
-      <View className="rounded-3xl border border-brand-border bg-brand-white p-5">
-        <Text className="font-jk-bold text-brand-slate text-[10px] tracking-[2px]">
-          MODE SPLIT
-        </Text>
+      {/* Part-to-whole: which modes make up the month */}
+      <View className="items-center mt-6">
+        <DonutChart
+          segments={series.map((s) => ({
+            key: s.key,
+            value: s.rides,
+            color: s.color,
+          }))}
+        >
+          {/* The one hero figure on this view. */}
+          <Text className="font-jk-black text-brand-black text-[48px] leading-[54px]">
+            {count}
+          </Text>
+          <Text className="font-jk text-brand-muted text-[12px] mt-0.5">
+            {activeModes === 1 ? "ride in 1 mode" : `rides in ${activeModes} modes`}
+          </Text>
+        </DonutChart>
+      </View>
 
-        <View className="flex-row h-3 rounded-full overflow-hidden mt-4 gap-x-0.5">
-          {MODE_KEYS.map((key, i) => {
-            const share = summary.count ? summary.byMode[key] / summary.count : 0;
-            if (share === 0) return null;
-            return (
+      {/* Legend + table view in one: every value is readable here. */}
+      <View className="gap-y-3.5 mt-7">
+        {series.map((s) => {
+          const pct = count ? Math.round((s.rides / count) * 100) : 0;
+
+          return (
+            <View key={s.key} className="flex-row items-center">
               <View
-                key={key}
-                style={{ flex: share, backgroundColor: SPLIT_TONES[i] }}
+                style={{ backgroundColor: s.color }}
+                className="h-2.5 w-2.5 rounded-full"
               />
-            );
-          })}
-        </View>
+              <Text className="font-jk-semi text-brand-black text-[13px] ml-3 w-[86px]">
+                {s.label}
+              </Text>
 
-        <View className="gap-y-3 mt-5">
-          {MODE_KEYS.map((key) => {
-            const mode = TRANSIT_MODES[key];
-            const rides = summary.byMode[key];
-            const pct = summary.count
-              ? Math.round((rides / summary.count) * 100)
-              : 0;
-
-            return (
-              <View key={key} className="flex-row items-center">
-                <View className="h-7 w-7 items-center justify-center rounded-lg bg-brand-black/[0.04]">
-                  <mode.Icon size={14} color="#09090B" strokeWidth={2.1} />
-                </View>
-                <Text className="font-jk-semi text-brand-black text-[13px] flex-1 ml-2.5">
-                  {mode.label}
-                </Text>
-                <Text className="font-jk text-brand-slate text-[12px] mr-3">
-                  {rides} {rides === 1 ? "ride" : "rides"}
-                </Text>
-                <Text className="font-jk-black text-brand-black text-[13px] w-10 text-right">
-                  {pct}%
-                </Text>
+              {/* Share track — the fill is the mark, the text stays in ink. */}
+              <View className="flex-1 h-1.5 rounded-full bg-brand-hairline overflow-hidden mr-3">
+                <View
+                  style={{ width: `${pct}%`, backgroundColor: s.color }}
+                  className="h-full rounded-full"
+                />
               </View>
-            );
-          })}
-        </View>
+
+              <Text
+                style={{ fontVariant: ["tabular-nums"] }}
+                className="font-jk-semi text-brand-muted text-[12px] w-8 text-right"
+              >
+                {pct}%
+              </Text>
+              <Text
+                style={{ fontVariant: ["tabular-nums"] }}
+                className="font-jk-bold text-brand-black text-[12px] w-12 text-right"
+              >
+                {s.rides} {s.rides === 1 ? "ride" : "rides"}
+              </Text>
+            </View>
+          );
+        })}
       </View>
 
-      <View className="rounded-3xl border border-brand-border bg-brand-white p-5">
-        <Text className="font-jk-bold text-brand-slate text-[10px] tracking-[2px]">
-          COMING SOON
+      {/* Change over time — a different question from the ring's composition */}
+      <View className="mt-9">
+        <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[2px]">
+          TIME IN TRANSIT
         </Text>
-        <Text className="font-jk-black text-brand-black text-[20px] leading-[26px] mt-2">
-          Hour-by-hour heatmap
+        <Text className="font-jk-semi text-brand-slate text-[12px] mt-1">
+          Hours per {trend.bucketLabel}
         </Text>
-        <Text className="font-jk text-brand-slate text-[13px] leading-[19px] mt-1.5">
-          Once a week of motion data is captured, this panel will show when you
-          actually leave the house versus when you think you do.
-        </Text>
+        <View className="mt-5">
+          <TrendChart points={trend.points} valueLabel="h" />
+        </View>
       </View>
     </Screen>
   );

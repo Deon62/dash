@@ -8,6 +8,9 @@ import { SHEET_PEEK_HEIGHT } from "@/theme/layout";
 import { useTransitStore } from "@/store/useTransitStore";
 import { impact, notify } from "@/lib/haptics";
 
+/** Ride history goes back a year; the sheet only ever shows the newest few. */
+const RECENT_LIMIT = 6;
+
 /**
  * Contents of the pull-up trip sheet.
  *
@@ -126,8 +129,9 @@ export default function TripSheet({ bottomPadding = 0 }) {
         </Text>
       </View>
 
+      {/* History runs back a year; the sheet shows only the newest handful. */}
       <View className="gap-y-2.5 mt-3.5">
-        {recentRides.map((ride) => (
+        {recentRides.slice(0, RECENT_LIMIT).map((ride) => (
           <RideRow key={ride.id} ride={ride} />
         ))}
       </View>

@@ -1,56 +1,7 @@
 import { create } from "zustand";
 
-/**
- * Placeholder ride data so every screen has something to render before the
- * motion-detection layer exists. Shape mirrors what the detector will emit.
- */
-const MOCK_RECENT_RIDES = [
-  {
-    id: "r-1",
-    vehicleType: "matatu",
-    route: "Route 46 · Kawangware → CBD",
-    startTime: new Date("2026-08-08T07:12:00"),
-    durationMin: 38,
-    distanceKm: 9.4,
-    fare: 70,
-  },
-  {
-    id: "r-2",
-    vehicleType: "boda",
-    route: "CBD → Upper Hill",
-    startTime: new Date("2026-08-08T08:05:00"),
-    durationMin: 11,
-    distanceKm: 3.1,
-    fare: 150,
-  },
-  {
-    id: "r-3",
-    vehicleType: "tuktuk",
-    route: "Upper Hill → Kilimani",
-    startTime: new Date("2026-08-07T18:40:00"),
-    durationMin: 16,
-    distanceKm: 4.2,
-    fare: 200,
-  },
-  {
-    id: "r-4",
-    vehicleType: "matatu",
-    route: "Route 111 · Ngong → CBD",
-    startTime: new Date("2026-08-07T06:55:00"),
-    durationMin: 44,
-    distanceKm: 12.8,
-    fare: 100,
-  },
-  {
-    id: "r-5",
-    vehicleType: "other",
-    route: "Rideshare · Westlands → Home",
-    startTime: new Date("2026-08-06T21:15:00"),
-    durationMin: 27,
-    distanceKm: 8.0,
-    fare: 620,
-  },
-];
+import { DEFAULT_PERIOD } from "@/theme/periods";
+import { generateRides } from "@/lib/mockRides";
 
 const EMPTY_TRIP = {
   vehicleType: null,
@@ -62,15 +13,21 @@ export const useTransitStore = create((set, get) => ({
   /** The person the header avatar and Wrapped card belong to. */
   profile: {
     name: "Daniel Ochieng",
+    email: "daniel@transit.app",
     initials: "DO",
     homeCity: "Nairobi",
     memberSince: "2025",
+    streakDays: 12,
   },
 
   /** `{ vehicleType, startTime, isDetecting }` — null vehicleType means idle. */
   activeTrip: EMPTY_TRIP,
 
-  recentRides: MOCK_RECENT_RIDES,
+  recentRides: generateRides(),
+
+  /** Reporting window for the Stats page — a key from `theme/periods`. */
+  statsPeriod: DEFAULT_PERIOD,
+  setStatsPeriod: (statsPeriod) => set({ statsPeriod }),
 
   /** Flip the sensor listener on/off without committing to a vehicle yet. */
   toggleDetection: () =>
@@ -121,4 +78,11 @@ export const useTransitStore = create((set, get) => ({
     set((state) => ({ recentRides: [ride, ...state.recentRides] })),
 
   resetTrip: () => set({ activeTrip: EMPTY_TRIP }),
+
+  /**
+   * Placeholder sign-out: clears session state only. There is no auth layer
+   * yet, so this does not revoke a token or navigate anywhere — wire it up
+   * when accounts land.
+   */
+  logout: () => set({ activeTrip: EMPTY_TRIP, recentRides: [] }),
 }));

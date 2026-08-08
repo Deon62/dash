@@ -9,7 +9,7 @@ export default function SectionHeading({ eyebrow, title, action }) {
             {eyebrow.toUpperCase()}
           </Text>
         ) : null}
-        <Text className="font-jk-black text-brand-black text-[22px] leading-[28px] mt-1">
+        <Text className="font-jk-black text-brand-black text-[19px] leading-[25px] mt-1">
           {title}
         </Text>
       </View>
