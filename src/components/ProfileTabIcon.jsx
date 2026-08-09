@@ -12,6 +12,7 @@ export default function ProfileTabIcon({ size = 23, color, strokeWidth }) {
   const avatarUri = useTransitStore((state) => state.profile.avatarUri);
 
   if (!avatarUri) {
+    // No photo yet — the outline glyph, same as a fresh account elsewhere.
     return <CircleUser size={size} color={color} strokeWidth={strokeWidth} />;
   }
 

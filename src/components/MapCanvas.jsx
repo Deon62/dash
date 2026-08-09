@@ -87,6 +87,7 @@ export default function MapCanvas() {
   const firstFix = useRef(true);
   const [granted, setGranted] = useState(false);
 
+
   useEffect(() => {
     let subscription;
     let cancelled = false;

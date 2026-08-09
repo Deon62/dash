@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Building2, ChevronLeft, Mail, UserRound } from "lucide-react-native";
+import { ChevronLeft, Mail, UserRound } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import TextField from "@/components/TextField";
@@ -16,16 +16,14 @@ export default function AccountScreen() {
 
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
-  const [homeCity, setHomeCity] = useState(profile.homeCity);
 
-  const dirty =
-    name !== profile.name ||
-    email !== profile.email ||
-    homeCity !== profile.homeCity;
+  // Home city lives on its own settings page, not here.
+  const dirty = name !== profile.name || email !== profile.email;
 
   const save = () => {
+    if (!dirty) return;
     impact("medium");
-    updateProfile({ name: name.trim(), email: email.trim(), homeCity: homeCity.trim() });
+    updateProfile({ name: name.trim(), email: email.trim() });
     notify("success");
     router.back();
   };
@@ -45,16 +43,7 @@ export default function AccountScreen() {
         <ChevronLeft size={19} color="#09090B" strokeWidth={2.2} />
       </Pressable>
 
-      <View className="mt-1">
-        <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[2px]">
-          YOUR ACCOUNT
-        </Text>
-        <Text className="font-jk-black text-brand-black text-[23px] leading-[29px] mt-1.5">
-          Personal details
-        </Text>
-      </View>
-
-      <View className="items-center mt-4">
+      <View className="items-center mt-2">
         <AvatarPicker />
       </View>
 
@@ -77,14 +66,6 @@ export default function AccountScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           autoComplete="email"
-        />
-        <TextField
-          label="Home city"
-          value={homeCity}
-          onChangeText={setHomeCity}
-          placeholder="Where you commute"
-          Icon={Building2}
-          autoCapitalize="words"
         />
       </View>
 

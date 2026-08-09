@@ -1,7 +1,6 @@
 import { create } from "zustand";
 
 import { DEFAULT_PERIOD } from "@/theme/periods";
-import { generateRides } from "@/lib/mockRides";
 
 const EMPTY_TRIP = {
   vehicleType: null,
@@ -9,19 +8,24 @@ const EMPTY_TRIP = {
   isDetecting: false,
 };
 
+/**
+ * A brand-new account. Nothing is seeded — every screen renders its empty
+ * state until the user logs a trip or a backend supplies real history.
+ */
+const EMPTY_PROFILE = {
+  name: "",
+  email: "",
+  phone: null,
+  initials: "",
+  /** Local file URI from the picker; empty falls back to a placeholder glyph. */
+  avatarUri: null,
+  homeCity: "",
+  memberSince: String(new Date().getFullYear()),
+  streakDays: 0,
+};
+
 export const useTransitStore = create((set, get) => ({
-  /** The person the header avatar and Wrapped card belong to. */
-  profile: {
-    name: "Daniel Ochieng",
-    email: "daniel@transit.app",
-    phone: null,
-    initials: "DO",
-    /** Local file URI from the picker; null falls back to the initials. */
-    avatarUri: null,
-    homeCity: "Nairobi",
-    memberSince: "2025",
-    streakDays: 12,
-  },
+  profile: { ...EMPTY_PROFILE },
 
   /** Everything reachable from the profile settings list. */
   settings: {
@@ -64,10 +68,8 @@ export const useTransitStore = create((set, get) => ({
   signIn: (identity = {}) =>
     set((state) => ({
       isAuthenticated: true,
-      // Signing out clears the local history; signing back in re-seeds it.
-      // Stands in for fetching the user's rides from a server — without this
-      // every screen stays empty after the first logout.
-      recentRides: state.recentRides.length ? state.recentRides : generateRides(),
+      // Ride history will come from the backend on sign-in. Until then a new
+      // session simply starts empty.
       profile: {
         ...state.profile,
         ...(identity.email ? { email: identity.email } : {}),
@@ -79,11 +81,19 @@ export const useTransitStore = create((set, get) => ({
   /** `{ vehicleType, startTime, isDetecting }` — null vehicleType means idle. */
   activeTrip: EMPTY_TRIP,
 
-  recentRides: generateRides(),
+  recentRides: [],
 
   /** Reporting window for the Stats page — a key from `theme/periods`. */
   statsPeriod: DEFAULT_PERIOD,
   setStatsPeriod: (statsPeriod) => set({ statsPeriod }),
+
+  /**
+   * Set when the (simulated) detector believes a trip has started but the mode
+   * is still unknown. The Trips screen turns this into a prompt.
+   */
+  pendingDetection: false,
+  flagDetection: () => set({ pendingDetection: true }),
+  dismissDetection: () => set({ pendingDetection: false }),
 
   /** Flip the sensor listener on/off without committing to a vehicle yet. */
   toggleDetection: () =>
@@ -97,6 +107,7 @@ export const useTransitStore = create((set, get) => ({
   /** Detector (or the user) settled on a mode — start the clock. */
   startTrip: (vehicleType) =>
     set({
+      pendingDetection: false,
       activeTrip: {
         vehicleType,
         startTime: new Date(),
@@ -105,7 +116,7 @@ export const useTransitStore = create((set, get) => ({
     }),
 
   /** Close the active trip and push it onto the recents list. */
-  endTrip: () => {
+  endTrip: (fare = 0) => {
     const { activeTrip, recentRides } = get();
     if (!activeTrip.vehicleType || !activeTrip.startTime) {
       set({ activeTrip: EMPTY_TRIP });
@@ -123,8 +134,9 @@ export const useTransitStore = create((set, get) => ({
       route: "Unnamed trip",
       startTime: activeTrip.startTime,
       durationMin,
+      // Distance needs real GPS tracking; the fare is whatever the rider paid.
       distanceKm: 0,
-      fare: 0,
+      fare: Number(fare) || 0,
     };
 
     set({ activeTrip: EMPTY_TRIP, recentRides: [ride, ...recentRides] });
@@ -149,17 +161,10 @@ export const useTransitStore = create((set, get) => ({
    * can be trusted to actually remove anything.
    */
   deleteAccount: () =>
-    set((state) => ({
+    set({
       activeTrip: EMPTY_TRIP,
       recentRides: [],
       isAuthenticated: false,
-      profile: {
-        ...state.profile,
-        name: "",
-        email: "",
-        phone: null,
-        avatarUri: null,
-        initials: "",
-      },
-    })),
+      profile: { ...EMPTY_PROFILE },
+    }),
 }));

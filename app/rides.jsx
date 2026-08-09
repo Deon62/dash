@@ -5,6 +5,8 @@ import { ChevronLeft } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import RideRow from "@/components/RideRow";
+import EmptyState from "@/components/EmptyState";
+import TripArt from "../assets/trip.svg";
 import { useTransitStore } from "@/store/useTransitStore";
 import { impact } from "@/lib/haptics";
 
@@ -67,9 +69,11 @@ export default function RidesScreen() {
       </View>
 
       {days.length === 0 ? (
-        <Text className="font-jk text-brand-muted text-[13px] mt-4">
-          No rides logged yet.
-        </Text>
+        <EmptyState
+          Art={TripArt}
+          title="No rides yet"
+          message="Every trip you log will be listed here, grouped by day."
+        />
       ) : (
         days.map((day) => {
           const minutes = day.rides.reduce((sum, r) => sum + r.durationMin, 0);

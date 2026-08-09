@@ -5,6 +5,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import MapCanvas from "@/components/MapCanvas";
 import TripSheet from "@/components/TripSheet";
+import DetectionPrompt from "@/components/DetectionPrompt";
+import { useTransitStore } from "@/store/useTransitStore";
 import {
   SHEET_HANDLE_HEIGHT,
   SHEET_PEEK_HEIGHT,
@@ -14,6 +16,10 @@ import {
 export default function TripsScreen() {
   const sheetRef = useRef(null);
   const insets = useSafeAreaInsets();
+
+  // Raised by the detection layer once it exists; nothing sets it today.
+  const pendingDetection = useTransitStore((s) => s.pendingDetection);
+  const dismissDetection = useTransitStore((s) => s.dismissDetection);
 
   const tabBarHeight = getTabBarHeight(insets);
 
@@ -29,6 +35,16 @@ export default function TripsScreen() {
   return (
     <View className="flex-1 bg-brand-canvas">
       <MapCanvas />
+
+      <DetectionPrompt
+        visible={pendingDetection}
+        onLater={dismissDetection}
+        onChoose={() => {
+          dismissDetection();
+          // Open the sheet at the mode picker rather than making them drag.
+          sheetRef.current?.snapToIndex(1);
+        }}
+      />
 
       <BottomSheet
         ref={sheetRef}

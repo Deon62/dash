@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
-import { Camera } from "lucide-react-native";
+import { Camera, UserRound } from "lucide-react-native";
 
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useTransitStore } from "@/store/useTransitStore";
@@ -76,10 +76,13 @@ export default function AvatarPicker() {
             style={{ width: SIZE, height: SIZE }}
             resizeMode="cover"
           />
-        ) : (
+        ) : profile.initials ? (
           <Text className="font-jk-black text-brand-white text-[30px] tracking-[1px]">
             {profile.initials}
           </Text>
+        ) : (
+          // No photo and no name yet — a glyph beats two blank letters.
+          <UserRound size={38} color="#FFFFFF" strokeWidth={1.8} />
         )}
       </View>
 

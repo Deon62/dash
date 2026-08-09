@@ -44,7 +44,7 @@ function PulseRing({ delay = 0 }) {
   );
 }
 
-export default function MapCanvas() {
+export default function MapCanvas(_props) {
   return (
     <View
       // Approximates the Google basemap ground so the stand-in reads the same.

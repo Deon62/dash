@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 
 import { getMode } from "@/theme/transitModes";
+import { useTransitStore } from "@/store/useTransitStore";
 
 const timeFormatter = new Intl.DateTimeFormat("en-GB", {
   hour: "2-digit",
@@ -10,6 +11,7 @@ const timeFormatter = new Intl.DateTimeFormat("en-GB", {
 export default function RideRow({ ride }) {
   const mode = getMode(ride.vehicleType);
   const { Icon } = mode;
+  const currency = useTransitStore((state) => state.settings.currency);
 
   return (
     <View className="flex-row items-center rounded-2xl border border-brand-hairline bg-white p-3.5">
@@ -40,7 +42,7 @@ export default function RideRow({ ride }) {
       </View>
 
       <Text className="font-jk-black text-brand-black text-[14px]">
-        KES {ride.fare}
+        {currency} {ride.fare}
       </Text>
     </View>
   );

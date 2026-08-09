@@ -1,7 +1,10 @@
 import { Pressable, Text, View } from "react-native";
+import { useState } from "react";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
 import { useRouter } from "expo-router";
 import { ChevronRight, List, Play, Square } from "lucide-react-native";
+
+import FarePrompt from "@/components/FarePrompt";
 
 import { MODE_KEYS, TRANSIT_MODES, getMode } from "@/theme/transitModes";
 import { SHEET_PEEK_HEIGHT } from "@/theme/layout";
@@ -20,6 +23,7 @@ import { impact, notify } from "@/lib/haptics";
  */
 export default function TripSheet({ bottomPadding = 0 }) {
   const router = useRouter();
+  const [askingFare, setAskingFare] = useState(false);
   const activeTrip = useTransitStore((state) => state.activeTrip);
   const recentRides = useTransitStore((state) => state.recentRides);
   const toggleDetection = useTransitStore((state) => state.toggleDetection);
@@ -55,12 +59,9 @@ export default function TripSheet({ bottomPadding = 0 }) {
           <Pressable
             onPress={() => {
               impact("medium");
-              if (onTrip) {
-                endTrip();
-                notify("success");
-              } else {
-                toggleDetection();
-              }
+              // Ending a trip asks for the fare before it's written to history.
+              if (onTrip) setAskingFare(true);
+              else toggleDetection();
             }}
             accessibilityRole="button"
             accessibilityLabel={onTrip ? "End trip" : "Start detecting"}
@@ -147,6 +148,20 @@ export default function TripSheet({ bottomPadding = 0 }) {
         </View>
         <ChevronRight size={16} color="#A1A1AA" strokeWidth={2.2} />
       </Pressable>
+
+      <FarePrompt
+        visible={askingFare}
+        modeLabel={activeMode?.label}
+        onSubmit={(fare) => {
+          setAskingFare(false);
+          endTrip(fare);
+          notify("success");
+        }}
+        onSkip={() => {
+          setAskingFare(false);
+          endTrip(0);
+        }}
+      />
     </BottomSheetScrollView>
   );
 }

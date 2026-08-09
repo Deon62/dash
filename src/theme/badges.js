@@ -13,9 +13,9 @@ import {
 /**
  * Achievement definitions.
  *
- * `progress` is 0–1 toward unlocking and drives the ring on locked medallions;
- * earned badges ignore it. Static for now — wire these to real ride totals when
- * the detection layer lands.
+ * Every badge starts locked and unearned — users unlock them one at a time.
+ * `progress` (0–1) drives the ring on a locked medallion; it is absent until a
+ * backend can compute real progress from ride totals.
  *
  * `color` is decorative identity, not a data encoding — badges are never
  * compared to each other by hue, and each carries its own glyph and title. The
@@ -31,7 +31,7 @@ export const BADGES = [
     Icon: Sunrise,
     title: "Early Riser",
     detail: "10 trips before 7am",
-    earned: true,
+    earned: false,
   },
   {
     id: "lane-splitter",
@@ -39,7 +39,7 @@ export const BADGES = [
     Icon: Bike,
     title: "Lane Splitter",
     detail: "25 boda rides",
-    earned: true,
+    earned: false,
   },
   {
     id: "three-wheeler",
@@ -47,7 +47,7 @@ export const BADGES = [
     Icon: CarTaxiFront,
     title: "Three Wheeler",
     detail: "15 tuk-tuk rides",
-    earned: true,
+    earned: false,
   },
   {
     id: "regular",
@@ -55,7 +55,7 @@ export const BADGES = [
     Icon: CalendarCheck,
     title: "The Regular",
     detail: "30 day streak",
-    earned: true,
+    earned: false,
   },
   {
     id: "century",
@@ -64,7 +64,6 @@ export const BADGES = [
     title: "Century Club",
     detail: "100 km in a week",
     earned: false,
-    progress: 0.72,
   },
   {
     id: "night-owl",
@@ -73,7 +72,6 @@ export const BADGES = [
     title: "Night Owl",
     detail: "20 trips after 10pm",
     earned: false,
-    progress: 0.45,
   },
   {
     id: "fare-hawk",
@@ -82,7 +80,6 @@ export const BADGES = [
     title: "Fare Hawk",
     detail: "Log 50 fares",
     earned: false,
-    progress: 0.6,
   },
   {
     id: "long-hauler",
@@ -91,7 +88,6 @@ export const BADGES = [
     title: "Long Hauler",
     detail: "A 60 min single leg",
     earned: false,
-    progress: 0.3,
   },
   {
     id: "city-royalty",
@@ -100,6 +96,5 @@ export const BADGES = [
     title: "City Royalty",
     detail: "1,000 km all-time",
     earned: false,
-    progress: 0.12,
   },
 ];

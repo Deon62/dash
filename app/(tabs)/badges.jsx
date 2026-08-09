@@ -41,7 +41,11 @@ export default function BadgesScreen() {
       </View>
 
       <BadgeGrid badges={earned} label="EARNED" />
-      <BadgeGrid badges={locked} label="IN PROGRESS" />
+      <BadgeGrid
+        badges={locked}
+        // "In progress" would overstate things before anything is under way.
+        label={earned.length ? "IN PROGRESS" : "TO EARN"}
+      />
     </Screen>
   );
 }
@@ -77,9 +81,10 @@ function BadgeGrid({ badges, label }) {
               numberOfLines={2}
               className="font-jk text-brand-muted text-[10px] leading-[14px] text-center mt-0.5"
             >
-              {badge.earned
-                ? badge.detail
-                : `${Math.round((badge.progress ?? 0) * 100)}% · ${badge.detail}`}
+              {/* Only show a percentage once there is real progress to report. */}
+              {!badge.earned && badge.progress
+                ? `${Math.round(badge.progress * 100)}% · ${badge.detail}`
+                : badge.detail}
             </Text>
           </View>
         ))}

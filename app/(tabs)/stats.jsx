@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import { Text, View } from "react-native";
+import { Route, Timer, Wallet } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import ModeBars from "@/components/ModeBars";
+import EmptyState from "@/components/EmptyState";
+import StatsArt from "../../assets/stat.svg";
 import PeriodPicker from "@/components/PeriodPicker";
 import TrendChart from "@/components/TrendChart";
 import { MODE_KEYS, TRANSIT_MODES } from "@/theme/transitModes";
@@ -16,14 +19,23 @@ function formatHours(minutes) {
   return m ? `${h}h ${m}m` : `${h}h`;
 }
 
-/** Label + value, no container. */
-function Figure({ label, value, unit }) {
+/**
+ * Headline scalar with a tinted glyph.
+ *
+ * Not a donut: a ring encodes part-to-whole, and these three measure unrelated
+ * things with no total to divide up — a one-value ring would be decoration
+ * pretending to be a chart. The number is the chart; the glyph just labels it.
+ * Colour here is decorative, and each figure carries its own text label.
+ */
+function Figure({ label, value, unit, Icon, tint }) {
   return (
     <View className="flex-1 items-center">
-      <Text className="font-jk-bold text-brand-muted text-[9px] tracking-[1.5px]">
-        {label}
-      </Text>
-      <View className="flex-row items-baseline mt-1.5">
+      {/* Neutral grey well, circular — the icon carries the only colour. */}
+      <View className="h-11 w-11 items-center justify-center rounded-full bg-brand-black/[0.05]">
+        <Icon size={19} color={tint} strokeWidth={2.2} />
+      </View>
+
+      <View className="flex-row items-baseline mt-2.5">
         <Text className="font-jk-black text-brand-black text-[19px]">{value}</Text>
         {unit ? (
           <Text className="font-jk-semi text-brand-muted text-[11px] ml-1">
@@ -31,6 +43,10 @@ function Figure({ label, value, unit }) {
           </Text>
         ) : null}
       </View>
+
+      <Text className="font-jk-bold text-brand-muted text-[9px] tracking-[1.5px] mt-1">
+        {label}
+      </Text>
     </View>
   );
 }
@@ -39,6 +55,8 @@ export default function StatsScreen() {
   const recentRides = useTransitStore((state) => state.recentRides);
   const statsPeriod = useTransitStore((state) => state.statsPeriod);
   const setStatsPeriod = useTransitStore((state) => state.setStatsPeriod);
+  // Fares follow the currency chosen in settings rather than a hardcoded KES.
+  const currency = useTransitStore((state) => state.settings.currency);
 
   const period = getPeriod(statsPeriod);
 
@@ -113,6 +131,20 @@ export default function StatsScreen() {
     };
   }, [rides, period.days]);
 
+  // With nothing logged there is no period to filter and no figures to show —
+  // the whole page reduces to one centred message.
+  if (count === 0) {
+    return (
+      <Screen contentStyle={{ flexGrow: 1, rowGap: 0 }}>
+        <EmptyState
+          Art={StatsArt}
+          title="Nothing logged yet"
+          message="Start a trip on the Trips tab and your time, distance and spend will show up here."
+        />
+      </Screen>
+    );
+  }
+
   return (
     <Screen>
       {/* One filter, above everything it scopes. */}
@@ -128,10 +160,28 @@ export default function StatsScreen() {
         <PeriodPicker value={statsPeriod} onChange={setStatsPeriod} />
       </View>
 
-      <View className="flex-row mt-1">
-        <Figure label="TIME" value={formatHours(totals.minutes)} />
-        <Figure label="DISTANCE" value={totals.km.toFixed(1)} unit="km" />
-        <Figure label="SPEND" value={totals.fare} unit="KES" />
+      <>
+      <View className="flex-row mt-2">
+        <Figure
+          label="TIME"
+          value={formatHours(totals.minutes)}
+          Icon={Timer}
+          tint="#2a78d6"
+        />
+        <Figure
+          label="DISTANCE"
+          value={totals.km.toFixed(1)}
+          unit="km"
+          Icon={Route}
+          tint="#1baf7a"
+        />
+        <Figure
+          label="SPEND"
+          value={totals.fare}
+          unit={currency}
+          Icon={Wallet}
+          tint="#eb6834"
+        />
       </View>
 
       {/* The one hero figure on this view. */}
@@ -150,7 +200,7 @@ export default function StatsScreen() {
         <ModeBars data={series} total={count} />
       </View>
 
-      {/* Change over time — a different question from the ring's composition */}
+      {/* Change over time — a different question from the mode breakdown */}
       <View className="mt-9">
         <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[2px]">
           TIME IN TRANSIT
@@ -162,6 +212,7 @@ export default function StatsScreen() {
           <TrendChart points={trend.points} valueLabel="h" />
         </View>
       </View>
+      </>
     </Screen>
   );
 }

@@ -38,7 +38,10 @@ export default function ProfileScreen() {
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
-  const values = { city: profile.homeCity, currency: settings.currency };
+  const values = {
+    city: profile.homeCity || "Not set",
+    currency: settings.currency,
+  };
 
   return (
     <Screen>
@@ -46,13 +49,17 @@ export default function ProfileScreen() {
         <AvatarPicker />
 
         <Text className="font-jk-black text-brand-black text-[23px] mt-5">
-          {profile.name}
+          {profile.name || "Your name"}
         </Text>
-        <Text className="font-jk text-brand-slate text-[13px] mt-1">
-          {profile.phone || profile.email}
-        </Text>
+        {profile.phone || profile.email ? (
+          <Text className="font-jk text-brand-slate text-[13px] mt-1">
+            {profile.phone || profile.email}
+          </Text>
+        ) : null}
         <Text className="font-jk text-brand-muted text-[12px] mt-1">
-          {profile.homeCity} · commuting since {profile.memberSince}
+          {profile.homeCity
+            ? `${profile.homeCity} · commuting since ${profile.memberSince}`
+            : `Commuting since ${profile.memberSince}`}
         </Text>
       </View>
 

@@ -6,9 +6,9 @@ import {
   CarTaxiFront,
   Caravan,
   Ellipsis,
-  Music4,
+  Scooter,
   TrainFront,
-  Zap,
+  Van,
 } from "lucide-react-native";
 
 /**
@@ -26,12 +26,12 @@ import {
 export const TRANSIT_MODES = {
   matatu: { key: "matatu", label: "Matatu", Icon: Bus, color: "#2a78d6" },
   bus: { key: "bus", label: "Bus", Icon: BusFront, color: "#eb6834" },
-  // Nganya: the loud, painted, sound-system matatu — hence the glyph.
-  nganya: { key: "nganya", label: "Nganya", Icon: Music4, color: "#1baf7a" },
+  // Nganya: a done-up matatu — same body, newer and louder than the classic.
+  nganya: { key: "nganya", label: "Nganya", Icon: Van, color: "#1baf7a" },
   train: { key: "train", label: "Train", Icon: TrainFront, color: "#eda100" },
   taxi: { key: "taxi", label: "Taxi", Icon: CarTaxiFront, color: "#e87ba4" },
   tuktuk: { key: "tuktuk", label: "Tuk-Tuk", Icon: Caravan, color: "#008300" },
-  motorbike: { key: "motorbike", label: "Boda Boda", Icon: Zap, color: "#4a3aa7" },
+  motorbike: { key: "motorbike", label: "Boda Boda", Icon: Scooter, color: "#4a3aa7" },
   bicycle: { key: "bicycle", label: "Bicycle", Icon: Bike, color: "#e34948" },
   other: { key: "other", label: "Other", Icon: Ellipsis, color: "#52525B" },
 };
