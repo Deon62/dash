@@ -31,7 +31,7 @@ export default function AccountScreen() {
   };
 
   return (
-    <Screen>
+    <Screen keyboardAware>
       <Pressable
         onPress={() => {
           impact("light");

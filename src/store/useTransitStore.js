@@ -23,6 +23,16 @@ export const useTransitStore = create((set, get) => ({
     streakDays: 12,
   },
 
+  /** Everything reachable from the profile settings list. */
+  settings: {
+    motionDetection: true,
+    /** ISO currency code — seeded from the detected country at sign-in. */
+    currency: "KES",
+  },
+
+  updateSettings: (patch) =>
+    set((state) => ({ settings: { ...state.settings, ...patch } })),
+
   setAvatar: (avatarUri) =>
     set((state) => ({ profile: { ...state.profile, avatarUri } })),
 
@@ -54,6 +64,10 @@ export const useTransitStore = create((set, get) => ({
   signIn: (identity = {}) =>
     set((state) => ({
       isAuthenticated: true,
+      // Signing out clears the local history; signing back in re-seeds it.
+      // Stands in for fetching the user's rides from a server — without this
+      // every screen stays empty after the first logout.
+      recentRides: state.recentRides.length ? state.recentRides : generateRides(),
       profile: {
         ...state.profile,
         ...(identity.email ? { email: identity.email } : {}),
@@ -128,4 +142,24 @@ export const useTransitStore = create((set, get) => ({
    */
   logout: () =>
     set({ activeTrip: EMPTY_TRIP, recentRides: [], isAuthenticated: false }),
+
+  /**
+   * Placeholder account deletion: wipes local state only. There is no backend,
+   * so nothing is deleted server-side — wire this to a real endpoint before it
+   * can be trusted to actually remove anything.
+   */
+  deleteAccount: () =>
+    set((state) => ({
+      activeTrip: EMPTY_TRIP,
+      recentRides: [],
+      isAuthenticated: false,
+      profile: {
+        ...state.profile,
+        name: "",
+        email: "",
+        phone: null,
+        avatarUri: null,
+        initials: "",
+      },
+    })),
 }));

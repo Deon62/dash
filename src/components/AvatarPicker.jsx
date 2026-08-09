@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { Alert, Image, Pressable, Text, View } from "react-native";
+import { Image, Pressable, Text, View } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Camera } from "lucide-react-native";
 
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { useTransitStore } from "@/store/useTransitStore";
 import { impact } from "@/lib/haptics";
 
@@ -19,6 +20,7 @@ export default function AvatarPicker() {
   const profile = useTransitStore((state) => state.profile);
   const setAvatar = useTransitStore((state) => state.setAvatar);
   const [busy, setBusy] = useState(false);
+  const [notice, setNotice] = useState(null);
 
   const pick = async () => {
     if (busy) return;
@@ -28,10 +30,10 @@ export default function AvatarPicker() {
     try {
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (!permission.granted) {
-        Alert.alert(
-          "Photo access needed",
-          "Allow photo access to set a profile picture."
-        );
+        setNotice({
+          title: "Photo access needed",
+          message: "Allow photo access in settings to set a profile picture.",
+        });
         return;
       }
 
@@ -46,7 +48,10 @@ export default function AvatarPicker() {
         setAvatar(result.assets[0].uri);
       }
     } catch {
-      Alert.alert("Couldn't open photos", "Please try again.");
+      setNotice({
+        title: "Couldn't open photos",
+        message: "Something went wrong. Please try again.",
+      });
     } finally {
       setBusy(false);
     }
@@ -82,6 +87,15 @@ export default function AvatarPicker() {
       <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-brand-black">
         <Camera size={14} color="#FFFFFF" strokeWidth={2.2} />
       </View>
+
+      <ConfirmDialog
+        visible={Boolean(notice)}
+        title={notice?.title}
+        message={notice?.message}
+        confirmLabel="OK"
+        onConfirm={() => setNotice(null)}
+        onDismiss={() => setNotice(null)}
+      />
     </Pressable>
   );
 }

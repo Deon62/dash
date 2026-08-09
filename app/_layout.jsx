@@ -63,6 +63,8 @@ export default function RootLayout() {
           <Stack.Screen name="rides" />
           <Stack.Screen name="wrapped" />
           <Stack.Screen name="account" />
+          <Stack.Screen name="settings/home-city" />
+          <Stack.Screen name="settings/currency" />
           <Stack.Screen name="login" options={{ animation: "fade" }} />
           <Stack.Screen name="verify" />
         </Stack>
