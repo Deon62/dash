@@ -60,7 +60,11 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="rides" />
           <Stack.Screen name="wrapped" />
+          <Stack.Screen name="account" />
+          <Stack.Screen name="login" options={{ animation: "fade" }} />
+          <Stack.Screen name="sign-up" />
         </Stack>
       </SafeAreaProvider>
     </GestureHandlerRootView>

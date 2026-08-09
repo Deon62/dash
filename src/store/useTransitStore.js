@@ -15,10 +15,43 @@ export const useTransitStore = create((set, get) => ({
     name: "Daniel Ochieng",
     email: "daniel@transit.app",
     initials: "DO",
+    /** Local file URI from the picker; null falls back to the initials. */
+    avatarUri: null,
     homeCity: "Nairobi",
     memberSince: "2025",
     streakDays: 12,
   },
+
+  setAvatar: (avatarUri) =>
+    set((state) => ({ profile: { ...state.profile, avatarUri } })),
+
+  /** Merge a partial profile — used by the account editor. */
+  updateProfile: (patch) =>
+    set((state) => {
+      const profile = { ...state.profile, ...patch };
+      // Keep the fallback initials in step with the name.
+      if (patch.name) {
+        profile.initials =
+          patch.name
+            .trim()
+            .split(/\s+/)
+            .slice(0, 2)
+            .map((part) => part[0]?.toUpperCase() ?? "")
+            .join("") || profile.initials;
+      }
+      return { profile };
+    }),
+
+  /**
+   * Session flag only. There is no auth backend — the sign-in screens set this
+   * so navigation behaves, and nothing here validates a credential.
+   */
+  isAuthenticated: true,
+  signIn: (email) =>
+    set((state) => ({
+      isAuthenticated: true,
+      profile: { ...state.profile, email: email || state.profile.email },
+    })),
 
   /** `{ vehicleType, startTime, isDetecting }` — null vehicleType means idle. */
   activeTrip: EMPTY_TRIP,
@@ -84,5 +117,6 @@ export const useTransitStore = create((set, get) => ({
    * yet, so this does not revoke a token or navigate anywhere — wire it up
    * when accounts land.
    */
-  logout: () => set({ activeTrip: EMPTY_TRIP, recentRides: [] }),
+  logout: () =>
+    set({ activeTrip: EMPTY_TRIP, recentRides: [], isAuthenticated: false }),
 }));

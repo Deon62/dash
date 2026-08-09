@@ -1,15 +1,12 @@
 import { Pressable, Text, View } from "react-native";
 import { BottomSheetScrollView } from "@gorhom/bottom-sheet";
-import { Play, Square } from "lucide-react-native";
+import { useRouter } from "expo-router";
+import { ChevronRight, List, Play, Square } from "lucide-react-native";
 
-import RideRow from "@/components/RideRow";
 import { MODE_KEYS, TRANSIT_MODES, getMode } from "@/theme/transitModes";
 import { SHEET_PEEK_HEIGHT } from "@/theme/layout";
 import { useTransitStore } from "@/store/useTransitStore";
 import { impact, notify } from "@/lib/haptics";
-
-/** Ride history goes back a year; the sheet only ever shows the newest few. */
-const RECENT_LIMIT = 6;
 
 /**
  * Contents of the pull-up trip sheet.
@@ -22,6 +19,7 @@ const RECENT_LIMIT = 6;
  * already read as draggable, the way Bolt's does.
  */
 export default function TripSheet({ bottomPadding = 0 }) {
+  const router = useRouter();
   const activeTrip = useTransitStore((state) => state.activeTrip);
   const recentRides = useTransitStore((state) => state.recentRides);
   const toggleDetection = useTransitStore((state) => state.toggleDetection);
@@ -33,8 +31,12 @@ export default function TripSheet({ bottomPadding = 0 }) {
 
   return (
     <BottomSheetScrollView
-      contentContainerStyle={{ paddingBottom: bottomPadding + 32 }}
-      contentContainerClassName="px-5"
+      // One source of truth for the container: adding contentContainerClassName
+      // alongside this would silently drop the classes.
+      contentContainerStyle={{
+        paddingHorizontal: 20,
+        paddingBottom: bottomPadding + 32,
+      }}
       showsVerticalScrollIndicator={false}
     >
       {/* ---- Peek: everything visible at rest ----
@@ -81,60 +83,70 @@ export default function TripSheet({ bottomPadding = 0 }) {
       <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[2px] mt-1">
         HOW ARE YOU TRAVELLING
       </Text>
-      <View className="flex-row flex-wrap gap-2.5 mt-3.5">
+      {/* Three across — nine modes as a fixed grid rather than a ragged wrap */}
+      <View className="flex-row flex-wrap mt-3.5">
         {MODE_KEYS.map((key) => {
           const mode = TRANSIT_MODES[key];
           const selected = activeTrip.vehicleType === key;
 
           return (
-            <Pressable
-              key={key}
-              onPress={() => {
-                impact("light");
-                startTrip(key);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={mode.label}
-              className={`flex-row items-center gap-x-2 rounded-2xl border px-3.5 py-3 active:opacity-70 ${
-                selected
-                  ? "border-brand-black bg-brand-black"
-                  : "border-brand-hairline bg-white"
-              }`}
-            >
-              <mode.Icon
-                size={17}
-                color={selected ? "#FFFFFF" : "#52525B"}
-                strokeWidth={2.1}
-              />
-              <Text
-                className={`font-jk-bold text-[13px] ${
-                  selected ? "text-brand-white" : "text-brand-black"
+            <View key={key} className="w-1/3 p-1">
+              <Pressable
+                onPress={() => {
+                  impact("light");
+                  startTrip(key);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={mode.label}
+                accessibilityState={selected ? { selected: true } : {}}
+                className={`items-center justify-center rounded-2xl border py-4 active:opacity-70 ${
+                  selected
+                    ? "border-brand-black bg-brand-black"
+                    : "border-brand-hairline bg-white"
                 }`}
               >
-                {mode.label}
-              </Text>
-            </Pressable>
+                <mode.Icon
+                  size={20}
+                  color={selected ? "#FFFFFF" : "#52525B"}
+                  strokeWidth={2.1}
+                />
+                <Text
+                  numberOfLines={1}
+                  className={`font-jk-bold text-[11px] mt-2 ${
+                    selected ? "text-brand-white" : "text-brand-black"
+                  }`}
+                >
+                  {mode.label}
+                </Text>
+              </Pressable>
+            </View>
           );
         })}
       </View>
 
-      <View className="h-px bg-brand-hairline my-6" />
-
-      <View className="flex-row items-end justify-between">
-        <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[2px]">
-          RECENT RIDES
-        </Text>
-        <Text className="font-jk text-brand-muted text-[11px]">
-          {recentRides.length} logged
-        </Text>
-      </View>
-
-      {/* History runs back a year; the sheet shows only the newest handful. */}
-      <View className="gap-y-2.5 mt-3.5">
-        {recentRides.slice(0, RECENT_LIMIT).map((ride) => (
-          <RideRow key={ride.id} ride={ride} />
-        ))}
-      </View>
+      {/* The full history is its own page — the sheet just points at it. */}
+      <Pressable
+        onPress={() => {
+          impact("light");
+          router.push("/rides");
+        }}
+        accessibilityRole="button"
+        accessibilityLabel="All rides"
+        className="flex-row items-center rounded-2xl border border-brand-hairline bg-white px-4 py-4 mt-6 active:opacity-70"
+      >
+        <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-black/[0.04]">
+          <List size={17} color="#09090B" strokeWidth={2} />
+        </View>
+        <View className="flex-1 ml-3.5">
+          <Text className="font-jk-bold text-brand-black text-[14px]">
+            All rides
+          </Text>
+          <Text className="font-jk text-brand-muted text-[11px] mt-0.5">
+            {recentRides.length} logged
+          </Text>
+        </View>
+        <ChevronRight size={16} color="#A1A1AA" strokeWidth={2.2} />
+      </Pressable>
     </BottomSheetScrollView>
   );
 }

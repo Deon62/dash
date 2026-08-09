@@ -19,9 +19,11 @@ export default function TripsScreen() {
 
   // Collapsed height = handle + peek card + room for the bottom bar, so the
   // status card lands fully above the bar and nothing else shows.
+  const collapsedHeight = SHEET_HANDLE_HEIGHT + SHEET_PEEK_HEIGHT + tabBarHeight;
+
   const snapPoints = useMemo(
-    () => [SHEET_HANDLE_HEIGHT + SHEET_PEEK_HEIGHT + tabBarHeight, "62%", "92%"],
-    [tabBarHeight]
+    () => [collapsedHeight, "62%", "92%"],
+    [collapsedHeight]
   );
 
   return (

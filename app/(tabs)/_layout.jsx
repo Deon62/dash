@@ -1,7 +1,8 @@
 import { Tabs } from "expo-router";
-import { ChartColumnBig, CircleUser, Route, Trophy } from "lucide-react-native";
+import { ChartColumnBig, Route, Trophy } from "lucide-react-native";
 
 import BottomTabBar from "@/components/BottomTabBar";
+import ProfileTabIcon from "@/components/ProfileTabIcon";
 
 export default function TabsLayout() {
   return (
@@ -19,7 +20,7 @@ export default function TabsLayout() {
       <Tabs.Screen name="index" options={{ title: "Trips", Icon: Route }} />
       <Tabs.Screen name="stats" options={{ title: "Stats", Icon: ChartColumnBig }} />
       <Tabs.Screen name="badges" options={{ title: "Badges", Icon: Trophy }} />
-      <Tabs.Screen name="profile" options={{ title: "Profile", Icon: CircleUser }} />
+      <Tabs.Screen name="profile" options={{ title: "Profile", Icon: ProfileTabIcon }} />
     </Tabs>
   );
 }

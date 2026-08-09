@@ -31,6 +31,12 @@
       "expo-router",
       "expo-font",
       [
+        "expo-image-picker",
+        {
+          "photosPermission": "Transit needs access to your photos so you can set a profile picture."
+        }
+      ],
+      [
         "expo-location",
         {
           "locationAlwaysAndWhenInUsePermission": "Transit uses your location to detect trips and show where you are on the map."

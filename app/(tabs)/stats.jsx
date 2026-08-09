@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Text, View } from "react-native";
 
 import Screen from "@/components/Screen";
-import DonutChart from "@/components/DonutChart";
+import ModeBars from "@/components/ModeBars";
 import PeriodPicker from "@/components/PeriodPicker";
 import TrendChart from "@/components/TrendChart";
 import { MODE_KEYS, TRANSIT_MODES } from "@/theme/transitModes";
@@ -68,15 +68,23 @@ export default function StatsScreen() {
     return { totals: t, byMode: m, count: rides.length };
   }, [rides]);
 
-  // Colour follows the mode, so both charts and the list agree by construction.
-  const series = MODE_KEYS.map((key) => ({
-    key,
-    label: TRANSIT_MODES[key].label,
-    color: TRANSIT_MODES[key].color,
-    rides: byMode[key].rides,
-  }));
+  // Every mode that actually saw a ride, biggest first. Bars cope with all
+  // nine, so nothing is folded away and no label collides with the real
+  // "Other" mode.
+  const series = useMemo(
+    () =>
+      MODE_KEYS.map((key) => ({
+        key,
+        label: TRANSIT_MODES[key].label,
+        color: TRANSIT_MODES[key].color,
+        value: byMode[key].rides,
+      }))
+        .filter((s) => s.value > 0)
+        .sort((a, b) => b.value - a.value),
+    [byMode]
+  );
 
-  const activeModes = series.filter((s) => s.rides > 0).length;
+  const activeModes = series.length;
 
   // Bucket the window into a handful of equal slices — enough shape to read a
   // trend, few enough that the x-axis stays legible on a phone.
@@ -126,63 +134,20 @@ export default function StatsScreen() {
         <Figure label="SPEND" value={totals.fare} unit="KES" />
       </View>
 
-      {/* Part-to-whole: which modes make up the month */}
-      <View className="items-center mt-6">
-        <DonutChart
-          segments={series.map((s) => ({
-            key: s.key,
-            value: s.rides,
-            color: s.color,
-          }))}
-        >
-          {/* The one hero figure on this view. */}
+      {/* The one hero figure on this view. */}
+      <View className="mt-7">
+        <View className="flex-row items-baseline">
           <Text className="font-jk-black text-brand-black text-[48px] leading-[54px]">
             {count}
           </Text>
-          <Text className="font-jk text-brand-muted text-[12px] mt-0.5">
-            {activeModes === 1 ? "ride in 1 mode" : `rides in ${activeModes} modes`}
+          <Text className="font-jk text-brand-muted text-[13px] ml-2">
+            {activeModes === 1 ? "rides · 1 mode" : `rides · ${activeModes} modes`}
           </Text>
-        </DonutChart>
+        </View>
       </View>
 
-      {/* Legend + table view in one: every value is readable here. */}
-      <View className="gap-y-3.5 mt-7">
-        {series.map((s) => {
-          const pct = count ? Math.round((s.rides / count) * 100) : 0;
-
-          return (
-            <View key={s.key} className="flex-row items-center">
-              <View
-                style={{ backgroundColor: s.color }}
-                className="h-2.5 w-2.5 rounded-full"
-              />
-              <Text className="font-jk-semi text-brand-black text-[13px] ml-3 w-[86px]">
-                {s.label}
-              </Text>
-
-              {/* Share track — the fill is the mark, the text stays in ink. */}
-              <View className="flex-1 h-1.5 rounded-full bg-brand-hairline overflow-hidden mr-3">
-                <View
-                  style={{ width: `${pct}%`, backgroundColor: s.color }}
-                  className="h-full rounded-full"
-                />
-              </View>
-
-              <Text
-                style={{ fontVariant: ["tabular-nums"] }}
-                className="font-jk-semi text-brand-muted text-[12px] w-8 text-right"
-              >
-                {pct}%
-              </Text>
-              <Text
-                style={{ fontVariant: ["tabular-nums"] }}
-                className="font-jk-bold text-brand-black text-[12px] w-12 text-right"
-              >
-                {s.rides} {s.rides === 1 ? "ride" : "rides"}
-              </Text>
-            </View>
-          );
-        })}
+      <View className="mt-5">
+        <ModeBars data={series} total={count} />
       </View>
 
       {/* Change over time — a different question from the ring's composition */}

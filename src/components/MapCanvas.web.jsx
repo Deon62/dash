@@ -47,7 +47,8 @@ function PulseRing({ delay = 0 }) {
 export default function MapCanvas() {
   return (
     <View
-      className="absolute inset-0 items-center justify-center bg-[#F7F7F9]"
+      // Approximates the Google basemap ground so the stand-in reads the same.
+      className="absolute inset-0 items-center justify-center bg-[#F2EFE9]"
       accessibilityLabel="Map"
     >
       <PulseRing />

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Platform, View } from "react-native";
-import MapView, { UrlTile } from "react-native-maps";
+import { View } from "react-native";
+import MapView from "react-native-maps";
 import * as Location from "expo-location";
 import Animated, {
   Easing,
@@ -22,9 +22,30 @@ const FALLBACK = {
 /** Camera zoom held while following the device. */
 const FOLLOW_ZOOM = 16.5;
 
-// Light raster basemap with street and place labels — the labels give the map
-// somewhere to read as a place. Needs no API key of its own.
-const TILE_URL = "https://basemaps.cartocdn.com/light_all/{z}/{x}/{y}@2x.png";
+/**
+ * Map styling.
+ *
+ * The basemap is the platform's own (Google on Android) rather than raster
+ * tiles: OSM-derived tiles only draw green where a park or landuse polygon has
+ * been mapped, which outside major cities is almost nowhere. Google infers
+ * vegetation from imagery, which is why its maps read green — and it is what
+ * Bolt and Uber are showing.
+ *
+ * This trims the clutter Google ships by default — business pins, medical and
+ * worship icons, transit badges — while leaving terrain, parks, roads and place
+ * names intact. Android only; Apple Maps ignores it on iOS.
+ */
+const MAP_STYLE = [
+  { featureType: "poi.business", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.medical", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.attraction", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.place_of_worship", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.government", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.sports_complex", stylers: [{ visibility: "off" }] },
+  { featureType: "poi.park", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { featureType: "transit", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  { featureType: "road", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+];
 
 function PulseRing({ delay = 0 }) {
   const t = useSharedValue(0);
@@ -115,21 +136,18 @@ export default function MapCanvas() {
         ref={mapRef}
         style={{ flex: 1 }}
         initialRegion={FALLBACK}
-        // `none` suppresses the built-in basemap so only the tiles below draw.
-        mapType={Platform.OS === "android" ? "none" : "standard"}
+        mapType="standard"
+        customMapStyle={MAP_STYLE}
         showsUserLocation={false}
         showsMyLocationButton={false}
         showsCompass={false}
         showsScale={false}
-        showsPointsOfInterest={false}
         showsBuildings={false}
         showsTraffic={false}
         toolbarEnabled={false}
         rotateEnabled={false}
         pitchEnabled={false}
-      >
-        <UrlTile urlTemplate={TILE_URL} maximumZ={19} tileSize={512} zIndex={-1} />
-      </MapView>
+      />
 
       {/* Beacon — centred because the camera tracks the device. */}
       <View
