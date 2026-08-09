@@ -14,6 +14,7 @@ export const useTransitStore = create((set, get) => ({
   profile: {
     name: "Daniel Ochieng",
     email: "daniel@transit.app",
+    phone: null,
     initials: "DO",
     /** Local file URI from the picker; null falls back to the initials. */
     avatarUri: null,
@@ -45,12 +46,20 @@ export const useTransitStore = create((set, get) => ({
   /**
    * Session flag only. There is no auth backend — the sign-in screens set this
    * so navigation behaves, and nothing here validates a credential.
+   *
+   * Takes whichever identity the chosen method produced: `{ phone }` from the
+   * SMS flow, `{ email, name }` from an OAuth provider once one is wired.
    */
   isAuthenticated: true,
-  signIn: (email) =>
+  signIn: (identity = {}) =>
     set((state) => ({
       isAuthenticated: true,
-      profile: { ...state.profile, email: email || state.profile.email },
+      profile: {
+        ...state.profile,
+        ...(identity.email ? { email: identity.email } : {}),
+        ...(identity.phone ? { phone: identity.phone } : {}),
+        ...(identity.name ? { name: identity.name } : {}),
+      },
     })),
 
   /** `{ vehicleType, startTime, isDetecting }` — null vehicleType means idle. */
