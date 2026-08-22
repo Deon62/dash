@@ -3,6 +3,9 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getTabBarHeight } from "@/theme/layout";
 
+/** Disc height plus its offset, rounded up. */
+const FAB_CLEARANCE = 92;
+
 /**
  * Standard scrolling page.
  *
@@ -19,6 +22,7 @@ export default function Screen({
   contentStyle,
   keyboardAware = false,
   bare = false,
+  fab = false,
 }) {
   const insets = useSafeAreaInsets();
 
@@ -31,7 +35,11 @@ export default function Screen({
         paddingTop: 12,
         // `bare` pages are pushed as a stack screen, so there is no tab bar
         // underneath them to clear.
-        paddingBottom: (bare ? Math.max(insets.bottom, 16) : getTabBarHeight(insets)) + 28,
+        // A floating button covers the bottom-right corner of the list, so
+        // pages carrying one need the last row pushed clear of it.
+        paddingBottom:
+          (bare ? Math.max(insets.bottom, 16) : getTabBarHeight(insets)) +
+          (fab ? FAB_CLEARANCE : 28),
         paddingHorizontal: 20,
         rowGap: 22,
         ...contentStyle,

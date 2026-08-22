@@ -7,11 +7,16 @@ import { impact } from "@/lib/haptics";
 /**
  * Back control, title and an optional right-hand action.
  *
+ * There is no description slot. A paragraph under every heading explaining
+ * what the page is turns into wallpaper by the second visit — the title and
+ * what is actually on the page say it, and anything genuinely load-bearing
+ * belongs next to the control it qualifies.
+ *
  * The arrow has a shaft — `←`, not `‹`. A bare chevron at this size is easy to
  * read as a list disclosure pointing the wrong way; an arrow only ever means
  * "back".
  */
-export default function ScreenHeader({ title, description, right, onBack }) {
+export default function ScreenHeader({ title, right, onBack }) {
   const router = useRouter();
 
   return (
@@ -35,13 +40,8 @@ export default function ScreenHeader({ title, description, right, onBack }) {
       </View>
 
       {title ? (
-        <Text className="font-jk-semi text-ink text-[24px] leading-[30px] mt-6">
+        <Text className="font-jk-bold text-ink text-[30px] leading-[37px] mt-6">
           {title}
-        </Text>
-      ) : null}
-      {description ? (
-        <Text className="font-jk text-muted text-[13.5px] leading-[20px] mt-2">
-          {description}
         </Text>
       ) : null}
     </View>

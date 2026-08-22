@@ -38,7 +38,7 @@ export default function Fab({ onPress, label = "Add", Icon = Plus }) {
         shadowOffset: { width: 0, height: 6 },
         elevation: 8,
       }}
-      className="absolute right-5 items-center justify-center bg-obsidian active:opacity-85"
+      className="absolute right-5 items-center justify-center bg-primary active:opacity-85"
     >
       <Icon size={24} color="#FFFFFF" strokeWidth={1.8} />
     </Pressable>

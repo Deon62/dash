@@ -30,7 +30,7 @@ export default function IconButton({
       hitSlop={6}
       style={{ width: size, height: size, borderRadius: size / 2 }}
       className={`items-center justify-center active:opacity-60 ${
-        tone === "solid" ? "bg-obsidian" : "bg-surface"
+        tone === "solid" ? "bg-primary" : "bg-surface"
       }`}
     >
       <Icon
@@ -42,7 +42,7 @@ export default function IconButton({
       {/* Unread marker. Deliberately a dot and not a count — a number invites
           you to clear it, a dot only tells you something arrived. */}
       {badge ? (
-        <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-indigo" />
+        <View className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary" />
       ) : null}
     </Pressable>
   );

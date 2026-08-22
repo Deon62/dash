@@ -59,10 +59,7 @@ export default function UsageScreen() {
 
   return (
     <Screen bare>
-      <ScreenHeader
-        title="Usage"
-        description="How much of your course is in here so far."
-      />
+      <ScreenHeader title="Usage" />
 
       <View>
         <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">

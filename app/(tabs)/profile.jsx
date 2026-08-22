@@ -47,7 +47,7 @@ export default function ProfileScreen() {
       <View className="items-center -mt-4">
         <AvatarPicker />
 
-        <Text className="font-jk-semi text-ink text-[21px] mt-5">
+        <Text className="font-jk-bold text-ink text-[22px] mt-5">
           {profile.name || "Your name"}
         </Text>
         {enrolment ? (
@@ -60,9 +60,8 @@ export default function ProfileScreen() {
         </Text>
       </View>
 
-      {/* Coursework. The counts live on the rows rather than in tiles above
-          them — a number a student can tap through to is worth more than one
-          they can only look at. */}
+      {/* One continuous list. Splitting it into groups put a gap where a rule
+          belongs, and the reader had to work out what the gap meant. */}
       <View>
         <LinkRow
           Icon={IdCard}
@@ -80,11 +79,7 @@ export default function ProfileScreen() {
           label="Class timetable"
           value={classes.length ? `${classes.length}/wk` : undefined}
           onPress={() => router.push("/timetable")}
-          last
         />
-      </View>
-
-      <View>
         <LinkRow
           Icon={ChartNoAxesColumn}
           label="Usage"
@@ -101,17 +96,13 @@ export default function ProfileScreen() {
           label="Payment methods"
           value={billing.mpesaNumber ? "M-Pesa" : undefined}
           onPress={() => router.push("/payment-methods")}
-          last
         />
-      </View>
-
-      <View>
         <LinkRow Icon={LogOut} label="Log out" onPress={signOut} last />
       </View>
 
       {/* Everything is on the phone, so this really is the whole account —
           worth saying plainly rather than implying a server holds a copy. */}
-      <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-3">
+      <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-4">
         Your coursework is stored on this device only. Logging out keeps it.
       </Text>
     </Screen>

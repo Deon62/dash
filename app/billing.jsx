@@ -41,10 +41,7 @@ export default function BillingScreen() {
 
   return (
     <Screen bare>
-      <ScreenHeader
-        title="Billing"
-        description="You're on the free plan. Nothing is charged until you say so."
-      />
+      <ScreenHeader title="Billing" />
 
       <View className="gap-y-3">
         {PLANS.map((plan) => {
@@ -54,7 +51,7 @@ export default function BillingScreen() {
             <View
               key={plan.key}
               className={`rounded-3xl border p-5 ${
-                current ? "border-obsidian bg-canvas" : "border-line bg-surface"
+                current ? "border-primary bg-canvas" : "border-line bg-surface"
               }`}
             >
               <View className="flex-row items-center justify-between">
@@ -95,7 +92,7 @@ export default function BillingScreen() {
                   }}
                   accessibilityRole="button"
                   accessibilityLabel={`Upgrade to ${plan.name}`}
-                  className="items-center justify-center rounded-2xl bg-obsidian py-3.5 mt-5 active:opacity-85"
+                  className="items-center justify-center rounded-2xl bg-primary py-3.5 mt-5 active:opacity-85"
                 >
                   <Text className="font-jk-med text-canvas text-[14.5px]">
                     Upgrade to {plan.name}

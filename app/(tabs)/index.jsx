@@ -1,18 +1,18 @@
 import { useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, CalendarDays, Clock, Plus } from "lucide-react-native";
+import { Bell, CalendarDays, Clock } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import SectionHeading from "@/components/SectionHeading";
 import IconButton from "@/components/IconButton";
+import Fab from "@/components/Fab";
 import ClassRow from "@/components/ClassRow";
 import EventRow from "@/components/EventRow";
 import EventComposer from "@/components/EventComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { greeting, minutesOf } from "@/lib/dates";
-import { impact } from "@/lib/haptics";
 
 /** How many upcoming items the dashboard shows before it stops being a summary. */
 const UPCOMING_LIMIT = 5;
@@ -66,12 +66,14 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Screen>
+      <Screen fab>
         <View className="flex-row items-start justify-between">
           <View className="flex-1 pr-3">
-            <Text className="font-jk text-muted text-[13px]">{greeting()}</Text>
-            <Text className="font-jk-semi text-ink text-[24px] leading-[30px] mt-1">
-              {firstName || "Welcome"}
+            <Text className="font-jk-semi text-ink text-[23px] leading-[29px]">
+              {greeting()},
+            </Text>
+            <Text className="font-jk-bold text-ink text-[30px] leading-[38px]">
+              {firstName || "there"} 👋
             </Text>
           </View>
 
@@ -116,21 +118,7 @@ export default function HomeScreen() {
 
         {/* --- Upcoming --- */}
         <View>
-          <View className="flex-row items-center justify-between">
-            <SectionHeading title="Upcoming" />
-            <Pressable
-              onPress={() => {
-                impact("medium");
-                setComposing(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Add an event"
-              hitSlop={8}
-              className="h-8 w-8 items-center justify-center rounded-full bg-surface active:opacity-60"
-            >
-              <Plus size={16} color="#09090B" strokeWidth={1.8} />
-            </Pressable>
-          </View>
+          <SectionHeading title="Upcoming" />
 
           <View className="mt-2">
             {upcoming.length === 0 ? (
@@ -154,6 +142,11 @@ export default function HomeScreen() {
           </View>
         </View>
       </Screen>
+
+      {/* Adding an event is the only thing you do *to* this screen, so it gets
+          the same thumb-reachable disc Knowledge uses rather than a small
+          control tucked beside a heading. */}
+      <Fab label="Add an event" onPress={() => setComposing(true)} />
 
       <EventComposer
         visible={composing}

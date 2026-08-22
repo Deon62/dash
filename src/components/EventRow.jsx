@@ -33,7 +33,7 @@ export default function EventRow({ event, unit, onToggle, onRemove, last = false
         accessibilityState={{ checked: event.done }}
         accessibilityLabel={event.title}
         className={`h-[22px] w-[22px] items-center justify-center rounded-full border mr-3.5 mt-0.5 active:opacity-60 ${
-          event.done ? "border-obsidian bg-obsidian" : "border-line bg-canvas"
+          event.done ? "border-primary bg-primary" : "border-line bg-canvas"
         }`}
       >
         {event.done ? <Check size={13} color="#FFFFFF" strokeWidth={2.4} /> : null}

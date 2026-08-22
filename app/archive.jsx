@@ -26,10 +26,7 @@ export default function ArchiveScreen() {
 
   return (
     <Screen bare>
-      <ScreenHeader
-        title="Archive"
-        description="Out of the way, and out of the tutor's answers. Nothing here is deleted."
-      />
+      <ScreenHeader title="Archive" />
 
       {archived.length === 0 ? (
         <EmptyState

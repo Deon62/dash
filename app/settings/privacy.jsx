@@ -26,7 +26,7 @@ const POINTS = [
 export default function PrivacyScreen() {
   return (
     <Screen bare>
-      <ScreenHeader title="Privacy" description="What is stored, and where." />
+      <ScreenHeader title="Privacy" />
 
       <View className="gap-y-6">
         {POINTS.map((point) => (

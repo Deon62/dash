@@ -21,7 +21,6 @@ export default function UnitsScreen() {
     <Screen bare>
       <ScreenHeader
         title="Units"
-        description="Everything you're enrolled in this semester."
         right={
           <IconButton
             Icon={Plus}
@@ -44,7 +43,7 @@ export default function UnitsScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel="Add a unit"
-              className="flex-row items-center gap-x-2 rounded-full bg-obsidian px-5 py-3 active:opacity-85"
+              className="flex-row items-center gap-x-2 rounded-full bg-primary px-5 py-3 active:opacity-85"
             >
               <Plus size={16} color="#FFFFFF" strokeWidth={1.8} />
               <Text className="font-jk-med text-canvas text-[14px]">Add a unit</Text>

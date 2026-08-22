@@ -47,7 +47,6 @@ export default function TimetableScreen() {
       <Screen bare>
         <ScreenHeader
           title="Class timetable"
-          description={`${classes.length} ${classes.length === 1 ? "session" : "sessions"} a week.`}
           right={
             <IconButton
               Icon={Plus}
@@ -70,7 +69,7 @@ export default function TimetableScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Add a class"
-                className="flex-row items-center gap-x-2 rounded-full bg-obsidian px-5 py-3 active:opacity-85"
+                className="flex-row items-center gap-x-2 rounded-full bg-primary px-5 py-3 active:opacity-85"
               >
                 <Plus size={16} color="#FFFFFF" strokeWidth={1.8} />
                 <Text className="font-jk-med text-canvas text-[14px]">Add a class</Text>
@@ -92,7 +91,7 @@ export default function TimetableScreen() {
                     {day.long.toUpperCase()}
                   </Text>
                   {day.index === today ? (
-                    <Text className="font-jk-med text-indigo text-[10px] tracking-[0.8px]">
+                    <Text className="font-jk-med text-primary text-[10px] tracking-[0.8px]">
                       TODAY
                     </Text>
                   ) : null}

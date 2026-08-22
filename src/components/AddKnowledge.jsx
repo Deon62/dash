@@ -237,7 +237,7 @@ export default function AddKnowledge({ visible, onClose, units, onSave, lockedUn
             accessibilityLabel="File it"
             accessibilityState={{ disabled: title.trim().length < 2 }}
             className={`items-center justify-center rounded-2xl py-4 ${
-              title.trim().length >= 2 ? "bg-obsidian active:opacity-85" : "bg-surface"
+              title.trim().length >= 2 ? "bg-primary active:opacity-85" : "bg-surface"
             }`}
           >
             <Text

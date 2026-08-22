@@ -68,7 +68,6 @@ export default function NotificationsScreen() {
     <Screen bare>
       <ScreenHeader
         title="Notifications"
-        description="The next few days, and today's remaining classes."
         right={
           <IconButton
             Icon={Settings}

@@ -81,7 +81,7 @@ export default function ConfirmDialog({
               accessibilityRole="button"
               accessibilityLabel={confirmLabel}
               className={`flex-1 items-center justify-center rounded-2xl py-3.5 active:opacity-85 ${
-                destructive ? "bg-danger" : "bg-obsidian"
+                destructive ? "bg-danger" : "bg-primary"
               }`}
             >
               <Text className="font-jk-med text-canvas text-[14px]">

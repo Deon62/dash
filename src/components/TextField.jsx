@@ -4,7 +4,7 @@ import { Text, TextInput, View } from "react-native";
 /**
  * Labelled input.
  *
- * Focus is marked with the indigo highlight — the one state on a form where a
+ * Focus is marked in the brand blue — the one state on a form where a
  * colour is telling you something rather than decorating.
  */
 export default function TextField({
@@ -29,13 +29,13 @@ export default function TextField({
 
       <View
         className={`flex-row items-center rounded-2xl border bg-canvas px-4 ${
-          focused ? "border-indigo" : "border-line"
+          focused ? "border-primary" : "border-line"
         }`}
       >
         {Icon ? (
           <Icon
             size={17}
-            color={focused ? "#4F46E5" : "#71717A"}
+            color={focused ? "#007FFA" : "#71717A"}
             strokeWidth={1.8}
           />
         ) : null}

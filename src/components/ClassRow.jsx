@@ -10,7 +10,7 @@ import { impact } from "@/lib/haptics";
  * `live` is worked out here rather than passed in so every caller gets the
  * highlight for free — a student glancing at Home should see which class they
  * are supposed to be sitting in right now. That highlight is the one place
- * indigo earns its keep on this screen.
+ * the blue earns its keep on this screen.
  */
 export default function ClassRow({ entry, unit, today = false, onRemove, last = false }) {
   const start = minutesOf(entry.start);
@@ -27,7 +27,7 @@ export default function ClassRow({ entry, unit, today = false, onRemove, last = 
     >
       <View className="w-[58px]">
         <Text
-          className={`text-[13px] ${live ? "font-jk-semi text-indigo" : "font-jk-med text-ink"}`}
+          className={`text-[13px] ${live ? "font-jk-semi text-primary" : "font-jk-med text-ink"}`}
         >
           {formatTime(entry.start)}
         </Text>
@@ -39,7 +39,7 @@ export default function ClassRow({ entry, unit, today = false, onRemove, last = 
       {/* A hairline rule rather than a coloured spine: it separates the clock
           from the class without adding another colour to the page. */}
       <View
-        className={`w-px self-stretch mr-4 ${live ? "bg-indigo" : "bg-line"}`}
+        className={`w-px self-stretch mr-4 ${live ? "bg-primary" : "bg-line"}`}
       />
 
       <View className="flex-1">
@@ -48,7 +48,7 @@ export default function ClassRow({ entry, unit, today = false, onRemove, last = 
             {unit?.code ?? "—"}
           </Text>
           {live ? (
-            <Text className="font-jk-med text-indigo text-[10px] tracking-[0.8px]">
+            <Text className="font-jk-med text-primary text-[10px] tracking-[0.8px]">
               NOW
             </Text>
           ) : null}

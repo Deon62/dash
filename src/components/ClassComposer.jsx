@@ -112,7 +112,7 @@ export default function ClassComposer({ visible, onClose, onSave, units, lockedU
           accessibilityLabel="Add class"
           accessibilityState={{ disabled: !canSave }}
           className={`items-center justify-center rounded-2xl py-4 mt-1 ${
-            canSave ? "bg-obsidian active:opacity-85" : "bg-surface"
+            canSave ? "bg-primary active:opacity-85" : "bg-surface"
           }`}
         >
           <Text

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CircleDot } from "lucide-react-native";
 
 import { TAB_BAR_HEIGHT } from "@/theme/layout";
+import { useKeyboardVisible } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
 
 const SPRING = { damping: 16, stiffness: 240, mass: 0.6 };
@@ -78,6 +79,12 @@ function TabItem({ label, Icon, focused, onPress, onLongPress }) {
  */
 export default function BottomTabBar({ state, descriptors, navigation }) {
   const insets = useSafeAreaInsets();
+  const keyboardUp = useKeyboardVisible();
+
+  // Android resizes the window for the keyboard, which would park this bar
+  // directly on top of the keys and over whatever field is being typed into.
+  // Nobody navigates mid-sentence, so it steps aside.
+  if (keyboardUp) return null;
 
   return (
     <View

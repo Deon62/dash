@@ -70,7 +70,7 @@ export default function CountryPicker({ value, onChange }) {
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Close country list"
-                className="h-8 w-8 items-center justify-center rounded-full bg-obsidian/[0.05] active:opacity-70"
+                className="h-8 w-8 items-center justify-center rounded-full bg-primary/[0.05] active:opacity-70"
               >
                 <X size={15} color="#52525B" strokeWidth={2.4} />
               </Pressable>
@@ -97,7 +97,7 @@ export default function CountryPicker({ value, onChange }) {
                     onPress={() => select(country.iso)}
                     accessibilityRole="button"
                     accessibilityLabel={country.name}
-                    className="flex-row items-center px-5 py-3.5 active:bg-obsidian/[0.04]"
+                    className="flex-row items-center px-5 py-3.5 active:bg-primary/[0.04]"
                   >
                     <Text className="text-[20px] w-8">
                       {flagEmoji(country.iso)}

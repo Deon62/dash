@@ -12,10 +12,7 @@ export default function NotificationSettingsScreen() {
 
   return (
     <Screen bare>
-      <ScreenHeader
-        title="Notifications"
-        description="What the app is allowed to interrupt you for."
-      />
+      <ScreenHeader title="Notifications" />
 
       <View>
         <LinkRow

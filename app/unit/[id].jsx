@@ -88,7 +88,7 @@ export default function UnitScreen() {
   if (!unit) {
     return (
       <Screen bare>
-        <ScreenHeader title="Unit not found" description="It may have been deleted." />
+        <ScreenHeader title="Unit not found" />
       </Screen>
     );
   }
@@ -114,7 +114,7 @@ export default function UnitScreen() {
         />
 
         <View className="-mt-4">
-          <Text className="font-jk-semi text-ink text-[24px] leading-[30px] tracking-[0.4px]">
+          <Text className="font-jk-bold text-ink text-[30px] leading-[37px] tracking-[0.4px]">
             {unit.code}
           </Text>
           <Text className="font-jk text-muted text-[14px] leading-[20px] mt-1.5">
@@ -130,7 +130,7 @@ export default function UnitScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel={`Revise ${unit.code}`}
-          className="flex-row items-center justify-center gap-x-2 rounded-full bg-obsidian py-3.5 active:opacity-85"
+          className="flex-row items-center justify-center gap-x-2 rounded-full bg-primary py-3.5 active:opacity-85"
         >
           <Orbit size={16} color="#FFFFFF" strokeWidth={1.8} />
           <Text className="font-jk-med text-canvas text-[14.5px]">

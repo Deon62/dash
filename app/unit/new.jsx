@@ -34,10 +34,7 @@ export default function NewUnitScreen() {
 
   return (
     <Screen bare keyboardAware>
-      <ScreenHeader
-        title="Add a unit"
-        description="One per subject. Your timetable, knowledge and deadlines all get filed underneath it."
-      />
+      <ScreenHeader title="Add a unit" />
 
       <View className="gap-y-4">
         <TextField
@@ -74,7 +71,7 @@ export default function NewUnitScreen() {
         accessibilityLabel="Add unit"
         accessibilityState={{ disabled: !canSave }}
         className={`items-center justify-center rounded-2xl py-4 ${
-          canSave ? "bg-obsidian active:opacity-85" : "bg-surface"
+          canSave ? "bg-primary active:opacity-85" : "bg-surface"
         }`}
       >
         <Text

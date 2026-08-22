@@ -87,7 +87,7 @@ export default function Dropdown({
                 ) : null}
               </View>
 
-              {active ? <Check size={17} color="#4F46E5" strokeWidth={2} /> : null}
+              {active ? <Check size={17} color="#007FFA" strokeWidth={2} /> : null}
             </Pressable>
           );
         })}

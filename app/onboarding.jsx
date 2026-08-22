@@ -117,7 +117,7 @@ export default function OnboardingScreen() {
             <View
               key={index}
               className={`h-0.5 flex-1 rounded-full ${
-                index <= step ? "bg-obsidian" : "bg-line"
+                index <= step ? "bg-primary" : "bg-line"
               }`}
             />
           ))}
@@ -125,7 +125,7 @@ export default function OnboardingScreen() {
 
         {step === 0 ? (
           <>
-            <Text className="font-jk-semi text-ink text-[25px] leading-[32px] mt-8">
+            <Text className="font-jk-bold text-ink text-[28px] leading-[35px] mt-8">
               Tell us about{"\n"}your course
             </Text>
             <Text className="font-jk text-muted text-[13.5px] leading-[20px] mt-2.5">
@@ -193,7 +193,7 @@ export default function OnboardingScreen() {
               accessibilityLabel="Continue"
               accessibilityState={{ disabled: !canContinue }}
               className={`flex-row items-center justify-center gap-x-2 rounded-2xl py-4 mt-8 ${
-                canContinue ? "bg-obsidian active:opacity-85" : "bg-surface"
+                canContinue ? "bg-primary active:opacity-85" : "bg-surface"
               }`}
             >
               <Text
@@ -210,7 +210,7 @@ export default function OnboardingScreen() {
           </>
         ) : (
           <>
-            <Text className="font-jk-semi text-ink text-[25px] leading-[32px] mt-8">
+            <Text className="font-jk-bold text-ink text-[28px] leading-[35px] mt-8">
               What are you taking{"\n"}this semester?
             </Text>
             <Text className="font-jk text-muted text-[13.5px] leading-[20px] mt-2.5">
@@ -293,7 +293,7 @@ export default function OnboardingScreen() {
                 onPress={finish}
                 accessibilityRole="button"
                 accessibilityLabel={units.length === 0 ? "Skip for now" : "Finish setup"}
-                className="items-center justify-center rounded-2xl bg-obsidian py-4 active:opacity-85"
+                className="items-center justify-center rounded-2xl bg-primary py-4 active:opacity-85"
               >
                 <Text className="font-jk-med text-canvas text-[15px]">
                   {units.length === 0 ? "Skip for now" : "Done"}

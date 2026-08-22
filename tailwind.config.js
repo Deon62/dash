@@ -15,24 +15,25 @@ module.exports = {
         ink: "#09090B",
         /** Secondary text, placeholders, inactive glyphs. */
         muted: "#71717A",
-        /** Filled buttons, active chips, the tab bar's selected state. */
-        obsidian: "#18181B",
         /**
-         * Reserved for interactive highlight only — a focused field, a live
-         * class, the send button once it is armed. Never decoration: the
-         * moment it is used for a heading it stops meaning "you can act here".
+         * The brand. Every filled button, every active state, every
+         * highlight — one blue doing all of it, always with white on top.
+         * Nothing decorative is painted in it: if it is this colour, it is
+         * something you can act on or something the app is telling you is on.
          */
-        indigo: "#4F46E5",
+        primary: "#007FFA",
         danger: "#DC2626",
       },
       // React Native has no synthetic font weights: every weight is its own
       // family, so these are named `jk-*` to avoid colliding with Tailwind's
-      // own fontWeight utilities. Nothing above 600 — the type is meant to
-      // read as quiet and even, and a heavier face undoes that on its own.
+      // own fontWeight utilities. Body copy stays at 400/500 so the page reads
+      // quiet; 700 is reserved for page titles, which are the one place the
+      // type is meant to be loud.
       fontFamily: {
         jk: ["PlusJakartaSans_400Regular"],
         "jk-med": ["PlusJakartaSans_500Medium"],
         "jk-semi": ["PlusJakartaSans_600SemiBold"],
+        "jk-bold": ["PlusJakartaSans_700Bold"],
       },
     },
   },

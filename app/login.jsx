@@ -118,7 +118,7 @@ export default function LoginScreen() {
           flexGrow: 1,
         }}
       >
-        <Text className="font-jk-semi text-ink text-[30px] leading-[38px] text-center">
+        <Text className="font-jk-bold text-ink text-[30px] leading-[38px] text-center">
           Your whole course,{"\n"}in one place.
         </Text>
         <Text className="font-jk text-muted text-[14px] leading-[20px] text-center mt-3">
@@ -194,7 +194,7 @@ export default function LoginScreen() {
             busy: busy === "phone",
           }}
           className={`flex-row items-center justify-center gap-x-2 rounded-2xl py-4 mt-5 ${
-            canContinue && !busy ? "bg-obsidian active:opacity-85" : "bg-surface"
+            canContinue && !busy ? "bg-primary active:opacity-85" : "bg-surface"
           }`}
         >
           <Text

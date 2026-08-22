@@ -68,7 +68,7 @@ export default function AvatarPicker() {
     >
       <View
         style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2 }}
-        className="items-center justify-center bg-obsidian overflow-hidden"
+        className="items-center justify-center bg-primary overflow-hidden"
       >
         {profile.avatarUri ? (
           <Image
@@ -87,7 +87,7 @@ export default function AvatarPicker() {
       </View>
 
       {/* Affordance — otherwise nothing says the avatar is tappable. */}
-      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-canvas bg-obsidian">
+      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-canvas bg-primary">
         <Camera size={14} color="#FFFFFF" strokeWidth={2.2} />
       </View>
 

@@ -59,10 +59,7 @@ export default function AccountScreen() {
 
   return (
     <Screen bare keyboardAware>
-      <ScreenHeader
-        title="Personal details"
-        description="Your programme and year are what let the tutor talk about your studies in your own terms."
-      />
+      <ScreenHeader title="Personal details" />
 
       <View className="items-center">
         <AvatarPicker />
@@ -134,7 +131,7 @@ export default function AccountScreen() {
         accessibilityLabel="Save changes"
         accessibilityState={{ disabled: !dirty }}
         className={`items-center justify-center rounded-2xl py-4 ${
-          dirty ? "bg-obsidian active:opacity-85" : "bg-surface"
+          dirty ? "bg-primary active:opacity-85" : "bg-surface"
         }`}
       >
         <Text

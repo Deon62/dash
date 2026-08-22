@@ -24,7 +24,7 @@ export default function SectionHeading({ title, caption, action, onAction }) {
           hitSlop={8}
           className="active:opacity-60"
         >
-          <Text className="font-jk-med text-indigo text-[13px]">{action}</Text>
+          <Text className="font-jk-med text-primary text-[13px]">{action}</Text>
         </Pressable>
       ) : null}
     </View>

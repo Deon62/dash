@@ -25,10 +25,7 @@ export default function PaymentMethodsScreen() {
 
   return (
     <Screen bare keyboardAware>
-      <ScreenHeader
-        title="Payment methods"
-        description="How you'd pay if you upgrade. Nothing is charged from this screen."
-      />
+      <ScreenHeader title="Payment methods" />
 
       {/* M-Pesa first: it is how most students here actually pay, and burying
           it under a card form would be backwards. */}
@@ -73,7 +70,7 @@ export default function PaymentMethodsScreen() {
             accessibilityLabel="Save M-Pesa number"
             accessibilityState={{ disabled: !valid || !dirty }}
             className={`items-center justify-center rounded-2xl py-3.5 mt-4 ${
-              valid && dirty ? "bg-obsidian active:opacity-85" : "bg-surface"
+              valid && dirty ? "bg-primary active:opacity-85" : "bg-surface"
             }`}
           >
             <Text

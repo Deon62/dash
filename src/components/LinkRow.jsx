@@ -64,7 +64,7 @@ export default function LinkRow({
             onToggle?.(next);
           }}
           accessibilityLabel={label}
-          trackColor={{ false: "#E4E4E7", true: "#18181B" }}
+          trackColor={{ false: "#E4E4E7", true: "#007FFA" }}
           thumbColor="#FFFFFF"
           ios_backgroundColor="#E4E4E7"
         />

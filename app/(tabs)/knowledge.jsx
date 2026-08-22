@@ -84,25 +84,15 @@ export default function KnowledgeScreen() {
     return table;
   }, [units, materials, events]);
 
-  const archivedCount = materials.filter((material) => material.archived).length;
-  const liveCount = materials.length - archivedCount;
-
   return (
     <>
-      <Screen>
+      <Screen fab>
         <View className="flex-row items-start justify-between">
-          <View className="flex-1 pr-3">
-            <Text className="font-jk-semi text-ink text-[24px] leading-[30px]">
-              Knowledge
-            </Text>
-            <Text className="font-jk text-muted text-[13px] mt-1">
-              {units.length === 0
-                ? "Nothing filed yet"
-                : `${units.length} ${units.length === 1 ? "unit" : "units"} · ${liveCount} ${
-                    liveCount === 1 ? "item" : "items"
-                  }`}
-            </Text>
-          </View>
+          {/* Title only. The counts were a caption nobody read, and the list
+              underneath already says how much is in here. */}
+          <Text className="font-jk-bold text-ink text-[30px] leading-[38px] flex-1 pr-3">
+            Knowledge
+          </Text>
 
           <IconButton
             Icon={Archive}
@@ -124,7 +114,7 @@ export default function KnowledgeScreen() {
                 }}
                 accessibilityRole="button"
                 accessibilityLabel="Add a unit"
-                className="flex-row items-center gap-x-2 rounded-full bg-obsidian px-5 py-3 active:opacity-85"
+                className="flex-row items-center gap-x-2 rounded-full bg-primary px-5 py-3 active:opacity-85"
               >
                 <Plus size={16} color="#FFFFFF" strokeWidth={1.8} />
                 <Text className="font-jk-med text-canvas text-[14px]">

@@ -104,7 +104,7 @@ export default function VerifyScreen() {
           <ArrowLeft size={18} color="#09090B" strokeWidth={1.8} />
         </Pressable>
 
-        <Text className="font-jk-semi text-ink text-[28px] leading-[34px] mt-8">
+        <Text className="font-jk-bold text-ink text-[30px] leading-[37px] mt-8">
           Enter the code
         </Text>
         <Text className="font-jk text-muted text-[14px] leading-[20px] mt-2">
@@ -129,7 +129,7 @@ export default function VerifyScreen() {
                 key={index}
                 className={`h-14 w-[46px] items-center justify-center rounded-2xl border ${
                   char || active
-                    ? "border-obsidian bg-canvas"
+                    ? "border-primary bg-canvas"
                     : "border-line bg-canvas"
                 }`}
               >
@@ -178,7 +178,7 @@ export default function VerifyScreen() {
           accessibilityLabel="Verify code"
           accessibilityState={{ disabled: !complete || busy, busy }}
           className={`items-center justify-center rounded-2xl py-4 mt-6 ${
-            complete && !busy ? "bg-obsidian active:opacity-85" : "bg-surface"
+            complete && !busy ? "bg-primary active:opacity-85" : "bg-surface"
           }`}
         >
           <Text

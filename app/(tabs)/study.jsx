@@ -29,6 +29,7 @@ import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { answer, buildFlashcards, buildQuiz } from "@/lib/tutor";
 import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
+import { useKeyboardVisible } from "@/lib/useKeyboardVisible";
 import { impact, notify } from "@/lib/haptics";
 
 const MODES = [
@@ -69,6 +70,12 @@ export default function StudyScreen() {
   const [scopeOpen, setScopeOpen] = useState(false);
 
   const scrollRef = useRef(null);
+
+  // The tab bar is absolutely positioned over the page, so the composer
+  // reserves its height — but only while the bar is actually there. It hides
+  // itself when the keyboard is up, and holding the gap open anyway would sit
+  // the field a tab bar's height above the keys for no reason.
+  const keyboardUp = useKeyboardVisible();
 
   const chat = chats.find((entry) => entry.id === activeChatId) ?? null;
   const unitId = chat?.unitId ?? null;
@@ -125,7 +132,10 @@ export default function StudyScreen() {
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      keyboardVerticalOffset={insets.top}
+      // Zero, not the status-bar inset: this view already starts at the top of
+      // the screen, and offsetting it again leaves the composer sitting that
+      // far behind the keyboard.
+      keyboardVerticalOffset={0}
       style={{ paddingTop: insets.top }}
       className="flex-1 bg-canvas"
     >
@@ -164,17 +174,21 @@ export default function StudyScreen() {
         >
           {messages.length === 0 ? (
             <View className="items-center px-4 -mt-16">
-              <Text className="font-jk text-muted text-[15px]">{greeting()}</Text>
-              <Text className="font-jk-semi text-ink text-[26px] leading-[34px] text-center mt-1.5">
-                {firstName ? `What are we revising, ${firstName}?` : "What are we revising?"}
+              <Text className="font-jk-semi text-ink text-[23px] leading-[29px] text-center">
+                {greeting()},
               </Text>
-              <Text className="font-jk text-muted text-[13px] leading-[19px] text-center mt-3">
-                {scoped.length === 0
-                  ? "File a note under a unit in Knowledge and I can revise it with you."
-                  : `Answers come out of your own ${scoped.length} filed ${
-                      scoped.length === 1 ? "item" : "items"
-                    }, quoted back with the note they came from.`}
+              <Text className="font-jk-bold text-ink text-[30px] leading-[38px] text-center">
+                {firstName ? `${firstName} 👋` : "let's revise 👋"}
               </Text>
+
+              {/* The only line here worth printing is the one a student can
+                  act on, and that is only true when there is nothing filed. */}
+              {scoped.length === 0 ? (
+                <Text className="font-jk text-muted text-[13.5px] leading-[20px] text-center mt-3">
+                  File a note under a unit in Knowledge and I can revise it with
+                  you.
+                </Text>
+              ) : null}
             </View>
           ) : (
             messages.map((message) => <Bubble key={message.id} message={message} />)
@@ -196,64 +210,67 @@ export default function StudyScreen() {
 
       {/* --- Composer --- */}
       <View
-        style={{ paddingBottom: getTabBarHeight(insets) + 8 }}
+        style={{ paddingBottom: keyboardUp ? 10 : getTabBarHeight(insets) + 8 }}
         className="px-5 pt-2"
       >
-        <View className="rounded-3xl border border-line bg-canvas px-4 pt-3 pb-2.5">
-          {mode === "ask" ? (
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={unit ? `Ask about ${unit.code}` : "Ask about your course"}
-              placeholderTextColor="#A1A1AA"
-              multiline
-              // Three lines then scroll: a taller box eats the conversation it
-              // is meant to be part of.
-              style={{ maxHeight: 110 }}
-              className="font-jk text-ink text-[15px] leading-[21px]"
-            />
-          ) : (
-            <Text className="font-jk text-muted text-[15px] py-0.5">
-              {MODES.find((option) => option.key === mode)?.hint}
-            </Text>
-          )}
-
-          <View className="flex-row items-center justify-between mt-2.5">
-            {/* The scope pill — this app's version of a model switcher. */}
-            <Pressable
-              onPress={() => {
-                impact("light");
-                setScopeOpen(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
-              className="flex-row items-center gap-x-1.5 rounded-full bg-surface px-3 py-1.5 active:opacity-60"
-            >
-              <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
-              <ChevronDown size={14} color="#71717A" strokeWidth={1.8} />
-            </Pressable>
-
+        <View className="rounded-3xl border border-line bg-canvas px-3.5 py-3">
+          {/* Send sits beside the field, not under it, and the row centres —
+              so the button lines up with the text you are typing however tall
+              the field has grown. */}
+          <View className="flex-row items-center gap-x-2.5">
             {mode === "ask" ? (
-              <Pressable
-                onPress={() => ask(draft)}
-                disabled={!draft.trim() || thinking}
-                accessibilityRole="button"
-                accessibilityLabel="Send"
-                accessibilityState={{ disabled: !draft.trim() || thinking }}
-                className={`h-9 w-9 items-center justify-center rounded-full ${
-                  draft.trim() && !thinking
-                    ? "bg-indigo active:opacity-85"
-                    : "bg-surface"
-                }`}
-              >
-                <ArrowUp
-                  size={17}
-                  color={draft.trim() && !thinking ? "#FFFFFF" : "#A1A1AA"}
-                  strokeWidth={2}
+              <>
+                <TextInput
+                  value={draft}
+                  onChangeText={setDraft}
+                  placeholder={unit ? `Ask about ${unit.code}` : "Ask about your course"}
+                  placeholderTextColor="#A1A1AA"
+                  multiline
+                  // Three lines then scroll: a taller box eats the conversation
+                  // it is meant to be part of.
+                  style={{ maxHeight: 110 }}
+                  className="flex-1 font-jk text-ink text-[15px] leading-[21px] py-1"
                 />
-              </Pressable>
-            ) : null}
+
+                <Pressable
+                  onPress={() => ask(draft)}
+                  disabled={!draft.trim() || thinking}
+                  accessibilityRole="button"
+                  accessibilityLabel="Send"
+                  accessibilityState={{ disabled: !draft.trim() || thinking }}
+                  className={`h-9 w-9 items-center justify-center rounded-full ${
+                    draft.trim() && !thinking
+                      ? "bg-primary active:opacity-85"
+                      : "bg-surface"
+                  }`}
+                >
+                  <ArrowUp
+                    size={17}
+                    color={draft.trim() && !thinking ? "#FFFFFF" : "#A1A1AA"}
+                    strokeWidth={2}
+                  />
+                </Pressable>
+              </>
+            ) : (
+              <Text className="flex-1 font-jk text-muted text-[15px] py-1">
+                {MODES.find((option) => option.key === mode)?.hint}
+              </Text>
+            )}
           </View>
+
+          {/* The scope pill — this app's version of a model switcher. */}
+          <Pressable
+            onPress={() => {
+              impact("light");
+              setScopeOpen(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
+            className="flex-row items-center gap-x-1.5 self-start rounded-full bg-surface px-3 py-1.5 mt-2.5 active:opacity-60"
+          >
+            <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
+            <ChevronDown size={14} color="#71717A" strokeWidth={1.8} />
+          </Pressable>
         </View>
       </View>
 
@@ -378,7 +395,7 @@ export default function StudyScreen() {
                   </Text>
                 ) : null}
               </View>
-              {active ? <Check size={17} color="#4F46E5" strokeWidth={2} /> : null}
+              {active ? <Check size={17} color="#007FFA" strokeWidth={2} /> : null}
             </Pressable>
           );
         })}
@@ -414,7 +431,7 @@ export default function StudyScreen() {
                   {option.hint}
                 </Text>
               </View>
-              {active ? <Check size={17} color="#4F46E5" strokeWidth={2} /> : null}
+              {active ? <Check size={17} color="#007FFA" strokeWidth={2} /> : null}
             </Pressable>
           );
         })}
@@ -505,7 +522,7 @@ function QuizPane({ materials, unit }) {
 
       <View className="border-t border-line pt-4">
         {revealed ? (
-          <Text className="font-jk-semi text-indigo text-[18px]">
+          <Text className="font-jk-semi text-primary text-[18px]">
             {question.answer}
           </Text>
         ) : (
@@ -554,7 +571,7 @@ function QuizPane({ materials, unit }) {
           }}
           accessibilityRole="button"
           accessibilityLabel={last ? "Finish and start a new set" : "Next question"}
-          className="flex-1 items-center justify-center rounded-full bg-obsidian py-3 active:opacity-85"
+          className="flex-1 items-center justify-center rounded-full bg-primary py-3 active:opacity-85"
         >
           <Text className="font-jk-med text-canvas text-[13.5px]">
             {last ? "Finish" : "Next"}
