@@ -31,6 +31,7 @@ module.exports = {
         violet: "#7C3AED",
         teal: "#0D9488",
         amber: "#F59E0B",
+        flame: "#F97316",
         danger: "#DC2626",
       },
       // React Native has no synthetic font weights: every weight is its own

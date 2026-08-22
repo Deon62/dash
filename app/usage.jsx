@@ -12,12 +12,22 @@ import { limitsFor, planName, unitCap } from "@/theme/plans";
 import { activeTier, daysRemaining, rollUsage } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 
-/** A number and what it counts, with nothing around it. */
-function Figure({ value, label }) {
+/**
+ * One line: what it counts on the left, the number on the right.
+ *
+ * A list down one column beats a grid of tiles here — these six figures are
+ * not comparable to each other, so laying them out side by side invited a
+ * comparison that means nothing.
+ */
+function Figure({ label, value, last = false }) {
   return (
-    <View className="flex-1">
-      <Text className="font-jk-bold text-ink text-[22px]">{value}</Text>
-      <Text className="font-jk text-muted text-[11.5px] mt-0.5">{label}</Text>
+    <View
+      className={`flex-row items-center justify-between py-3 ${
+        last ? "" : "border-b border-hairline"
+      }`}
+    >
+      <Text className="font-jk text-ink text-[14px]">{label}</Text>
+      <Text className="font-jk-med text-ink text-[14px]">{value}</Text>
     </View>
   );
 }
@@ -121,19 +131,18 @@ export default function UsageScreen() {
           WHAT YOU HAVE BUILT
         </Text>
 
-        <View className="flex-row">
-          <Figure value={live.length} label="items filed" />
-          {/* Words, not megabytes: the tutor searches text, so text is the
-              capacity that actually matters. */}
-          <Figure value={words.toLocaleString()} label="words readable" />
-          <Figure value={materials.length - live.length} label="archived" />
-        </View>
-
-        <View className="flex-row mt-5">
-          <Figure value={questions} label="questions asked" />
-          <Figure value={events.length} label="events tracked" />
-          <Figure value={`${study.streakDays}d`} label="current streak" />
-        </View>
+        <Figure label="Items filed" value={live.length} />
+        {/* Words, not megabytes: the tutor searches text, so text is the
+            capacity that actually matters. */}
+        <Figure label="Words the tutor can read" value={words.toLocaleString()} />
+        <Figure label="Archived" value={materials.length - live.length} />
+        <Figure label="Questions asked" value={questions} />
+        <Figure label="Events tracked" value={events.length} />
+        <Figure
+          label="Current streak"
+          value={`${study.streakDays} ${study.streakDays === 1 ? "day" : "days"}`}
+          last
+        />
       </View>
     </Screen>
   );

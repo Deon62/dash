@@ -207,17 +207,19 @@ export default function StudyScreen() {
                 {greeting()},
               </Text>
               <Text className="font-jk-bold text-ink text-[30px] leading-[38px] text-center">
-                {firstName ? `${firstName} 👋` : "let's revise 👋"}
+                {firstName ? `${firstName} 👋` : "ready when you are 👋"}
               </Text>
 
-              {/* The only line here worth printing is the one a student can
-                  act on, and that is only true when there is nothing filed. */}
-              {scoped.length === 0 ? (
-                <Text className="font-jk text-muted text-[13.5px] leading-[20px] text-center mt-3">
-                  File a note under a unit in Knowledge and I can revise it with
-                  you.
-                </Text>
-              ) : null}
+              {/* Naming what it has actually read is the whole promise of the
+                  app, and this is the moment a student is deciding whether to
+                  trust it. An empty library gets the one line it can act on. */}
+              <Text className="font-jk text-muted text-[13.5px] leading-[20px] text-center mt-3">
+                {scoped.length === 0
+                  ? "Drop a note into Knowledge and I'll revise it with you."
+                  : `I've read your ${scoped.length} filed ${
+                      scoped.length === 1 ? "item" : "items"
+                    }${unit ? ` for ${unit.code}` : ""}. Ask me anything in there.`}
+              </Text>
             </View>
           ) : (
             messages.map((message) => <Bubble key={message.id} message={message} />)

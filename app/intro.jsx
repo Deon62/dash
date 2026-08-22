@@ -26,20 +26,20 @@ const SLIDES = [
   {
     key: "knowledge",
     Art: FiledArt,
-    title: "Your whole course,\nfiled by unit",
-    body: "Class times, notes and slides, each under the unit they belong to.",
+    title: "Chuck it all in\none place",
+    body: "Timetable, notes, slides, past papers — filed under the unit they belong to instead of lost in your gallery.",
   },
   {
     key: "study",
     Art: NotesArt,
-    title: "Revise from your\nown notes",
-    body: "Ask anything. Answers come straight from what you filed, quoted.",
+    title: "An AI that studies\nwhat you study",
+    body: "It reads your material, not the internet. Ask anything and it answers from your own lecture — and tells you which one.",
   },
   {
     key: "calendar",
     Art: CalendarArt,
-    title: "Nothing sneaks\nup on you",
-    body: "CATs, exams and deadlines on one calendar, counting down.",
+    title: "Never get ambushed\nby a CAT again",
+    body: "Every deadline on one calendar, counting down from the moment you add it.",
   },
 ];
 

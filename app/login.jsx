@@ -159,12 +159,16 @@ export default function LoginScreen() {
           flexGrow: 1,
         }}
       >
+        {/* The old hero said "your whole course, in one place", which is every
+            folder app ever made. The thing worth saying is that the tutor
+            studies *your* material — that is the product, and it belongs on the
+            first screen rather than being discovered three tabs in. */}
         <Text className="font-jk-bold text-ink text-[30px] leading-[38px] text-center">
-          Your whole course,{"\n"}in one place.
+          The AI that actually{"\n"}did your readings.
         </Text>
-        <Text className="font-jk text-muted text-[14px] leading-[21px] text-center mt-3.5">
-          Sign in to pick up your notes, deadlines and revision where you left
-          them.
+        <Text className="font-jk text-muted text-[14.5px] leading-[22px] text-center mt-3.5">
+          Feed it your notes, slides and past papers. It learns your units and
+          revises with you — quoting the exact lecture it got the answer from.
         </Text>
 
         {/* The sign-in controls sit in the vertical middle rather than packed

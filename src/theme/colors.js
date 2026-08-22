@@ -26,6 +26,8 @@ export const COLORS = {
   violet: "#7C3AED",
   teal: "#0D9488",
   amber: "#F59E0B",
+  /** The streak flame, and nothing else. */
+  flame: "#F97316",
   danger: "#DC2626",
 };
 

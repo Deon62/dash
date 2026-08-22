@@ -5,6 +5,7 @@ import { Bell, CalendarOff } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import IconButton from "@/components/IconButton";
+import StreakBadge from "@/components/StreakBadge";
 import Fab from "@/components/Fab";
 import MonthCalendar from "@/components/MonthCalendar";
 import DaySheet from "@/components/DaySheet";
@@ -35,6 +36,7 @@ export default function HomeScreen() {
   const events = useStudyStore((state) => state.events);
   const addEvent = useStudyStore((state) => state.addEvent);
   const toggleEvent = useStudyStore((state) => state.toggleEvent);
+  const study = useStudyStore((state) => state.study);
 
   const [composing, setComposing] = useState(false);
   const [openDate, setOpenDate] = useState(null);
@@ -73,12 +75,20 @@ export default function HomeScreen() {
             </Text>
           </View>
 
-          <IconButton
-            Icon={Bell}
-            label="Notifications"
-            onPress={() => router.push("/notifications")}
-            badge={overdue}
-          />
+          {/* Streak first, then the bell: one is a reward and the other is a
+              demand, and the reward should not be the thing you reach past. */}
+          <View className="flex-row items-center gap-x-2">
+            <StreakBadge
+              days={study.streakDays}
+              onPress={() => router.push("/usage")}
+            />
+            <IconButton
+              Icon={Bell}
+              label="Notifications"
+              onPress={() => router.push("/notifications")}
+              badge={overdue}
+            />
+          </View>
         </View>
 
         {/* --- The month --- */}

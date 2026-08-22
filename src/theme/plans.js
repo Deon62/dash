@@ -130,7 +130,7 @@ export const PLAN_CARDS = [
   {
     tier: SubscriptionTier.PRO,
     name: "Synapse",
-    tagline: "For a full course load and finals",
+    tagline: "For a full load, and finals week",
     checkoutUrl: "https://paystack.shop/pay/a-tbik1kof",
     /**
      * Filled. Two identical white cards make a student compare nine lines of
@@ -142,7 +142,7 @@ export const PLAN_CARDS = [
   {
     tier: SubscriptionTier.FRIENDS,
     name: "Friends",
-    tagline: "Synapse for five, split between you",
+    tagline: "Synapse for five, split five ways",
     // No link yet — a group plan needs the seats created server-side before a
     // payment means anything, so this one asks rather than pretending.
     checkoutUrl: null,
