@@ -14,7 +14,12 @@ import { getTabBarHeight } from "@/theme/layout";
  * split across `contentContainerClassName` as well: passing both means the
  * explicit style wins and the classes are silently dropped.
  */
-export default function Screen({ children, contentStyle, keyboardAware = false }) {
+export default function Screen({
+  children,
+  contentStyle,
+  keyboardAware = false,
+  bare = false,
+}) {
   const insets = useSafeAreaInsets();
 
   const scroller = (
@@ -23,10 +28,12 @@ export default function Screen({ children, contentStyle, keyboardAware = false }
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
       contentContainerStyle={{
-        paddingTop: 16,
-        paddingBottom: getTabBarHeight(insets) + 28,
+        paddingTop: 12,
+        // `bare` pages are pushed as a stack screen, so there is no tab bar
+        // underneath them to clear.
+        paddingBottom: (bare ? Math.max(insets.bottom, 16) : getTabBarHeight(insets)) + 28,
         paddingHorizontal: 20,
-        rowGap: 20,
+        rowGap: 22,
         ...contentStyle,
       }}
     >
@@ -35,7 +42,7 @@ export default function Screen({ children, contentStyle, keyboardAware = false }
   );
 
   return (
-    <View style={{ paddingTop: insets.top }} className="flex-1 bg-brand-canvas">
+    <View style={{ paddingTop: insets.top }} className="flex-1 bg-canvas">
       {keyboardAware ? (
         <KeyboardAvoidingView
           behavior={Platform.OS === "ios" ? "padding" : undefined}

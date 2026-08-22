@@ -4,7 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Camera, UserRound } from "lucide-react-native";
 
 import ConfirmDialog from "@/components/ConfirmDialog";
-import { useTransitStore } from "@/store/useTransitStore";
+import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
 
 const SIZE = 96;
@@ -12,13 +12,13 @@ const SIZE = 96;
 /**
  * Tappable avatar. Falls back to initials until a picture is chosen.
  *
- * The chosen image is a local file URI held in the store, so it survives
- * navigation but not a restart — persisting it needs real storage, which is a
- * job for whatever backs accounts later.
+ * The chosen image is a local file URI held in the store. That survives a
+ * restart because the store is persisted, but it is still a path into this
+ * device's cache — uploading the file belongs to whatever backs accounts later.
  */
 export default function AvatarPicker() {
-  const profile = useTransitStore((state) => state.profile);
-  const setAvatar = useTransitStore((state) => state.setAvatar);
+  const profile = useStudyStore((state) => state.profile);
+  const setAvatar = useStudyStore((state) => state.setAvatar);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 
@@ -68,7 +68,7 @@ export default function AvatarPicker() {
     >
       <View
         style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2 }}
-        className="items-center justify-center bg-brand-black overflow-hidden"
+        className="items-center justify-center bg-obsidian overflow-hidden"
       >
         {profile.avatarUri ? (
           <Image
@@ -77,7 +77,7 @@ export default function AvatarPicker() {
             resizeMode="cover"
           />
         ) : profile.initials ? (
-          <Text className="font-jk-black text-brand-white text-[30px] tracking-[1px]">
+          <Text className="font-jk-semi text-canvas text-[30px] tracking-[1px]">
             {profile.initials}
           </Text>
         ) : (
@@ -87,7 +87,7 @@ export default function AvatarPicker() {
       </View>
 
       {/* Affordance — otherwise nothing says the avatar is tappable. */}
-      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-white bg-brand-black">
+      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-canvas bg-obsidian">
         <Camera size={14} color="#FFFFFF" strokeWidth={2.2} />
       </View>
 

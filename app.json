@@ -79,7 +79,8 @@
           "image": "./assets/logo.png",
           "imageWidth": 180
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": false

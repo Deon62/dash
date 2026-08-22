@@ -49,9 +49,12 @@ function TabItem({ label, Icon, focused, onPress, onLongPress }) {
     >
       <Animated.View style={iconStyle} className="items-center justify-center">
         <Icon
-          size={23}
-          color={focused ? "#09090B" : "#A1A1AA"}
-          strokeWidth={focused ? 2.3 : 1.9}
+          size={22}
+          color={focused ? "#09090B" : "#71717A"}
+          // A hair heavier when selected, not a different weight class: the
+          // label below already carries the state, and doubling the signal
+          // makes the bar look like it is shouting.
+          strokeWidth={focused ? 2 : 1.6}
         />
       </Animated.View>
 
@@ -59,7 +62,7 @@ function TabItem({ label, Icon, focused, onPress, onLongPress }) {
         numberOfLines={1}
         style={{ textAlign: "center" }}
         className={`mt-1.5 w-full text-[11px] ${
-          focused ? "font-jk-bold text-brand-black" : "font-jk-semi text-brand-muted"
+          focused ? "font-jk-semi text-ink" : "font-jk text-muted"
         }`}
       >
         {label}
@@ -79,7 +82,7 @@ export default function BottomTabBar({ state, descriptors, navigation }) {
   return (
     <View
       style={{ paddingBottom: Math.max(insets.bottom, 10) }}
-      className="absolute inset-x-0 bottom-0 bg-white border-t border-brand-hairline"
+      className="absolute inset-x-0 bottom-0 bg-canvas border-t border-line"
     >
       <View className="flex-row items-stretch">
         {state.routes.map((route, index) => {

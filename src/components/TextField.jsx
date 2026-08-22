@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Pressable, Text, TextInput, View } from "react-native";
-import { Eye, EyeOff } from "lucide-react-native";
+import { Text, TextInput, View } from "react-native";
 
 /**
- * Labelled input with an optional leading glyph. Password fields get a reveal
- * toggle — masking with no way to check what you typed is a common cause of
- * failed sign-ins on phone keyboards.
+ * Labelled input.
+ *
+ * Focus is marked with the indigo highlight — the one state on a form where a
+ * colour is telling you something rather than decorating.
  */
 export default function TextField({
   label,
@@ -13,28 +13,30 @@ export default function TextField({
   onChangeText,
   placeholder,
   Icon,
-  secure = false,
+  hint,
+  multiline = false,
   ...inputProps
 }) {
-  const [hidden, setHidden] = useState(secure);
   const [focused, setFocused] = useState(false);
 
   return (
     <View>
-      <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[1.5px] mb-2">
-        {label.toUpperCase()}
-      </Text>
+      {label ? (
+        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-2">
+          {label}
+        </Text>
+      ) : null}
 
       <View
-        className={`flex-row items-center rounded-2xl border bg-white px-4 ${
-          focused ? "border-brand-black" : "border-brand-hairline"
+        className={`flex-row items-center rounded-2xl border bg-canvas px-4 ${
+          focused ? "border-indigo" : "border-line"
         }`}
       >
         {Icon ? (
           <Icon
             size={17}
-            color={focused ? "#09090B" : "#A1A1AA"}
-            strokeWidth={2}
+            color={focused ? "#4F46E5" : "#71717A"}
+            strokeWidth={1.8}
           />
         ) : null}
 
@@ -43,30 +45,20 @@ export default function TextField({
           onChangeText={onChangeText}
           placeholder={placeholder}
           placeholderTextColor="#A1A1AA"
-          secureTextEntry={hidden}
+          multiline={multiline}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          className={`flex-1 py-4 font-jk-semi text-brand-black text-[15px] ${
-            Icon ? "ml-3" : ""
-          }`}
+          style={multiline ? { minHeight: 104, textAlignVertical: "top" } : undefined}
+          className={`flex-1 py-3.5 font-jk text-ink text-[15px] ${Icon ? "ml-3" : ""}`}
           {...inputProps}
         />
-
-        {secure ? (
-          <Pressable
-            onPress={() => setHidden((h) => !h)}
-            hitSlop={10}
-            accessibilityRole="button"
-            accessibilityLabel={hidden ? "Show password" : "Hide password"}
-          >
-            {hidden ? (
-              <EyeOff size={17} color="#A1A1AA" strokeWidth={2} />
-            ) : (
-              <Eye size={17} color="#09090B" strokeWidth={2} />
-            )}
-          </Pressable>
-        ) : null}
       </View>
+
+      {hint ? (
+        <Text className="font-jk text-muted text-[11.5px] leading-[16px] mt-2 ml-1">
+          {hint}
+        </Text>
+      ) : null}
     </View>
   );
 }

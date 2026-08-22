@@ -1,7 +1,7 @@
 import { Image, View } from "react-native";
 import { CircleUser } from "lucide-react-native";
 
-import { useTransitStore } from "@/store/useTransitStore";
+import { useStudyStore } from "@/store/useStudyStore";
 
 /**
  * Profile tab icon. Shows the user's picture once one is set, falling back to
@@ -9,7 +9,7 @@ import { useTransitStore } from "@/store/useTransitStore";
  * so it drops into the `Icon` option unchanged.
  */
 export default function ProfileTabIcon({ size = 23, color, strokeWidth }) {
-  const avatarUri = useTransitStore((state) => state.profile.avatarUri);
+  const avatarUri = useStudyStore((state) => state.profile.avatarUri);
 
   if (!avatarUri) {
     // No photo yet — the outline glyph, same as a fresh account elsewhere.

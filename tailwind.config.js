@@ -5,45 +5,34 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        brand: {
-          white: "#FFFFFF",
-          // Pure white canvas — glass surfaces need a clean ground to sit on,
-          // an off-white makes the frosted panels read as dirty grey.
-          canvas: "#FFFFFF",
-          black: "#09090B",
-          slate: "#52525B",
-          muted: "#A1A1AA",
-          border: "#E5E7EB",
-          // Hairline used on glass, where a solid border is too heavy.
-          hairline: "#EFEFF2",
-        },
-        transit: {
-          // Matatu — yellow / amber
-          matatu: "#FFB800",
-          "matatu-bg": "#FFFBEB",
-          "matatu-border": "#FDE68A",
-          // Boda Boda — coral / red
-          boda: "#FF3B30",
-          "boda-bg": "#FEF2F2",
-          "boda-border": "#FECACA",
-          // Tuk-Tuk — electric teal / cyan
-          tuktuk: "#00C7BE",
-          "tuktuk-bg": "#ECFEFF",
-          "tuktuk-border": "#A5F3FC",
-          // Everything else — slate
-          other: "#64748B",
-          "other-bg": "#F8FAFC",
-          "other-border": "#E2E8F0",
-        },
+        /** Page ground. Everything sits on white. */
+        canvas: "#FFFFFF",
+        /** Cards, wells, inactive chips — the only fill besides white. */
+        surface: "#F4F4F5",
+        /** Every border and divider on the page. */
+        line: "#E4E4E7",
+        /** Primary text. */
+        ink: "#09090B",
+        /** Secondary text, placeholders, inactive glyphs. */
+        muted: "#71717A",
+        /** Filled buttons, active chips, the tab bar's selected state. */
+        obsidian: "#18181B",
+        /**
+         * Reserved for interactive highlight only — a focused field, a live
+         * class, the send button once it is armed. Never decoration: the
+         * moment it is used for a heading it stops meaning "you can act here".
+         */
+        indigo: "#4F46E5",
+        danger: "#DC2626",
       },
       // React Native has no synthetic font weights: every weight is its own
       // family, so these are named `jk-*` to avoid colliding with Tailwind's
-      // own `font-bold` / `font-semibold` fontWeight utilities.
+      // own fontWeight utilities. Nothing above 600 — the type is meant to
+      // read as quiet and even, and a heavier face undoes that on its own.
       fontFamily: {
         jk: ["PlusJakartaSans_400Regular"],
+        "jk-med": ["PlusJakartaSans_500Medium"],
         "jk-semi": ["PlusJakartaSans_600SemiBold"],
-        "jk-bold": ["PlusJakartaSans_700Bold"],
-        "jk-black": ["PlusJakartaSans_800ExtraBold"],
       },
     },
   },

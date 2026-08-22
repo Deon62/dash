@@ -40,10 +40,10 @@ export default function CountryPicker({ value, onChange }) {
         }}
         accessibilityRole="button"
         accessibilityLabel={`Country code, currently ${active.name} ${active.dial}`}
-        className="flex-row items-center gap-x-1.5 pr-3 mr-3 border-r border-brand-hairline active:opacity-60"
+        className="flex-row items-center gap-x-1.5 pr-3 mr-3 border-r border-line active:opacity-60"
       >
-        <Text className="text-[19px]">{flagEmoji(active.iso)}</Text>
-        <Text className="font-jk-bold text-brand-black text-[15px]">
+        <Text className="text-[18px]">{flagEmoji(active.iso)}</Text>
+        <Text className="font-jk-med text-ink text-[15px]">
           {active.dial}
         </Text>
       </Pressable>
@@ -54,15 +54,15 @@ export default function CountryPicker({ value, onChange }) {
         animationType="slide"
         onRequestClose={() => setOpen(false)}
       >
-        <View className="flex-1 bg-brand-black/30">
+        <View className="flex-1 bg-ink/30">
           <Pressable className="flex-1" onPress={() => setOpen(false)} />
 
           <View
             style={{ paddingBottom: insets.bottom + 8, maxHeight: "78%" }}
-            className="rounded-t-3xl bg-white"
+            className="rounded-t-3xl bg-canvas"
           >
             <View className="flex-row items-center justify-between px-5 pt-5 pb-3">
-              <Text className="font-jk-black text-brand-black text-[17px]">
+              <Text className="font-jk-semi text-ink text-[17px]">
                 Country
               </Text>
               <Pressable
@@ -70,13 +70,13 @@ export default function CountryPicker({ value, onChange }) {
                 hitSlop={10}
                 accessibilityRole="button"
                 accessibilityLabel="Close country list"
-                className="h-8 w-8 items-center justify-center rounded-full bg-brand-black/[0.05] active:opacity-70"
+                className="h-8 w-8 items-center justify-center rounded-full bg-obsidian/[0.05] active:opacity-70"
               >
                 <X size={15} color="#52525B" strokeWidth={2.4} />
               </Pressable>
             </View>
 
-            <View className="mx-5 mb-2 flex-row items-center rounded-2xl border border-brand-hairline px-3.5">
+            <View className="mx-5 mb-2 flex-row items-center rounded-2xl border border-line px-3.5">
               <Search size={16} color="#A1A1AA" strokeWidth={2} />
               <TextInput
                 value={query}
@@ -84,7 +84,7 @@ export default function CountryPicker({ value, onChange }) {
                 placeholder="Search country or code"
                 placeholderTextColor="#A1A1AA"
                 autoCorrect={false}
-                className="flex-1 py-3 ml-2.5 font-jk-semi text-brand-black text-[14px]"
+                className="flex-1 py-3 ml-2.5 font-jk-semi text-ink text-[14px]"
               />
             </View>
 
@@ -97,7 +97,7 @@ export default function CountryPicker({ value, onChange }) {
                     onPress={() => select(country.iso)}
                     accessibilityRole="button"
                     accessibilityLabel={country.name}
-                    className="flex-row items-center px-5 py-3.5 active:bg-brand-black/[0.04]"
+                    className="flex-row items-center px-5 py-3.5 active:bg-obsidian/[0.04]"
                   >
                     <Text className="text-[20px] w-8">
                       {flagEmoji(country.iso)}
@@ -105,13 +105,13 @@ export default function CountryPicker({ value, onChange }) {
                     <Text
                       className={`flex-1 text-[14px] ml-1 ${
                         selected
-                          ? "font-jk-bold text-brand-black"
-                          : "font-jk-semi text-brand-slate"
+                          ? "font-jk-med text-ink"
+                          : "font-jk-semi text-muted"
                       }`}
                     >
                       {country.name}
                     </Text>
-                    <Text className="font-jk text-brand-muted text-[13px] mr-3">
+                    <Text className="font-jk text-muted text-[13px] mr-3">
                       {country.dial}
                     </Text>
                     {selected ? (
@@ -122,7 +122,7 @@ export default function CountryPicker({ value, onChange }) {
               })}
 
               {results.length === 0 ? (
-                <Text className="font-jk text-brand-muted text-[13px] text-center py-8">
+                <Text className="font-jk text-muted text-[13px] text-center py-8">
                   No match for “{query}”.
                 </Text>
               ) : null}

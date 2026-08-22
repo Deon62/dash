@@ -1,174 +1,119 @@
-import { useState } from "react";
-import { Pressable, Switch, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
-  Building2,
-  ChevronRight,
+  CalendarDays,
+  ChartNoAxesColumn,
+  CreditCard,
   IdCard,
+  Layers,
   LogOut,
-  Radar,
-  Trash2,
-  Wallet,
+  Receipt,
+  Settings,
 } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
+import IconButton from "@/components/IconButton";
 import AvatarPicker from "@/components/AvatarPicker";
-import ConfirmDialog from "@/components/ConfirmDialog";
-import { useTransitStore } from "@/store/useTransitStore";
-import { impact } from "@/lib/haptics";
-
-/**
- * `toggle` rows switch in place; the rest push a page. Values are resolved
- * from state at render so a row can never show stale copy.
- */
-const ROWS = [
-  { id: "details", label: "Personal details", Icon: IdCard, href: "/account" },
-  { id: "motion", label: "Motion detection", Icon: Radar, toggle: true },
-  { id: "city", label: "Home city", Icon: Building2, href: "/settings/home-city" },
-  { id: "currency", label: "Fare currency", Icon: Wallet, href: "/settings/currency" },
-];
+import LinkRow from "@/components/LinkRow";
+import { useStudyStore } from "@/store/useStudyStore";
 
 export default function ProfileScreen() {
   const router = useRouter();
-  const profile = useTransitStore((state) => state.profile);
-  const settings = useTransitStore((state) => state.settings);
-  const updateSettings = useTransitStore((state) => state.updateSettings);
-  const logout = useTransitStore((state) => state.logout);
-  const deleteAccount = useTransitStore((state) => state.deleteAccount);
 
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const profile = useStudyStore((state) => state.profile);
+  const units = useStudyStore((state) => state.units);
+  const classes = useStudyStore((state) => state.classes);
+  const billing = useStudyStore((state) => state.billing);
+  const signOut = useStudyStore((state) => state.signOut);
 
-  const values = {
-    city: profile.homeCity || "Not set",
-    currency: settings.currency,
-  };
+  const enrolment = [profile.program, profile.institution].filter(Boolean).join(" · ");
+  const term = [
+    profile.yearOfStudy ? `Year ${profile.yearOfStudy}` : null,
+    profile.semester ? `Semester ${profile.semester}` : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   return (
     <Screen>
-      <View className="items-center pt-10">
+      <View className="flex-row justify-end">
+        <IconButton
+          Icon={Settings}
+          label="Settings"
+          onPress={() => router.push("/settings")}
+        />
+      </View>
+
+      <View className="items-center -mt-4">
         <AvatarPicker />
 
-        <Text className="font-jk-black text-brand-black text-[23px] mt-5">
+        <Text className="font-jk-semi text-ink text-[21px] mt-5">
           {profile.name || "Your name"}
         </Text>
-        {profile.phone || profile.email ? (
-          <Text className="font-jk text-brand-slate text-[13px] mt-1">
-            {profile.phone || profile.email}
+        {enrolment ? (
+          <Text className="font-jk text-muted text-[13px] text-center mt-1">
+            {enrolment}
           </Text>
         ) : null}
-        <Text className="font-jk text-brand-muted text-[12px] mt-1">
-          {profile.homeCity
-            ? `${profile.homeCity} · commuting since ${profile.memberSince}`
-            : `Commuting since ${profile.memberSince}`}
+        <Text className="font-jk text-muted text-[12.5px] mt-1">
+          {term || `Student since ${profile.memberSince}`}
         </Text>
       </View>
 
-      <View className="gap-y-1 mt-4">
-        {ROWS.map((row) => {
-          const content = (
-            <>
-              <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-black/[0.04]">
-                <row.Icon size={17} color="#09090B" strokeWidth={2} />
-              </View>
-              <Text className="font-jk-semi text-brand-black text-[15px] flex-1 ml-3.5">
-                {row.label}
-              </Text>
-            </>
-          );
-
-          if (row.toggle) {
-            return (
-              <View
-                key={row.id}
-                className="flex-row items-center rounded-2xl px-1 py-3"
-              >
-                {content}
-                <Switch
-                  value={settings.motionDetection}
-                  onValueChange={(value) => {
-                    impact("light");
-                    updateSettings({ motionDetection: value });
-                  }}
-                  accessibilityLabel="Motion detection"
-                  trackColor={{ false: "#E5E7EB", true: "#09090B" }}
-                  thumbColor="#FFFFFF"
-                  ios_backgroundColor="#E5E7EB"
-                />
-              </View>
-            );
-          }
-
-          return (
-            <Pressable
-              key={row.id}
-              onPress={() => {
-                impact("light");
-                router.push(row.href);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={row.label}
-              className="flex-row items-center rounded-2xl px-1 py-4 active:bg-brand-black/[0.03]"
-            >
-              {content}
-              {values[row.id] ? (
-                <Text className="font-jk text-brand-muted text-[13px] mr-2">
-                  {values[row.id]}
-                </Text>
-              ) : null}
-              <ChevronRight size={16} color="#A1A1AA" strokeWidth={2.2} />
-            </Pressable>
-          );
-        })}
+      {/* Coursework. The counts live on the rows rather than in tiles above
+          them — a number a student can tap through to is worth more than one
+          they can only look at. */}
+      <View>
+        <LinkRow
+          Icon={IdCard}
+          label="Personal details"
+          onPress={() => router.push("/account")}
+        />
+        <LinkRow
+          Icon={Layers}
+          label="Units"
+          value={units.length ? String(units.length) : undefined}
+          onPress={() => router.push("/units")}
+        />
+        <LinkRow
+          Icon={CalendarDays}
+          label="Class timetable"
+          value={classes.length ? `${classes.length}/wk` : undefined}
+          onPress={() => router.push("/timetable")}
+          last
+        />
       </View>
 
-      <Pressable
-        onPress={() => {
-          impact("medium");
-          logout();
-          router.replace("/login");
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Log out"
-        className="flex-row items-center rounded-2xl px-1 py-4 mt-3 active:bg-transit-boda-bg"
-      >
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-transit-boda-bg">
-          <LogOut size={17} color="#FF3B30" strokeWidth={2} />
-        </View>
-        <Text className="font-jk-bold text-transit-boda text-[15px] ml-3.5">
-          Log out
-        </Text>
-      </Pressable>
+      <View>
+        <LinkRow
+          Icon={ChartNoAxesColumn}
+          label="Usage"
+          onPress={() => router.push("/usage")}
+        />
+        <LinkRow
+          Icon={Receipt}
+          label="Billing"
+          value={billing.plan === "free" ? "Free" : "Pro"}
+          onPress={() => router.push("/billing")}
+        />
+        <LinkRow
+          Icon={CreditCard}
+          label="Payment methods"
+          value={billing.mpesaNumber ? "M-Pesa" : undefined}
+          onPress={() => router.push("/payment-methods")}
+          last
+        />
+      </View>
 
-      <Pressable
-        onPress={() => {
-          impact("light");
-          setConfirmingDelete(true);
-        }}
-        accessibilityRole="button"
-        accessibilityLabel="Delete my account"
-        className="flex-row items-center rounded-2xl px-1 py-4 active:bg-brand-black/[0.03]"
-      >
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-brand-black/[0.04]">
-          <Trash2 size={17} color="#52525B" strokeWidth={2} />
-        </View>
-        <Text className="font-jk-semi text-brand-slate text-[15px] ml-3.5">
-          Delete my account
-        </Text>
-      </Pressable>
+      <View>
+        <LinkRow Icon={LogOut} label="Log out" onPress={signOut} last />
+      </View>
 
-      <ConfirmDialog
-        visible={confirmingDelete}
-        title="Delete your account?"
-        message="This removes your profile and every ride you've logged. It can't be undone."
-        confirmLabel="Delete"
-        destructive
-        onCancel={() => setConfirmingDelete(false)}
-        onConfirm={() => {
-          setConfirmingDelete(false);
-          deleteAccount();
-          router.replace("/login");
-        }}
-      />
+      {/* Everything is on the phone, so this really is the whole account —
+          worth saying plainly rather than implying a server holds a copy. */}
+      <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-3">
+        Your coursework is stored on this device only. Logging out keeps it.
+      </Text>
     </Screen>
   );
 }

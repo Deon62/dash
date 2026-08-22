@@ -10,9 +10,10 @@ import {
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ChevronLeft } from "lucide-react-native";
+import { ArrowLeft } from "lucide-react-native";
 
-import { useTransitStore } from "@/store/useTransitStore";
+import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
+import { useStudyStore } from "@/store/useStudyStore";
 import { impact, notify } from "@/lib/haptics";
 
 const CODE_LENGTH = 6;
@@ -21,12 +22,17 @@ const RESEND_SECONDS = 30;
 export default function VerifyScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { phone } = useLocalSearchParams();
-  const signIn = useTransitStore((state) => state.signIn);
+  // `phone` is E.164 and must match what the code was sent to; `display` is the
+  // prettier version for the heading.
+  const { phone, display } = useLocalSearchParams();
+
+  const signIn = useStudyStore((state) => state.signIn);
 
   const inputRef = useRef(null);
   const [code, setCode] = useState("");
   const [secondsLeft, setSecondsLeft] = useState(RESEND_SECONDS);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (secondsLeft <= 0) return undefined;
@@ -36,19 +42,44 @@ export default function VerifyScreen() {
 
   const complete = code.length === CODE_LENGTH;
 
-  const verify = () => {
-    if (!complete) return;
+  const verify = async () => {
+    if (!complete || busy) return;
     impact("medium");
-    // No SMS provider wired yet — any six digits are accepted.
-    signIn({ phone: String(phone ?? "") });
+    setBusy(true);
+    setError("");
+
+    const result = await verifyPhoneOtp(String(phone ?? ""), code);
+    setBusy(false);
+
+    if (result.error) {
+      // Clear the boxes so the next attempt starts from a clean field rather
+      // than the user having to delete six digits first.
+      setCode("");
+      setError(result.error);
+      notify("error");
+      return;
+    }
+
     notify("success");
-    router.replace("/(tabs)");
+    // No navigation here — the session guard sends a new student to onboarding
+    // and a returning one straight to the tabs.
+    signIn(String(phone ?? ""));
+  };
+
+  const resend = async () => {
+    if (secondsLeft > 0 || busy) return;
+    impact("light");
+    setError("");
+
+    const result = await sendPhoneOtp(String(phone ?? ""));
+    if (result.error) setError(result.error);
+    else setSecondsLeft(RESEND_SECONDS);
   };
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-brand-canvas"
+      className="flex-1 bg-canvas"
     >
       <ScrollView
         keyboardShouldPersistTaps="handled"
@@ -68,17 +99,17 @@ export default function VerifyScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={8}
-          className="h-10 w-10 items-center justify-center rounded-full border border-brand-hairline bg-white active:opacity-70"
+          className="h-10 w-10 items-center justify-center rounded-full bg-surface active:opacity-60"
         >
-          <ChevronLeft size={19} color="#09090B" strokeWidth={2.2} />
+          <ArrowLeft size={18} color="#09090B" strokeWidth={1.8} />
         </Pressable>
 
-        <Text className="font-jk-black text-brand-black text-[28px] leading-[34px] mt-8">
+        <Text className="font-jk-semi text-ink text-[28px] leading-[34px] mt-8">
           Enter the code
         </Text>
-        <Text className="font-jk text-brand-slate text-[14px] leading-[20px] mt-2">
+        <Text className="font-jk text-muted text-[14px] leading-[20px] mt-2">
           We sent a {CODE_LENGTH}-digit code to{" "}
-          <Text className="font-jk-bold text-brand-black">{phone}</Text>.
+          <Text className="font-jk-med text-ink">{display ?? phone}</Text>.
         </Text>
 
         {/* One input behind six boxes — simpler and more reliable than six
@@ -98,11 +129,11 @@ export default function VerifyScreen() {
                 key={index}
                 className={`h-14 w-[46px] items-center justify-center rounded-2xl border ${
                   char || active
-                    ? "border-brand-black bg-white"
-                    : "border-brand-hairline bg-white"
+                    ? "border-obsidian bg-canvas"
+                    : "border-line bg-canvas"
                 }`}
               >
-                <Text className="font-jk-black text-brand-black text-[22px]">
+                <Text className="font-jk-semi text-ink text-[22px]">
                   {char ?? ""}
                 </Text>
               </View>
@@ -125,26 +156,43 @@ export default function VerifyScreen() {
           style={{ position: "absolute", opacity: 0, height: 1, width: 1 }}
         />
 
+        {/* Auth is not connected to a provider yet. Saying so beats a student
+            waiting on a text that is never going to arrive. */}
+        <View className="rounded-2xl border border-line bg-surface px-4 py-3 mt-5">
+          <Text className="font-jk text-muted text-[12px] leading-[17px]">
+            Sign-in is running offline for now — any {CODE_LENGTH} digits will
+            let you in.
+          </Text>
+        </View>
+
+        {error ? (
+          <Text className="font-jk text-danger text-[12px] leading-[17px] mt-4">
+            {error}
+          </Text>
+        ) : null}
+
         <Pressable
           onPress={verify}
-          disabled={!complete}
+          disabled={!complete || busy}
           accessibilityRole="button"
           accessibilityLabel="Verify code"
-          accessibilityState={{ disabled: !complete }}
-          className={`items-center justify-center rounded-2xl py-4 mt-8 ${
-            complete ? "bg-brand-black active:opacity-85" : "bg-brand-black/20"
+          accessibilityState={{ disabled: !complete || busy, busy }}
+          className={`items-center justify-center rounded-2xl py-4 mt-6 ${
+            complete && !busy ? "bg-obsidian active:opacity-85" : "bg-surface"
           }`}
         >
-          <Text className="font-jk-bold text-brand-white text-[15px]">Verify</Text>
+          <Text
+            className={`font-jk-med text-[15px] ${
+              complete && !busy ? "text-canvas" : "text-muted"
+            }`}
+          >
+            {busy ? "Checking…" : "Verify"}
+          </Text>
         </Pressable>
 
         <Pressable
-          onPress={() => {
-            if (secondsLeft > 0) return;
-            impact("light");
-            setSecondsLeft(RESEND_SECONDS);
-          }}
-          disabled={secondsLeft > 0}
+          onPress={resend}
+          disabled={secondsLeft > 0 || busy}
           accessibilityRole="button"
           accessibilityLabel="Resend code"
           accessibilityState={{ disabled: secondsLeft > 0 }}
@@ -153,8 +201,8 @@ export default function VerifyScreen() {
           <Text
             className={`text-[13px] ${
               secondsLeft > 0
-                ? "font-jk text-brand-muted"
-                : "font-jk-bold text-brand-black"
+                ? "font-jk text-muted"
+                : "font-jk-med text-ink"
             }`}
           >
             {secondsLeft > 0 ? `Resend code in ${secondsLeft}s` : "Resend code"}

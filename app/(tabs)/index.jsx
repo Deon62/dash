@@ -1,83 +1,166 @@
-import { useMemo, useRef } from "react";
-import { View } from "react-native";
-import BottomSheet from "@gorhom/bottom-sheet";
-import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useMemo, useState } from "react";
+import { Pressable, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { Bell, CalendarDays, Clock, Plus } from "lucide-react-native";
 
-import MapCanvas from "@/components/MapCanvas";
-import TripSheet from "@/components/TripSheet";
-import DetectionPrompt from "@/components/DetectionPrompt";
-import { useTransitStore } from "@/store/useTransitStore";
-import {
-  SHEET_HANDLE_HEIGHT,
-  SHEET_PEEK_HEIGHT,
-  getTabBarHeight,
-} from "@/theme/layout";
+import Screen from "@/components/Screen";
+import SectionHeading from "@/components/SectionHeading";
+import IconButton from "@/components/IconButton";
+import ClassRow from "@/components/ClassRow";
+import EventRow from "@/components/EventRow";
+import EventComposer from "@/components/EventComposer";
+import EmptyState from "@/components/EmptyState";
+import { useStudyStore, unitById } from "@/store/useStudyStore";
+import { greeting, minutesOf } from "@/lib/dates";
+import { impact } from "@/lib/haptics";
 
-export default function TripsScreen() {
-  const sheetRef = useRef(null);
-  const insets = useSafeAreaInsets();
+/** How many upcoming items the dashboard shows before it stops being a summary. */
+const UPCOMING_LIMIT = 5;
 
-  // Raised by the detection layer once it exists; nothing sets it today.
-  const pendingDetection = useTransitStore((s) => s.pendingDetection);
-  const dismissDetection = useTransitStore((s) => s.dismissDetection);
+/**
+ * The dashboard: today, and what is coming.
+ *
+ * Two sections and nothing else. Everything that invites browsing — units,
+ * notes, past chats — lives in the tab that owns it, so this one can answer
+ * "what is happening" without becoming a second copy of the app.
+ */
+export default function HomeScreen() {
+  const router = useRouter();
 
-  const tabBarHeight = getTabBarHeight(insets);
+  const profile = useStudyStore((state) => state.profile);
+  const units = useStudyStore((state) => state.units);
+  const classes = useStudyStore((state) => state.classes);
+  const events = useStudyStore((state) => state.events);
+  const addEvent = useStudyStore((state) => state.addEvent);
+  const toggleEvent = useStudyStore((state) => state.toggleEvent);
 
-  // Collapsed height = handle + peek card + room for the bottom bar, so the
-  // status card lands fully above the bar and nothing else shows.
-  const collapsedHeight = SHEET_HANDLE_HEIGHT + SHEET_PEEK_HEIGHT + tabBarHeight;
+  const [composing, setComposing] = useState(false);
 
-  const snapPoints = useMemo(
-    () => [collapsedHeight, "62%", "92%"],
-    [collapsedHeight]
+  const today = new Date().getDay();
+
+  const todaysClasses = useMemo(
+    () =>
+      classes
+        .filter((entry) => entry.day === today)
+        .sort((a, b) => minutesOf(a.start) - minutesOf(b.start)),
+    [classes, today]
   );
 
+  // Undated items sort last: something with no date cannot be urgent, and
+  // putting it first would bury what is.
+  const upcoming = useMemo(
+    () =>
+      events
+        .filter((event) => !event.done)
+        .sort((a, b) => (a.at ?? "9999").localeCompare(b.at ?? "9999"))
+        .slice(0, UPCOMING_LIMIT),
+    [events]
+  );
+
+  const firstName = profile.name.trim().split(/\s+/)[0];
+  const dateLabel = new Date().toLocaleDateString(undefined, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+  });
+
   return (
-    <View className="flex-1 bg-brand-canvas">
-      <MapCanvas />
+    <>
+      <Screen>
+        <View className="flex-row items-start justify-between">
+          <View className="flex-1 pr-3">
+            <Text className="font-jk text-muted text-[13px]">{greeting()}</Text>
+            <Text className="font-jk-semi text-ink text-[24px] leading-[30px] mt-1">
+              {firstName || "Welcome"}
+            </Text>
+          </View>
 
-      <DetectionPrompt
-        visible={pendingDetection}
-        onLater={dismissDetection}
-        onChoose={() => {
-          dismissDetection();
-          // Open the sheet at the mode picker rather than making them drag.
-          sheetRef.current?.snapToIndex(1);
-        }}
+          <IconButton
+            Icon={Bell}
+            label="Notifications"
+            onPress={() => router.push("/notifications")}
+            badge={upcoming.some((event) => (event.at ?? "") <= new Date().toISOString())}
+          />
+        </View>
+
+        {/* --- Timetable --- */}
+        <View>
+          <SectionHeading
+            title="Timetable"
+            caption={dateLabel}
+            action="Full week"
+            onAction={() => router.push("/timetable")}
+          />
+
+          <View className="mt-2">
+            {todaysClasses.length === 0 ? (
+              <EmptyState
+                compact
+                Icon={Clock}
+                title="No classes today"
+                message="Add when a unit meets and its sessions appear here on the day."
+              />
+            ) : (
+              todaysClasses.map((entry, index) => (
+                <ClassRow
+                  key={entry.id}
+                  entry={entry}
+                  unit={unitById(units, entry.unitId)}
+                  today
+                  last={index === todaysClasses.length - 1}
+                />
+              ))
+            )}
+          </View>
+        </View>
+
+        {/* --- Upcoming --- */}
+        <View>
+          <View className="flex-row items-center justify-between">
+            <SectionHeading title="Upcoming" />
+            <Pressable
+              onPress={() => {
+                impact("medium");
+                setComposing(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="Add an event"
+              hitSlop={8}
+              className="h-8 w-8 items-center justify-center rounded-full bg-surface active:opacity-60"
+            >
+              <Plus size={16} color="#09090B" strokeWidth={1.8} />
+            </Pressable>
+          </View>
+
+          <View className="mt-2">
+            {upcoming.length === 0 ? (
+              <EmptyState
+                compact
+                Icon={CalendarDays}
+                title="Nothing coming up"
+                message="Assignments, CATs and exams you add show up here, soonest first."
+              />
+            ) : (
+              upcoming.map((event, index) => (
+                <EventRow
+                  key={event.id}
+                  event={event}
+                  unit={unitById(units, event.unitId)}
+                  onToggle={() => toggleEvent(event.id)}
+                  last={index === upcoming.length - 1}
+                />
+              ))
+            )}
+          </View>
+        </View>
+      </Screen>
+
+      <EventComposer
+        visible={composing}
+        units={units}
+        onClose={() => setComposing(false)}
+        onSave={addEvent}
       />
-
-      <BottomSheet
-        ref={sheetRef}
-        index={0}
-        snapPoints={snapPoints}
-        enableDynamicSizing={false}
-        // The map is near-white, so a white sheet on top has no natural edge.
-        // A hard top hairline plus a deep shadow is what makes the card's start
-        // readable — the shadow alone disappears against light tiles.
-        backgroundStyle={{
-          backgroundColor: "#FFFFFF",
-          borderTopLeftRadius: 26,
-          borderTopRightRadius: 26,
-          borderTopWidth: 1,
-          borderLeftWidth: 1,
-          borderRightWidth: 1,
-          borderColor: "#E2E2E7",
-        }}
-        handleIndicatorStyle={{
-          backgroundColor: "#C4C4CC",
-          width: 48,
-          height: 5,
-        }}
-        style={{
-          shadowColor: "#09090B",
-          shadowOpacity: 0.22,
-          shadowRadius: 20,
-          shadowOffset: { width: 0, height: -8 },
-          elevation: 24,
-        }}
-      >
-        <TripSheet bottomPadding={tabBarHeight} />
-      </BottomSheet>
-    </View>
+    </>
   );
 }

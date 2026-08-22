@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 import { ArrowRight } from "lucide-react-native";
 
 import GoogleMark from "@/components/GoogleMark";
@@ -23,44 +22,21 @@ import {
   phoneHint,
 } from "@/theme/countries";
 import { detectCountry } from "@/lib/geo";
-import { useTransitStore } from "@/store/useTransitStore";
+import { sendPhoneOtp, signInWithGoogle } from "@/lib/auth";
+import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
-
-/** Soft colour wash behind the top of the screen — the page's only colour. */
-function Aurora() {
-  return (
-    <View className="absolute inset-x-0 top-0 h-80" pointerEvents="none">
-      <Svg width="100%" height="100%">
-        <Defs>
-          <RadialGradient id="a" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#2a78d6" stopOpacity="0.22" />
-            <Stop offset="1" stopColor="#2a78d6" stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="b" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#eb6834" stopOpacity="0.2" />
-            <Stop offset="1" stopColor="#eb6834" stopOpacity="0" />
-          </RadialGradient>
-          <RadialGradient id="c" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#1baf7a" stopOpacity="0.18" />
-            <Stop offset="1" stopColor="#1baf7a" stopOpacity="0" />
-          </RadialGradient>
-        </Defs>
-        <Circle cx="18%" cy="16%" r="150" fill="url(#a)" />
-        <Circle cx="88%" cy="8%" r="140" fill="url(#b)" />
-        <Circle cx="62%" cy="40%" r="130" fill="url(#c)" />
-      </Svg>
-    </View>
-  );
-}
 
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const signIn = useTransitStore((state) => state.signIn);
+
+  const signInWithEmail = useStudyStore((state) => state.signInWithEmail);
 
   const scrollRef = useRef(null);
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
   const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(null);
+  const [error, setError] = useState("");
 
   const selected = getCountry(country);
 
@@ -81,73 +57,103 @@ export default function LoginScreen() {
   const digits = normalisePhone(phone, selected);
   const canContinue = isPhoneComplete(digits, selected);
 
-  const continueWithPhone = () => {
-    if (!canContinue) return;
+  const continueWithPhone = async () => {
+    if (!canContinue || busy) return;
     impact("medium");
+    setBusy("phone");
+    setError("");
+
+    // E.164 — no spaces, no leading zero. Kept in this shape so swapping the
+    // local stub for a real provider needs no change here.
+    const e164 = `${selected.dial}${digits}`.replace(/[^\d+]/g, "");
+    const result = await sendPhoneOtp(e164);
+
+    setBusy(null);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
     router.push({
       pathname: "/verify",
-      params: { phone: `${selected.dial} ${digits}` },
+      // `display` is only for the heading; `phone` is what the verify step
+      // needs, and it has to match the number the code was sent to exactly.
+      params: { phone: e164, display: `${selected.dial} ${digits}` },
     });
   };
 
-  const continueWithGoogle = () => {
+  const continueWithGoogle = async () => {
+    if (busy) return;
     impact("medium");
-    // No provider wired yet — this stands in for the OAuth round trip.
-    signIn({});
-    router.replace("/(tabs)");
+    setBusy("google");
+    setError("");
+
+    const result = await signInWithGoogle();
+    setBusy(null);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
+    // No navigation here — the session guard reacts to the new session and
+    // sends a new student to onboarding, a returning one to the tabs.
+    signInWithEmail(result.email);
   };
 
   return (
     <KeyboardAvoidingView
       behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-brand-canvas"
+      className="flex-1 bg-canvas"
     >
-      <Aurora />
-
       <ScrollView
         ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          // The icon used to sit above the title; without it the heading needs
-          // more room so it lands inside the colour wash rather than above it.
-          paddingTop: insets.top + 96,
+          paddingTop: insets.top + 88,
           paddingBottom: insets.bottom + 32,
           paddingHorizontal: 24,
           flexGrow: 1,
         }}
       >
-        <Text className="font-jk-black text-brand-black text-[32px] leading-[38px] text-center">
-          Every trip,{"\n"}counted.
+        <Text className="font-jk-semi text-ink text-[30px] leading-[38px] text-center">
+          Your whole course,{"\n"}in one place.
         </Text>
-        <Text className="font-jk text-brand-slate text-[14px] leading-[20px] text-center mt-3">
-          Sign in to pick up where your commute left off.
+        <Text className="font-jk text-muted text-[14px] leading-[20px] text-center mt-3">
+          Sign in to pick up your notes, deadlines and revision where you left
+          them.
         </Text>
 
         {/* Google */}
         <Pressable
           onPress={continueWithGoogle}
+          disabled={Boolean(busy)}
           accessibilityRole="button"
           accessibilityLabel="Continue with Google"
-          className="flex-row items-center justify-center gap-x-3 rounded-2xl border border-brand-border bg-white py-4 mt-9 active:opacity-70"
+          accessibilityState={{ disabled: Boolean(busy), busy: busy === "google" }}
+          className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 mt-10 ${
+            busy ? "opacity-50" : "active:bg-surface"
+          }`}
         >
-          <GoogleMark size={19} />
-          <Text className="font-jk-bold text-brand-black text-[15px]">
-            Continue with Google
+          <GoogleMark size={18} />
+          <Text className="font-jk-med text-ink text-[15px]">
+            {busy === "google" ? "Signing in…" : "Continue with Google"}
           </Text>
         </Pressable>
 
-        <View className="flex-row items-center gap-x-3 my-7">
-          <View className="flex-1 h-px bg-brand-hairline" />
-          <Text className="font-jk-semi text-brand-muted text-[11px]">or</Text>
-          <View className="flex-1 h-px bg-brand-hairline" />
+        <View className="flex-row items-center gap-x-3 my-6">
+          <View className="flex-1 h-px bg-line" />
+          <Text className="font-jk text-muted text-[11px]">or</Text>
+          <View className="flex-1 h-px bg-line" />
         </View>
 
         {/* Phone */}
-        <Text className="font-jk-bold text-brand-muted text-[10px] tracking-[1.5px] mb-2">
+        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-2">
           MOBILE NUMBER
         </Text>
-        <View className="flex-row items-center rounded-2xl border border-brand-hairline bg-white px-4">
+        <View className="flex-row items-center rounded-2xl border border-line px-4">
           <CountryPicker value={country} onChange={setCountry} />
           <TextInput
             value={digits}
@@ -162,33 +168,48 @@ export default function LoginScreen() {
             keyboardType="phone-pad"
             textContentType="telephoneNumber"
             autoComplete="tel"
-            className="flex-1 py-4 font-jk-semi text-brand-black text-[15px]"
+            className="flex-1 py-4 font-jk text-ink text-[15px]"
           />
         </View>
 
-        <Text className="font-jk text-brand-muted text-[11px] mt-2 ml-1">
+        <Text className="font-jk text-muted text-[11.5px] mt-2 ml-1">
           {digits.length > 0 && !canContinue
             ? phoneHint(selected)
             : `We'll text a code to ${selected.dial} ${digits || "…"}`}
         </Text>
 
+        {error ? (
+          <Text className="font-jk text-danger text-[12px] leading-[17px] mt-3 ml-1">
+            {error}
+          </Text>
+        ) : null}
+
         <Pressable
           onPress={continueWithPhone}
-          disabled={!canContinue}
+          disabled={!canContinue || Boolean(busy)}
           accessibilityRole="button"
           accessibilityLabel="Continue with phone number"
-          accessibilityState={{ disabled: !canContinue }}
+          accessibilityState={{
+            disabled: !canContinue || Boolean(busy),
+            busy: busy === "phone",
+          }}
           className={`flex-row items-center justify-center gap-x-2 rounded-2xl py-4 mt-5 ${
-            canContinue ? "bg-brand-black active:opacity-85" : "bg-brand-black/20"
+            canContinue && !busy ? "bg-obsidian active:opacity-85" : "bg-surface"
           }`}
         >
-          <Text className="font-jk-bold text-brand-white text-[15px]">
-            Continue
+          <Text
+            className={`font-jk-med text-[15px] ${
+              canContinue && !busy ? "text-canvas" : "text-muted"
+            }`}
+          >
+            {busy === "phone" ? "Sending code…" : "Continue"}
           </Text>
-          <ArrowRight size={16} color="#FFFFFF" strokeWidth={2.4} />
+          {canContinue && !busy ? (
+            <ArrowRight size={16} color="#FFFFFF" strokeWidth={1.8} />
+          ) : null}
         </Pressable>
 
-        <Text className="font-jk text-brand-muted text-[11px] leading-[16px] text-center mt-auto pt-10">
+        <Text className="font-jk text-muted text-[11px] leading-[16px] text-center mt-auto pt-10">
           By continuing you agree to the Terms and Privacy Policy.
         </Text>
       </ScrollView>
