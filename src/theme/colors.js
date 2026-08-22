@@ -10,6 +10,15 @@ export const COLORS = {
   canvas: "#FFFFFF",
   surface: "#F4F4F5",
   line: "#E4E4E7",
+  /**
+   * A lighter rule, for long runs of list separators.
+   *
+   * `line` is right where a border has to state an edge — a card, a field. Down
+   * a list of eight links it stacks up and the page starts to read as a table,
+   * so those get this instead: present from across the room, invisible when you
+   * are reading a row.
+   */
+  hairline: "#F1F1F3",
   ink: "#09090B",
   muted: "#71717A",
   primary: "#007FFA",

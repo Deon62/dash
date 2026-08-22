@@ -3,7 +3,6 @@ import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
-  ArrowUp,
   Check,
   ChevronDown,
   Eye,
@@ -16,6 +15,7 @@ import {
 
 import Sheet from "@/components/Sheet";
 import LimitSheet from "@/components/LimitSheet";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
@@ -33,6 +33,8 @@ import {
   quizSize,
 } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
+import { useDictation } from "@/lib/useDictation";
+import { MicGlyph, SendGlyph } from "@/components/Glyph";
 import { impact, notify } from "@/lib/haptics";
 
 const MODES = [
@@ -159,6 +161,11 @@ export default function StudyScreen() {
   /** Something to send, and nothing already in flight. */
   const armed = draft.trim().length > 0 && !thinking;
 
+  // Dictation writes straight into the draft, so a student can speak a
+  // sentence and then fix a word by typing without losing either.
+  const dictation = useDictation({ onText: setDraft });
+  const listening = dictation.listening;
+
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-canvas">
       {/* --- Chrome. No title: the page is the conversation. --- */}
@@ -246,31 +253,81 @@ export default function StudyScreen() {
         }}
         className="px-5 pt-2"
       >
-        <View className="rounded-3xl border border-line bg-canvas px-3.5 py-3">
-          {/* Send sits beside the field, not under it, and the row centres —
-              so the button lines up with the text you are typing however tall
-              the field has grown. */}
-          <View className="flex-row items-center gap-x-2.5">
+        <View className="rounded-3xl border border-line bg-canvas px-4 py-3">
+          {mode === "ask" ? (
+            <TextInput
+              value={draft}
+              onChangeText={setDraft}
+              placeholder={
+                listening
+                  ? "Listening…"
+                  : unit
+                    ? `Ask about ${unit.code}`
+                    : "Ask about your course"
+              }
+              placeholderTextColor="#A1A1AA"
+              multiline
+              // Three lines then scroll: a taller box eats the conversation it
+              // is meant to be part of.
+              style={{ maxHeight: 110, width: "100%" }}
+              className="font-jk text-ink text-[15.5px] leading-[22px] py-1"
+            />
+          ) : (
+            <Text className="font-jk text-muted text-[15px] py-1">
+              {MODES.find((option) => option.key === mode)?.hint}
+            </Text>
+          )}
+
+          {/* Everything you can act on sits on one line under the field: the
+              scope on the left, the controls on the right. The send button
+              beside the input drifted up and down as the field grew. */}
+          <View className="flex-row items-center justify-between mt-3">
+            <Pressable
+              onPress={() => {
+                impact("light");
+                setScopeOpen(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
+              className="flex-row items-center gap-x-1.5 rounded-full bg-surface px-3 py-1.5 active:opacity-60"
+            >
+              <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
+              <ChevronDown size={14} color={COLORS.muted} strokeWidth={1.8} />
+            </Pressable>
+
             {mode === "ask" ? (
-              <>
-                {/* The field is wrapped rather than flexed directly. A
-                    multiline TextInput reports its content width as its
-                    intrinsic size, and in a bare row that width grew with every
-                    character and shoved the send button off the edge. The
-                    wrapper owns the width; the input just fills it. */}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <TextInput
-                    value={draft}
-                    onChangeText={setDraft}
-                    placeholder={unit ? `Ask about ${unit.code}` : "Ask about your course"}
-                    placeholderTextColor="#A1A1AA"
-                    multiline
-                    // Three lines then scroll: a taller box eats the
-                    // conversation it is meant to be part of.
-                    style={{ maxHeight: 110, width: "100%" }}
-                    className="font-jk text-ink text-[15px] leading-[21px] py-1"
+              <View className="flex-row items-center gap-x-2">
+                <Pressable
+                  onPress={() => {
+                    impact("light");
+                    dictation.toggle(draft);
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel={listening ? "Stop dictating" : "Speak your question"}
+                  accessibilityState={{ selected: listening }}
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    flexGrow: 0,
+                    flexShrink: 0,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: listening ? COLORS.danger : COLORS.surface,
+                  }}
+                  className="active:opacity-70"
+                >
+                  <MicGlyph
+                    size={19}
+                    color={
+                      listening
+                        ? COLORS.canvas
+                        : dictation.available
+                          ? COLORS.ink
+                          : COLORS.muted
+                    }
                   />
-                </View>
+                </Pressable>
 
                 <Pressable
                   onPress={() => ask(draft)}
@@ -286,49 +343,15 @@ export default function StudyScreen() {
                     borderRadius: 18,
                     flexGrow: 0,
                     flexShrink: 0,
+                    alignItems: "center",
+                    justifyContent: "center",
                     backgroundColor: armed ? COLORS.primary : COLORS.surface,
                   }}
-                  className="items-center justify-center active:opacity-85"
+                  className="active:opacity-85"
                 >
-                  <ArrowUp
-                    size={18}
-                    color={armed ? COLORS.canvas : COLORS.muted}
-                    strokeWidth={2.2}
-                  />
+                  <SendGlyph size={19} color={armed ? COLORS.canvas : COLORS.muted} />
                 </Pressable>
-              </>
-            ) : (
-              <Text className="flex-1 font-jk text-muted text-[15px] py-1">
-                {MODES.find((option) => option.key === mode)?.hint}
-              </Text>
-            )}
-          </View>
-
-          {/* The scope pill — this app's version of a model switcher. */}
-          <View className="flex-row items-center justify-between mt-2.5">
-            <Pressable
-              onPress={() => {
-                impact("light");
-                setScopeOpen(true);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
-              className="flex-row items-center gap-x-1.5 rounded-full bg-surface px-3 py-1.5 active:opacity-60"
-            >
-              <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
-              <ChevronDown size={14} color="#71717A" strokeWidth={1.8} />
-            </Pressable>
-
-            {/* Only shown once the allowance is nearly gone. A counter that is
-                always on screen turns every question into a transaction. */}
-            {left !== null && left <= 5 ? (
-              <Text
-                className={`font-jk text-[11.5px] ${
-                  left === 0 ? "text-danger" : "text-muted"
-                }`}
-              >
-                {left} left today
-              </Text>
+              </View>
             ) : null}
           </View>
         </View>
@@ -406,7 +429,7 @@ export default function StudyScreen() {
                   accessibilityLabel={`Delete ${entry.title}`}
                   className="h-8 w-8 items-center justify-center rounded-full active:bg-surface"
                 >
-                  <Trash2 size={15} color="#71717A" strokeWidth={1.8} />
+                  <Trash2 size={15} color={COLORS.danger} strokeWidth={1.8} />
                 </Pressable>
               </View>
             );
@@ -498,6 +521,15 @@ export default function StudyScreen() {
       </Sheet>
 
       <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
+
+      <ConfirmDialog
+        visible={Boolean(dictation.error)}
+        title="Can't hear you"
+        message={dictation.error}
+        confirmLabel="OK"
+        onConfirm={dictation.clearError}
+        onDismiss={dictation.clearError}
+      />
     </View>
   );
 }

@@ -115,6 +115,7 @@ export default function UnitScreen() {
           right={
             <IconButton
               Icon={Trash2}
+              glyphTone="danger"
               label={`Delete ${unit.code}`}
               onPress={() => setConfirmingDelete(true)}
             />

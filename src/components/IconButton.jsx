@@ -1,5 +1,6 @@
 import { Pressable, View } from "react-native";
 
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -15,6 +16,8 @@ export default function IconButton({
   label,
   size = 40,
   tone = "surface",
+  /** Colours the glyph alone — used to mark a destructive control. */
+  glyphTone = "ink",
   badge = false,
 }) {
   const glyph = size >= 40 ? 18 : 16;
@@ -35,7 +38,13 @@ export default function IconButton({
     >
       <Icon
         size={glyph}
-        color={tone === "solid" ? "#FFFFFF" : "#09090B"}
+        color={
+          tone === "solid"
+            ? COLORS.canvas
+            : glyphTone === "danger"
+              ? COLORS.danger
+              : COLORS.ink
+        }
         strokeWidth={1.8}
       />
 

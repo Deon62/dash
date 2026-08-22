@@ -15,6 +15,8 @@ export const SubscriptionTier = {
   TRIAL: "trial",
   STANDARD: "standard",
   PRO: "pro",
+  /** Synapse, split five ways. Same limits, one bill. */
+  FRIENDS: "friends",
 };
 
 /**
@@ -65,6 +67,20 @@ export const PLAN_CONFIGS = {
       monthlyOcrPageLimit: 0,
     },
   },
+  /**
+   * Friends is Pro's limit set at a group price — deliberately the same
+   * object, spread, rather than a second copy of the numbers. A limit changed
+   * on Pro has to move here too, and a copy is how those drift apart.
+   */
+  [SubscriptionTier.FRIENDS]: {
+    id: SubscriptionTier.FRIENDS,
+    name: "Friends",
+    priceKsh: 1000,
+    durationDays: 30,
+    /** How many students one payment covers, the payer included. */
+    seats: 5,
+    limits: null, // filled in below, from Pro
+  },
   [SubscriptionTier.PRO]: {
     id: SubscriptionTier.PRO,
     name: "Pro Scholar",
@@ -84,6 +100,17 @@ export const PLAN_CONFIGS = {
     },
   },
 };
+
+// Friends is Pro per seat. Assigned after the fact so there is exactly one
+// definition of what the top tier allows.
+PLAN_CONFIGS[SubscriptionTier.FRIENDS].limits = {
+  ...PLAN_CONFIGS[SubscriptionTier.PRO].limits,
+};
+
+/** Seats a tier covers. Everything except Friends is a single student. */
+export function seatsFor(tier) {
+  return PLAN_CONFIGS[tier]?.seats ?? 1;
+}
 
 /**
  * What the student is shown and sold.
@@ -111,6 +138,17 @@ export const PLAN_CARDS = [
      * it before they read a word.
      */
     tone: "shaded",
+  },
+  {
+    tier: SubscriptionTier.FRIENDS,
+    name: "Friends",
+    tagline: "Synapse for five, split between you",
+    // No link yet — a group plan needs the seats created server-side before a
+    // payment means anything, so this one asks rather than pretending.
+    checkoutUrl: null,
+    tone: "plain",
+    /** Shown instead of the flat price: what it costs each person. */
+    perSeatNote: true,
   },
 ];
 
@@ -168,11 +206,16 @@ export function planFeatures(tier) {
         ? `${count(quiz.count, "quiz", "quizzes")} a week, up to ${count(quiz.maxQuestions, "question")}`
         : `${count(quiz.count, "quiz", "quizzes")} in total, up to ${count(quiz.maxQuestions, "question")}`;
 
+  const seats = seatsFor(tier);
+
   return [
-    // Stated on both cards rather than once above them: it is part of what
-    // each plan is, and a student comparing two columns should not have to
-    // look somewhere else to learn it applies to the one they are reading.
+    // Stated on every card rather than once above them: it is part of what
+    // each plan is, and a student comparing columns should not have to look
+    // somewhere else to learn it applies to the one they are reading.
     { text: `${PLAN_CONFIGS[SubscriptionTier.TRIAL].durationDays}-day free trial`, available: true },
+    ...(seats > 1
+      ? [{ text: `${seats} students on one payment`, available: true }]
+      : []),
     { text: count(unitCap(tier), "course unit"), available: true },
     { text: `${limits.totalPdfPagesPool} PDF pages of storage`, available: true },
     {

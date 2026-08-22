@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Text, View } from "react-native";
+import { useEffect, useState } from "react";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   BellRing,
@@ -13,6 +13,7 @@ import ScreenHeader from "@/components/ScreenHeader";
 import LinkRow from "@/components/LinkRow";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useStudyStore } from "@/store/useStudyStore";
+import { authenticate, describe, isAvailable } from "@/lib/biometrics";
 
 export default function SettingsScreen() {
   const router = useRouter();
@@ -22,6 +23,38 @@ export default function SettingsScreen() {
   const resetEverything = useStudyStore((state) => state.resetEverything);
 
   const [confirming, setConfirming] = useState(false);
+  const [notice, setNotice] = useState(null);
+  const [biometry, setBiometry] = useState({ available: false, name: "Biometrics" });
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([isAvailable(), describe()]).then(([available, name]) => {
+      if (!cancelled) setBiometry({ available, name });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * Turning the lock on has to prove it works first. A switch that flips
+   * without a prompt can leave someone locked out by a sensor that was never
+   * going to read, on the one screen where that is unrecoverable.
+   */
+  const setLock = async (next) => {
+    if (!next) {
+      updateSettings({ biometricLock: false });
+      return;
+    }
+
+    if (!biometry.available) {
+      setNotice("This device has no fingerprint or face unlock set up yet. Add one in your phone's settings first.");
+      return;
+    }
+
+    const result = await authenticate("Turn on the lock for ALS");
+    if (result.ok) updateSettings({ biometricLock: true });
+  };
 
   return (
     <Screen bare>
@@ -36,11 +69,15 @@ export default function SettingsScreen() {
         />
         <LinkRow
           Icon={FingerprintPattern}
-          label="Biometrics"
-          hint="Ask for a fingerprint before opening"
+          label={biometry.name === "Face" ? "Face unlock" : "Fingerprint unlock"}
+          hint={
+            biometry.available
+              ? "Ask for it before opening ALS"
+              : "Not set up on this device"
+          }
           toggle
           toggleValue={settings.biometricLock}
-          onToggle={(biometricLock) => updateSettings({ biometricLock })}
+          onToggle={setLock}
         />
         <LinkRow
           Icon={ShieldCheck}
@@ -62,10 +99,14 @@ export default function SettingsScreen() {
         />
       </View>
 
-      <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-3">
-        Biometrics is stored as a preference for now — the lock itself needs
-        expo-local-authentication, which is not wired up yet.
-      </Text>
+      <ConfirmDialog
+        visible={Boolean(notice)}
+        title="Not available"
+        message={notice}
+        confirmLabel="OK"
+        onConfirm={() => setNotice(null)}
+        onDismiss={() => setNotice(null)}
+      />
 
       <ConfirmDialog
         visible={confirming}

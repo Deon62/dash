@@ -169,15 +169,6 @@ export default function VerifyScreen() {
           style={{ position: "absolute", opacity: 0, height: 1, width: 1 }}
         />
 
-        {/* Auth is not connected to a provider yet. Saying so beats a student
-            waiting on a text that is never going to arrive. */}
-        <View className="rounded-2xl border border-line bg-surface px-4 py-3 mt-5">
-          <Text className="font-jk text-muted text-[12px] leading-[17px]">
-            Sign-in is running offline for now — any {CODE_LENGTH} digits will
-            let you in.
-          </Text>
-        </View>
-
         {error ? (
           <Text className="font-jk text-danger text-[12px] leading-[17px] mt-4">
             {error}

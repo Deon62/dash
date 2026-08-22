@@ -11,6 +11,8 @@ module.exports = {
         surface: "#F4F4F5",
         /** Every border and divider on the page. */
         line: "#E4E4E7",
+        /** Fainter rule for long lists of separators. */
+        hairline: "#F1F1F3",
         /** Primary text. */
         ink: "#09090B",
         /** Secondary text, placeholders, inactive glyphs. */

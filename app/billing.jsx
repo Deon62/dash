@@ -8,7 +8,7 @@ import ScreenHeader from "@/components/ScreenHeader";
 import Button from "@/components/Button";
 import Sheet from "@/components/Sheet";
 import { useStudyStore } from "@/store/useStudyStore";
-import { PLAN_CARDS, planFeatures, planFor } from "@/theme/plans";
+import { PLAN_CARDS, planFeatures, planFor, seatsFor } from "@/theme/plans";
 import { activeTier, daysRemaining, isExpired } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
@@ -28,6 +28,7 @@ export default function BillingScreen() {
   const activatePlan = useStudyStore((state) => state.activatePlan);
 
   const [confirming, setConfirming] = useState(null);
+  const [pending, setPending] = useState(null);
 
   const tier = activeTier(subscription);
   const left = daysRemaining(subscription);
@@ -35,6 +36,15 @@ export default function BillingScreen() {
 
   const checkout = async (card) => {
     impact("medium");
+
+    // A group plan needs its seats created before a payment means anything, so
+    // the card says so rather than sending money somewhere that cannot honour
+    // it. The endpoint is already specified in `src/api/endpoints.js`.
+    if (!card.checkoutUrl) {
+      setPending(card);
+      return;
+    }
+
     // Opened in the system browser rather than a WebView: this is a real
     // payment page and the student should be able to see the address bar it
     // is being entered on.
@@ -100,6 +110,15 @@ export default function BillingScreen() {
                 </Text>
               </View>
 
+              {/* What it costs each person is the whole point of the group
+                  plan, and it is not something to make anyone divide. */}
+              {card.perSeatNote ? (
+                <Text className="font-jk text-muted text-[12.5px] mt-1">
+                  KES {Math.round(plan.priceKsh / seatsFor(card.tier))} each, for{" "}
+                  {seatsFor(card.tier)} of you
+                </Text>
+              ) : null}
+
               <View className="gap-y-2.5 mt-5">
                 {planFeatures(card.tier).map((feature) => (
                   <View key={feature.text} className="flex-row items-start">
@@ -127,7 +146,13 @@ export default function BillingScreen() {
 
               <View className="mt-6">
                 <Button
-                  label={current ? "Your current plan" : `Get ${card.name}`}
+                  label={
+                    current
+                      ? "Your current plan"
+                      : card.checkoutUrl
+                        ? `Get ${card.name}`
+                        : "Get in touch"
+                  }
                   disabled={current}
                   onPress={() => checkout(card)}
                 />
@@ -148,6 +173,15 @@ export default function BillingScreen() {
       {/* The device cannot see a Paystack charge. Until a server receives the
           webhook, activation is the student's word — recorded as unverified so
           it can be reconciled rather than silently trusted. */}
+      <Sheet
+        visible={Boolean(pending)}
+        onClose={() => setPending(null)}
+        title="Friends isn't open yet"
+        subtitle="One payment covering five students needs the seats and invites set up on our side first. It is next on the list — tell us you want it and we will let you know the day it opens."
+      >
+        <Button label="Got it" onPress={() => setPending(null)} />
+      </Sheet>
+
       <Sheet
         visible={Boolean(confirming)}
         onClose={() => setConfirming(null)}

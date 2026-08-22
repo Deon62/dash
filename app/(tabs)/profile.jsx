@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import {
@@ -14,12 +15,15 @@ import Screen from "@/components/Screen";
 import IconButton from "@/components/IconButton";
 import AvatarPicker from "@/components/AvatarPicker";
 import LinkRow from "@/components/LinkRow";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import { useStudyStore } from "@/store/useStudyStore";
 import { activeTier } from "@/lib/quota";
 import { planName } from "@/theme/plans";
 
 export default function ProfileScreen() {
   const router = useRouter();
+
+  const [confirmingLogout, setConfirmingLogout] = useState(false);
 
   const profile = useStudyStore((state) => state.profile);
   const units = useStudyStore((state) => state.units);
@@ -92,7 +96,13 @@ export default function ProfileScreen() {
           value={planName(activeTier(subscription))}
           onPress={() => router.push("/billing")}
         />
-        <LinkRow Icon={LogOut} iconTone="danger" label="Log out" onPress={signOut} last />
+        <LinkRow
+          Icon={LogOut}
+          iconTone="danger"
+          label="Log out"
+          onPress={() => setConfirmingLogout(true)}
+          last
+        />
       </View>
 
       {/* Everything is on the phone, so this really is the whole account —
@@ -100,6 +110,20 @@ export default function ProfileScreen() {
       <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-4">
         Your coursework is stored on this device only. Logging out keeps it.
       </Text>
+
+      {/* Signing out is cheap here — the coursework stays — but it still ends
+          a session, and a mis-tap on the last row of a list should not do it. */}
+      <ConfirmDialog
+        visible={confirmingLogout}
+        title="Log out?"
+        message="Your units, notes and deadlines stay on this device. You can sign back in any time."
+        confirmLabel="Log out"
+        onCancel={() => setConfirmingLogout(false)}
+        onConfirm={() => {
+          setConfirmingLogout(false);
+          signOut();
+        }}
+      />
     </Screen>
   );
 }

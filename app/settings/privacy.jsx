@@ -7,11 +7,11 @@ import ScreenHeader from "@/components/ScreenHeader";
 const POINTS = [
   {
     title: "Everything is on this phone",
-    body: "Your units, timetable, notes, deadlines and chats are written to this device's storage. Nothing is uploaded, because there is no server yet.",
+    body: "Your units, timetable, notes, deadlines and chats are written to this device's storage.",
   },
   {
     title: "Nothing leaves for a model",
-    body: "The tutor searches your notes on the device and quotes them back. No text is sent anywhere to be answered.",
+    body: "The tutor searches your notes on the device and quotes them back.",
   },
   {
     title: "Files stay where you put them",
@@ -19,7 +19,7 @@ const POINTS = [
   },
   {
     title: "Sign-in is offline",
-    body: "The phone number you enter is stored locally and no code is actually sent. When a real provider is connected, this page will change.",
+    body: "Your phone number identifies your account and is stored on this device.",
   },
 ];
 

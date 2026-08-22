@@ -12,6 +12,6 @@
  *
  * Implemented by not persisting the `introSeen` flag, so the intro can still be
  * completed and dismissed normally within a session — it simply forgets by the
- * next cold start. Set to `false` to ship.
+ * next cold start. Off: new users see it once and never again.
  */
-export const ALWAYS_SHOW_INTRO = true;
+export const ALWAYS_SHOW_INTRO = false;

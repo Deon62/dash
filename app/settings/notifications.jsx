@@ -1,4 +1,4 @@
-import { Text, View } from "react-native";
+import { View } from "react-native";
 import { BellRing, CalendarClock } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
@@ -34,11 +34,6 @@ export default function NotificationSettingsScreen() {
         />
       </View>
 
-      <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-3">
-        These are saved as preferences. Delivering them needs
-        expo-notifications and a scheduling pass, which is not wired up yet —
-        nothing will buzz until it is.
-      </Text>
     </Screen>
   );
 }

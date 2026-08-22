@@ -55,7 +55,7 @@ export default function LinkRow({
     </>
   );
 
-  const border = last ? "" : "border-b border-line";
+  const border = last ? "" : "border-b border-hairline";
 
   if (toggle) {
     return (

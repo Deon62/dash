@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { View } from "react-native";
+import { Pressable, Text, View } from "react-native";
 
 import Sheet from "@/components/Sheet";
 import Button from "@/components/Button";
 import TextField from "@/components/TextField";
 import Dropdown from "@/components/Dropdown";
+import DatePicker from "@/components/DatePicker";
+import { COLORS } from "@/theme/colors";
+import { dayKey, dueLabel } from "@/lib/dates";
 import { EVENT_KINDS } from "@/theme/units";
 import { notify } from "@/lib/haptics";
 
@@ -15,21 +18,23 @@ import { notify } from "@/lib/haptics";
  * mental conversion; almost every deadline a student adds is a round number of
  * days away, so those are the options.
  */
-const WHEN = [
-  { value: 0, label: "Today" },
-  { value: 1, label: "Tomorrow" },
-  { value: 3, label: "In 3 days" },
-  { value: 7, label: "Next week" },
-  { value: 14, label: "In 2 weeks" },
-  { value: 30, label: "In a month" },
-];
-
 function isoInDays(days) {
   const date = new Date();
   date.setDate(date.getDate() + days);
   date.setHours(23, 59, 0, 0);
   return date.toISOString();
 }
+
+/**
+ * The two dates worth a shortcut.
+ *
+ * Anything further out is easier to find on a calendar than to count in days —
+ * "in 3 days" makes a student do arithmetic to check it is not the weekend.
+ */
+const QUICK = [
+  { label: "Today", days: 0 },
+  { label: "Tomorrow", days: 1 },
+];
 
 /** Sheet for adding anything with a date. Used by Home and by a unit. */
 export default function EventComposer({
@@ -43,7 +48,7 @@ export default function EventComposer({
   const [unitId, setUnitId] = useState(lockedUnitId ?? null);
   const [kind, setKind] = useState("assignment");
   const [label, setLabel] = useState("");
-  const [days, setDays] = useState(7);
+  const [at, setAt] = useState(() => isoInDays(7));
 
   const canSave = title.trim().length >= 2;
   const naming = EVENT_KINDS.find((option) => option.key === kind)?.open;
@@ -52,7 +57,7 @@ export default function EventComposer({
     setTitle("");
     setKind("assignment");
     setLabel("");
-    setDays(7);
+    setAt(isoInDays(7));
     setUnitId(lockedUnitId ?? null);
     onClose();
   };
@@ -113,20 +118,57 @@ export default function EventComposer({
           />
         ) : null}
 
-        <Dropdown
-          label="DUE"
-          sheetTitle="When is it due?"
-          value={days}
-          onChange={setDays}
-          options={WHEN}
-        />
+        <View>
+          <View className="flex-row items-center justify-between mb-2">
+            <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px]">
+              DUE
+            </Text>
+
+            <View className="flex-row gap-x-2">
+              {QUICK.map((option) => {
+                const isoValue = isoInDays(option.days);
+                const active = dayKey(at) === dayKey(isoValue);
+
+                return (
+                  <Pressable
+                    key={option.label}
+                    onPress={() => setAt(isoValue)}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    accessibilityLabel={option.label}
+                    style={{
+                      borderRadius: 999,
+                      paddingHorizontal: 12,
+                      paddingVertical: 5,
+                      backgroundColor: active ? COLORS.ink : COLORS.surface,
+                    }}
+                    className="active:opacity-70"
+                  >
+                    <Text
+                      style={{ color: active ? COLORS.canvas : COLORS.muted }}
+                      className="font-jk-med text-[12px]"
+                    >
+                      {option.label}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          </View>
+
+          <DatePicker value={at} onChange={setAt} />
+
+          <Text className="font-jk text-muted text-[12px] mt-1">
+            {dueLabel(at)}
+          </Text>
+        </View>
 
         <Button
           label="Add event"
           disabled={!canSave}
           onPress={() => {
             notify("success");
-            onSave({ title, unitId, kind, label, at: isoInDays(days) });
+            onSave({ title, unitId, kind, label, at });
             close();
           }}
         />

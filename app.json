@@ -1,8 +1,8 @@
 {
   "expo": {
-    "name": "Agora",
-    "slug": "agora",
-    "scheme": "agora",
+    "name": "ALS",
+    "slug": "als",
+    "scheme": "als",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -12,11 +12,14 @@
     "primaryColor": "#007FFA",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.ardena.agora",
-      "buildNumber": "1"
+      "bundleIdentifier": "com.ardena.als",
+      "buildNumber": "1",
+      "infoPlist": {
+        "CFBundleDisplayName": "ALS"
+      }
     },
     "android": {
-      "package": "com.ardena.agora",
+      "package": "com.ardena.als",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#09090B",
@@ -27,22 +30,10 @@
       "permissions": [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.VIBRATE",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.READ_MEDIA_IMAGES",
-        "android.permission.VIBRATE",
         "android.permission.RECORD_AUDIO"
       ],
       "blockedPermissions": [
         "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
-        "android.permission.ACCESS_COARSE_LOCATION",
-        "android.permission.ACCESS_FINE_LOCATION",
-        "android.permission.ACCESS_BACKGROUND_LOCATION",
-        "android.permission.READ_EXTERNAL_STORAGE",
-        "android.permission.WRITE_EXTERNAL_STORAGE",
-        "android.permission.READ_MEDIA_VIDEO",
-        "android.permission.CAMERA",
-        "android.permission.RECORD_AUDIO",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
@@ -65,7 +56,7 @@
           "android": {
             "enableProguardInReleaseBuilds": true,
             "enableShrinkResourcesInReleaseBuilds": true,
-            "extraProguardRules": "# --- Keep rules for Agora release builds ---\n# R8 strips aggressively; anything reached only by reflection or from\n# native code must be kept explicitly or the release build crashes where\n# the debug build did not.\n\n# React Native core\n-keep,allowobfuscation @interface com.facebook.proguard.annotations.DoNotStrip\n-keep,allowobfuscation @interface com.facebook.proguard.annotations.KeepGettersAndSetters\n-keep @com.facebook.proguard.annotations.DoNotStrip class *\n-keepclassmembers class * { @com.facebook.proguard.annotations.DoNotStrip *; }\n-keepclassmembers class * { @com.facebook.react.uimanager.annotations.ReactProp <methods>; }\n-keepclassmembers class * { @com.facebook.react.bridge.ReactMethod <methods>; }\n-keep class com.facebook.jni.** { *; }\n-keep class com.facebook.react.turbomodule.** { *; }\n\n# Hermes\n-keep class com.facebook.hermes.unicode.** { *; }\n-keep class com.facebook.jni.** { *; }\n\n# Expo modules are resolved by name at runtime\n-keep class expo.modules.** { *; }\n-keep class expo.core.** { *; }\n-keepclassmembers class * { @expo.modules.core.interfaces.ExpoProp <methods>; }\n-keepclassmembers class * { @expo.modules.core.interfaces.ExpoMethod <methods>; }\n\n# Reanimated / worklets run through JNI\n-keep class com.swmansion.reanimated.** { *; }\n-keep class com.swmansion.worklets.** { *; }\n-keep class com.swmansion.gesturehandler.** { *; }\n\n# react-native-svg and react-native-screens\n-keep public class com.horcrux.svg.** { *; }\n-keep class com.swmansion.rnscreens.** { *; }\n\n# OkHttp / Okio emit build warnings for optional deps\n-dontwarn okhttp3.**\n-dontwarn okio.**\n-dontwarn javax.annotation.**\n-dontwarn org.conscrypt.**\n\n# Keep line numbers so Play Console stack traces stay readable\n-keepattributes SourceFile,LineNumberTable\n-renamesourcefileattribute SourceFile\n",
+            "extraProguardRules": "# --- Keep rules for ALS release builds ---\n# R8 strips aggressively; anything reached only by reflection or from\n# native code must be kept explicitly or the release build crashes where\n# the debug build did not.\n\n# React Native core\n-keep,allowobfuscation @interface com.facebook.proguard.annotations.DoNotStrip\n-keep,allowobfuscation @interface com.facebook.proguard.annotations.KeepGettersAndSetters\n-keep @com.facebook.proguard.annotations.DoNotStrip class *\n-keepclassmembers class * { @com.facebook.proguard.annotations.DoNotStrip *; }\n-keepclassmembers class * { @com.facebook.react.uimanager.annotations.ReactProp <methods>; }\n-keepclassmembers class * { @com.facebook.react.bridge.ReactMethod <methods>; }\n-keep class com.facebook.jni.** { *; }\n-keep class com.facebook.react.turbomodule.** { *; }\n\n# Hermes\n-keep class com.facebook.hermes.unicode.** { *; }\n-keep class com.facebook.jni.** { *; }\n\n# Expo modules are resolved by name at runtime\n-keep class expo.modules.** { *; }\n-keep class expo.core.** { *; }\n-keepclassmembers class * { @expo.modules.core.interfaces.ExpoProp <methods>; }\n-keepclassmembers class * { @expo.modules.core.interfaces.ExpoMethod <methods>; }\n\n# Reanimated / worklets run through JNI\n-keep class com.swmansion.reanimated.** { *; }\n-keep class com.swmansion.worklets.** { *; }\n-keep class com.swmansion.gesturehandler.** { *; }\n\n# react-native-svg and react-native-screens\n-keep public class com.horcrux.svg.** { *; }\n-keep class com.swmansion.rnscreens.** { *; }\n\n# OkHttp / Okio emit build warnings for optional deps\n-dontwarn okhttp3.**\n-dontwarn okio.**\n-dontwarn javax.annotation.**\n-dontwarn org.conscrypt.**\n\n# Keep line numbers so Play Console stack traces stay readable\n-keepattributes SourceFile,LineNumberTable\n-renamesourcefileattribute SourceFile\n",
             "enableMinifyInReleaseBuilds": true
           }
         }
@@ -73,7 +64,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Agora needs access to your photos so you can add pictures of your notes.",
+          "photosPermission": "ALS needs access to your photos so you can add pictures of your notes.",
           "cameraPermission": false
         }
       ],
@@ -85,7 +76,20 @@
           "imageWidth": 220
         }
       ],
-      "expo-web-browser"
+      "expo-web-browser",
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "ALS uses the microphone so you can speak your question instead of typing it.",
+          "speechRecognitionPermission": "ALS uses speech recognition to turn what you say into text in the chat."
+        }
+      ],
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "ALS uses Face ID to unlock your coursework."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false
