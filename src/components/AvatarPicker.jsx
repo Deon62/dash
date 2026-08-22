@@ -4,6 +4,7 @@ import * as ImagePicker from "expo-image-picker";
 import { Camera, UserRound } from "lucide-react-native";
 
 import ConfirmDialog from "@/components/ConfirmDialog";
+import { COLORS } from "@/theme/colors";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
 
@@ -86,9 +87,11 @@ export default function AvatarPicker() {
         )}
       </View>
 
-      {/* Affordance — otherwise nothing says the avatar is tappable. */}
-      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border-2 border-canvas bg-primary">
-        <Camera size={14} color="#FFFFFF" strokeWidth={2.2} />
+      {/* Affordance — otherwise nothing says the avatar is tappable. The badge
+          is a white disc with a coloured glyph, not the reverse: a white icon
+          on a coloured disc vanished into the light parts of a photo. */}
+      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border border-line bg-canvas">
+        <Camera size={15} color={COLORS.primary} strokeWidth={2} />
       </View>
 
       <ConfirmDialog

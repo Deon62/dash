@@ -22,6 +22,7 @@ import { answer, buildFlashcards, buildQuiz } from "@/lib/tutor";
 import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
+import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
 
 const MODES = [
@@ -122,6 +123,9 @@ export default function StudyScreen() {
 
   const firstName = profile.name.trim().split(/\s+/)[0];
 
+  /** Something to send, and nothing already in flight. */
+  const armed = draft.trim().length > 0 && !thinking;
+
   return (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-canvas">
       {/* --- Chrome. No title: the page is the conversation. --- */}
@@ -209,34 +213,47 @@ export default function StudyScreen() {
           <View className="flex-row items-center gap-x-2.5">
             {mode === "ask" ? (
               <>
-                <TextInput
-                  value={draft}
-                  onChangeText={setDraft}
-                  placeholder={unit ? `Ask about ${unit.code}` : "Ask about your course"}
-                  placeholderTextColor="#A1A1AA"
-                  multiline
-                  // Three lines then scroll: a taller box eats the conversation
-                  // it is meant to be part of.
-                  style={{ maxHeight: 110 }}
-                  className="flex-1 font-jk text-ink text-[15px] leading-[21px] py-1"
-                />
+                {/* The field is wrapped rather than flexed directly. A
+                    multiline TextInput reports its content width as its
+                    intrinsic size, and in a bare row that width grew with every
+                    character and shoved the send button off the edge. The
+                    wrapper owns the width; the input just fills it. */}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <TextInput
+                    value={draft}
+                    onChangeText={setDraft}
+                    placeholder={unit ? `Ask about ${unit.code}` : "Ask about your course"}
+                    placeholderTextColor="#A1A1AA"
+                    multiline
+                    // Three lines then scroll: a taller box eats the
+                    // conversation it is meant to be part of.
+                    style={{ maxHeight: 110, width: "100%" }}
+                    className="font-jk text-ink text-[15px] leading-[21px] py-1"
+                  />
+                </View>
 
                 <Pressable
                   onPress={() => ask(draft)}
-                  disabled={!draft.trim() || thinking}
+                  disabled={!armed}
                   accessibilityRole="button"
                   accessibilityLabel="Send"
-                  accessibilityState={{ disabled: !draft.trim() || thinking }}
-                  className={`h-9 w-9 items-center justify-center rounded-full ${
-                    draft.trim() && !thinking
-                      ? "bg-primary active:opacity-85"
-                      : "bg-surface"
-                  }`}
+                  accessibilityState={{ disabled: !armed }}
+                  // Fixed and unshrinkable, so nothing the field does can
+                  // squeeze it out of the row.
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    flexGrow: 0,
+                    flexShrink: 0,
+                    backgroundColor: armed ? COLORS.primary : COLORS.surface,
+                  }}
+                  className="items-center justify-center active:opacity-85"
                 >
                   <ArrowUp
-                    size={17}
-                    color={draft.trim() && !thinking ? "#FFFFFF" : "#A1A1AA"}
-                    strokeWidth={2}
+                    size={18}
+                    color={armed ? COLORS.canvas : COLORS.muted}
+                    strokeWidth={2.2}
                   />
                 </Pressable>
               </>

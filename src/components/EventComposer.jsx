@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 
 import Sheet from "@/components/Sheet";
+import Button from "@/components/Button";
 import TextField from "@/components/TextField";
 import Dropdown from "@/components/Dropdown";
 import { EVENT_KINDS } from "@/theme/units";
-import { impact, notify } from "@/lib/haptics";
+import { notify } from "@/lib/haptics";
 
 /**
  * Deadline shortcuts.
@@ -103,30 +104,15 @@ export default function EventComposer({
           options={WHEN}
         />
 
-        <Pressable
+        <Button
+          label="Add event"
+          disabled={!canSave}
           onPress={() => {
-            if (!canSave) return;
-            impact("medium");
             notify("success");
             onSave({ title, unitId, kind, at: isoInDays(days) });
             close();
           }}
-          disabled={!canSave}
-          accessibilityRole="button"
-          accessibilityLabel="Add event"
-          accessibilityState={{ disabled: !canSave }}
-          className={`items-center justify-center rounded-2xl py-4 mt-1 ${
-            canSave ? "bg-primary active:opacity-85" : "bg-surface"
-          }`}
-        >
-          <Text
-            className={`font-jk-med text-[15px] ${
-              canSave ? "text-canvas" : "text-muted"
-            }`}
-          >
-            Add event
-          </Text>
-        </Pressable>
+        />
       </View>
     </Sheet>
   );

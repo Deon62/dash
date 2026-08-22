@@ -5,6 +5,7 @@ import * as ImagePicker from "expo-image-picker";
 import { FileText, Image as ImageIcon, Link2, NotebookPen } from "lucide-react-native";
 
 import Sheet from "@/components/Sheet";
+import Button from "@/components/Button";
 import TextField from "@/components/TextField";
 import { impact, notify } from "@/lib/haptics";
 
@@ -230,24 +231,11 @@ export default function AddKnowledge({ visible, onClose, units, onSave, lockedUn
             keyboardType={format === "link" ? "url" : "default"}
           />
 
-          <Pressable
-            onPress={() => file({ kind: format, title, body })}
+          <Button
+            label="File it"
             disabled={title.trim().length < 2}
-            accessibilityRole="button"
-            accessibilityLabel="File it"
-            accessibilityState={{ disabled: title.trim().length < 2 }}
-            className={`items-center justify-center rounded-2xl py-4 ${
-              title.trim().length >= 2 ? "bg-primary active:opacity-85" : "bg-surface"
-            }`}
-          >
-            <Text
-              className={`font-jk-med text-[15px] ${
-                title.trim().length >= 2 ? "text-canvas" : "text-muted"
-              }`}
-            >
-              File it
-            </Text>
-          </Pressable>
+            onPress={() => file({ kind: format, title, body })}
+          />
         </View>
       )}
     </Sheet>

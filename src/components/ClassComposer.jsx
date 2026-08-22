@@ -1,12 +1,13 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 
 import Sheet from "@/components/Sheet";
+import Button from "@/components/Button";
 import TextField from "@/components/TextField";
 import Dropdown from "@/components/Dropdown";
 import { DAYS } from "@/theme/units";
 import { formatTime, minutesOf } from "@/lib/dates";
-import { impact, notify } from "@/lib/haptics";
+import { notify } from "@/lib/haptics";
 
 /**
  * Half-hour slots from 07:00 to 21:00.
@@ -99,28 +100,15 @@ export default function ClassComposer({ visible, onClose, onSave, units, lockedU
           placeholder="Optional"
         />
 
-        <Pressable
+        <Button
+          label="Add class"
+          disabled={!canSave}
           onPress={() => {
-            if (!canSave) return;
-            impact("medium");
             notify("success");
             onSave({ unitId, day, start, end, room: room.trim() });
             close();
           }}
-          disabled={!canSave}
-          accessibilityRole="button"
-          accessibilityLabel="Add class"
-          accessibilityState={{ disabled: !canSave }}
-          className={`items-center justify-center rounded-2xl py-4 mt-1 ${
-            canSave ? "bg-primary active:opacity-85" : "bg-surface"
-          }`}
-        >
-          <Text
-            className={`font-jk-med text-[15px] ${canSave ? "text-canvas" : "text-muted"}`}
-          >
-            Add class
-          </Text>
-        </Pressable>
+        />
       </View>
     </Sheet>
   );

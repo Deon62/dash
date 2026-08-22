@@ -19,6 +19,7 @@ import {
 } from "lucide-react-native";
 
 import TextField from "@/components/TextField";
+import Button from "@/components/Button";
 import Dropdown from "@/components/Dropdown";
 import { useStudyStore } from "@/store/useStudyStore";
 import { SEMESTERS, YEARS } from "@/theme/units";
@@ -182,31 +183,14 @@ export default function OnboardingScreen() {
               </View>
             </View>
 
-            <Pressable
-              onPress={() => {
-                if (!canContinue) return;
-                impact("medium");
-                setStep(1);
-              }}
-              disabled={!canContinue}
-              accessibilityRole="button"
-              accessibilityLabel="Continue"
-              accessibilityState={{ disabled: !canContinue }}
-              className={`flex-row items-center justify-center gap-x-2 rounded-2xl py-4 mt-8 ${
-                canContinue ? "bg-primary active:opacity-85" : "bg-surface"
-              }`}
-            >
-              <Text
-                className={`font-jk-med text-[15px] ${
-                  canContinue ? "text-canvas" : "text-muted"
-                }`}
-              >
-                Continue
-              </Text>
-              {canContinue ? (
-                <ArrowRight size={16} color="#FFFFFF" strokeWidth={1.8} />
-              ) : null}
-            </Pressable>
+            <View className="mt-8">
+              <Button
+                label="Continue"
+                disabled={!canContinue}
+                onPress={() => setStep(1)}
+                Icon={ArrowRight}
+              />
+            </View>
           </>
         ) : (
           <>
@@ -289,16 +273,10 @@ export default function OnboardingScreen() {
             ) : null}
 
             <View className="mt-auto pt-10">
-              <Pressable
+              <Button
+                label={units.length === 0 ? "Skip for now" : "Done"}
                 onPress={finish}
-                accessibilityRole="button"
-                accessibilityLabel={units.length === 0 ? "Skip for now" : "Finish setup"}
-                className="items-center justify-center rounded-2xl bg-primary py-4 active:opacity-85"
-              >
-                <Text className="font-jk-med text-canvas text-[15px]">
-                  {units.length === 0 ? "Skip for now" : "Done"}
-                </Text>
-              </Pressable>
+              />
             </View>
           </>
         )}

@@ -6,6 +6,9 @@ import { COLORS, MARK_COLORS } from "@/theme/colors";
 import { dayKey } from "@/lib/dates";
 import { impact } from "@/lib/haptics";
 
+/** Big enough to read at arm's length; three still fit under a date. */
+const DOT = 6;
+
 /** Monday-first column headings, matching how a timetable is printed. */
 const COLUMNS = ["M", "T", "W", "T", "F", "S", "S"];
 
@@ -18,27 +21,38 @@ function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
+/** Draw order, so the same kind of day always looks the same. */
+const DOT_ORDER = ["class", "cat", "exam", "assignment", "other"];
+
 /**
- * A dot per kind of thing happening, capped.
+ * A dot per kind of thing happening, capped at three.
  *
- * Three is the limit: a fourth dot makes the row wider than the date above it
- * and the grid starts to wobble. The order is fixed so the same kind of day
- * always looks the same.
+ * Built from whatever keys the day actually carries rather than from a fixed
+ * list: an event whose `kind` is missing or something the app has not heard of
+ * used to match nothing and draw no dot at all, so the day looked empty when it
+ * was not. Anything unrecognised falls back to the neutral mark.
  */
 function Dots({ marks }) {
-  const kinds = ["class", "cat", "exam", "assignment", "other"].filter(
-    (kind) => marks[kind] > 0
-  );
+  const kinds = Object.keys(marks)
+    .filter((kind) => marks[kind] > 0)
+    .map((kind) => (MARK_COLORS[kind] ? kind : "other"))
+    .sort((a, b) => DOT_ORDER.indexOf(a) - DOT_ORDER.indexOf(b));
 
-  if (kinds.length === 0) return <View className="h-1.5 mt-1" />;
+  // Reserve the row even when empty, so dates with and without marks sit at
+  // the same height and the grid does not jump.
+  if (kinds.length === 0) return <View style={{ height: DOT, marginTop: 4 }} />;
 
   return (
-    <View className="flex-row gap-x-[3px] h-1.5 mt-1">
-      {kinds.slice(0, 3).map((kind) => (
+    <View style={{ height: DOT, marginTop: 4 }} className="flex-row gap-x-1">
+      {[...new Set(kinds)].slice(0, 3).map((kind) => (
         <View
           key={kind}
-          style={{ backgroundColor: MARK_COLORS[kind] }}
-          className="h-1.5 w-1.5 rounded-full"
+          style={{
+            width: DOT,
+            height: DOT,
+            borderRadius: DOT / 2,
+            backgroundColor: MARK_COLORS[kind],
+          }}
         />
       ))}
     </View>
@@ -52,7 +66,7 @@ function Dots({ marks }) {
  * cluster, which week is empty. Detail belongs in the sheet a tap opens, not
  * on a 40-pixel cell.
  */
-export default function MonthCalendar({ classes, events, onSelectDate }) {
+export default function MonthCalendar({ classes, events, onSelectDate, action, onAction }) {
   const today = new Date();
   const [cursor, setCursor] = useState({
     year: today.getFullYear(),
@@ -129,7 +143,22 @@ export default function MonthCalendar({ classes, events, onSelectDate }) {
       <View className="flex-row items-center justify-between mb-3">
         <Text className="font-jk-semi text-ink text-[15px]">{monthLabel}</Text>
 
-        <View className="flex-row gap-x-1">
+        <View className="flex-row items-center gap-x-1">
+          {action ? (
+            <Pressable
+              onPress={() => {
+                impact("light");
+                onAction?.();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={action}
+              hitSlop={6}
+              className="px-2 active:opacity-60"
+            >
+              <Text className="font-jk-med text-primary text-[13px]">{action}</Text>
+            </Pressable>
+          ) : null}
+
           <Pressable
             onPress={() => step(-1)}
             accessibilityRole="button"
@@ -183,10 +212,11 @@ export default function MonthCalendar({ classes, events, onSelectDate }) {
               style={{ width: `${100 / 7}%` }}
               className="h-12 items-center justify-center active:opacity-60"
             >
+              {/* Today is a dark disc, every month, whether or not anything
+                  is on. It is the one fixed landmark in the grid. */}
               <View
-                className={`h-7 w-7 items-center justify-center rounded-full ${
-                  isToday ? "bg-primary" : ""
-                }`}
+                style={isToday ? { backgroundColor: COLORS.ink } : undefined}
+                className="h-8 w-8 items-center justify-center rounded-full"
               >
                 <Text
                   className={`text-[13px] ${

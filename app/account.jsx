@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { Building2, GraduationCap, Mail, UserRound } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
+import Button from "@/components/Button";
 import ScreenHeader from "@/components/ScreenHeader";
 import TextField from "@/components/TextField";
 import Dropdown from "@/components/Dropdown";
@@ -124,22 +125,7 @@ export default function AccountScreen() {
         </View>
       </View>
 
-      <Pressable
-        onPress={save}
-        disabled={!dirty}
-        accessibilityRole="button"
-        accessibilityLabel="Save changes"
-        accessibilityState={{ disabled: !dirty }}
-        className={`items-center justify-center rounded-2xl py-4 ${
-          dirty ? "bg-primary active:opacity-85" : "bg-surface"
-        }`}
-      >
-        <Text
-          className={`font-jk-med text-[15px] ${dirty ? "text-canvas" : "text-muted"}`}
-        >
-          Save changes
-        </Text>
-      </Pressable>
+      <Button label="Save changes" onPress={save} disabled={!dirty} />
     </Screen>
   );
 }

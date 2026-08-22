@@ -1,17 +1,17 @@
 import { useMemo, useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { Plus } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
+import { PillButton } from "@/components/Button";
 import ClassRow from "@/components/ClassRow";
 import ClassComposer from "@/components/ClassComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { DAYS } from "@/theme/units";
 import { minutesOf } from "@/lib/dates";
-import { impact } from "@/lib/haptics";
 
 /**
  * The whole week, day by day.
@@ -62,18 +62,7 @@ export default function TimetableScreen() {
             title="Nothing scheduled"
             message="Add when each unit meets and today's sessions appear on Home."
             action={
-              <Pressable
-                onPress={() => {
-                  impact("medium");
-                  setComposing(true);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel="Add a class"
-                className="flex-row items-center gap-x-2 rounded-full bg-primary px-5 py-3 active:opacity-85"
-              >
-                <Plus size={16} color="#FFFFFF" strokeWidth={1.8} />
-                <Text className="font-jk-med text-canvas text-[14px]">Add a class</Text>
-              </Pressable>
+              <PillButton label="Add a class" Icon={Plus} onPress={() => setComposing(true)} />
             }
           />
         ) : (

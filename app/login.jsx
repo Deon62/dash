@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowRight } from "lucide-react-native";
 
 import GoogleMark from "@/components/GoogleMark";
+import Button from "@/components/Button";
 import CountryPicker from "@/components/CountryPicker";
 import {
   DEFAULT_COUNTRY,
@@ -184,30 +185,16 @@ export default function LoginScreen() {
           </Text>
         ) : null}
 
-        <Pressable
-          onPress={continueWithPhone}
-          disabled={!canContinue || Boolean(busy)}
-          accessibilityRole="button"
-          accessibilityLabel="Continue with phone number"
-          accessibilityState={{
-            disabled: !canContinue || Boolean(busy),
-            busy: busy === "phone",
-          }}
-          className={`flex-row items-center justify-center gap-x-2 rounded-2xl py-4 mt-5 ${
-            canContinue && !busy ? "bg-primary active:opacity-85" : "bg-surface"
-          }`}
-        >
-          <Text
-            className={`font-jk-med text-[15px] ${
-              canContinue && !busy ? "text-canvas" : "text-muted"
-            }`}
-          >
-            {busy === "phone" ? "Sending code…" : "Continue"}
-          </Text>
-          {canContinue && !busy ? (
-            <ArrowRight size={16} color="#FFFFFF" strokeWidth={1.8} />
-          ) : null}
-        </Pressable>
+        <View className="mt-5">
+          <Button
+            label="Continue"
+            busyLabel="Sending code…"
+            busy={busy === "phone"}
+            disabled={!canContinue || Boolean(busy)}
+            onPress={continueWithPhone}
+            Icon={ArrowRight}
+          />
+        </View>
 
         <Text className="font-jk text-muted text-[11px] leading-[16px] text-center mt-auto pt-10">
           By continuing you agree to the Terms and Privacy Policy.

@@ -3,6 +3,7 @@ import { useRouter } from "expo-router";
 import { Check } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
+import Button from "@/components/Button";
 import ScreenHeader from "@/components/ScreenHeader";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
@@ -82,22 +83,15 @@ export default function BillingScreen() {
               </View>
 
               {current ? null : (
-                <Pressable
-                  onPress={() => {
-                    impact("medium");
-                    // Nothing is charged here. Upgrading needs a payment method
-                    // on file, so this sends them there rather than pretending
-                    // a plan changed.
-                    router.push("/payment-methods");
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Upgrade to ${plan.name}`}
-                  className="items-center justify-center rounded-2xl bg-primary py-3.5 mt-5 active:opacity-85"
-                >
-                  <Text className="font-jk-med text-canvas text-[14.5px]">
-                    Upgrade to {plan.name}
-                  </Text>
-                </Pressable>
+                <View className="mt-5">
+                  <Button
+                    label={`Upgrade to ${plan.name}`}
+                    // Nothing is charged here. Upgrading needs a payment
+                    // method on file, so this sends them there rather than
+                    // pretending a plan changed.
+                    onPress={() => router.push("/payment-methods")}
+                  />
+                </View>
               )}
             </View>
           );

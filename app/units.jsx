@@ -5,6 +5,7 @@ import { ChevronRight, FolderClosed, Plus } from "lucide-react-native";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
+import { PillButton } from "@/components/Button";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
@@ -36,18 +37,7 @@ export default function UnitsScreen() {
           title="No units yet"
           message="Add one for each subject you're taking."
           action={
-            <Pressable
-              onPress={() => {
-                impact("medium");
-                router.push("/unit/new");
-              }}
-              accessibilityRole="button"
-              accessibilityLabel="Add a unit"
-              className="flex-row items-center gap-x-2 rounded-full bg-primary px-5 py-3 active:opacity-85"
-            >
-              <Plus size={16} color="#FFFFFF" strokeWidth={1.8} />
-              <Text className="font-jk-med text-canvas text-[14px]">Add a unit</Text>
-            </Pressable>
+            <PillButton label="Add a unit" Icon={Plus} onPress={() => router.push("/unit/new")} />
           }
         />
       ) : (

@@ -13,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
+import Button from "@/components/Button";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact, notify } from "@/lib/haptics";
 
@@ -171,24 +172,15 @@ export default function VerifyScreen() {
           </Text>
         ) : null}
 
-        <Pressable
-          onPress={verify}
-          disabled={!complete || busy}
-          accessibilityRole="button"
-          accessibilityLabel="Verify code"
-          accessibilityState={{ disabled: !complete || busy, busy }}
-          className={`items-center justify-center rounded-2xl py-4 mt-6 ${
-            complete && !busy ? "bg-primary active:opacity-85" : "bg-surface"
-          }`}
-        >
-          <Text
-            className={`font-jk-med text-[15px] ${
-              complete && !busy ? "text-canvas" : "text-muted"
-            }`}
-          >
-            {busy ? "Checking…" : "Verify"}
-          </Text>
-        </Pressable>
+        <View className="mt-6">
+          <Button
+            label="Verify"
+            busyLabel="Checking…"
+            busy={busy}
+            disabled={!complete || busy}
+            onPress={verify}
+          />
+        </View>
 
         <Pressable
           onPress={resend}

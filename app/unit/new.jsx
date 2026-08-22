@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { Pressable, Text, View } from "react-native";
+import { View } from "react-native";
 import { useRouter } from "expo-router";
 import { UserRound } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
+import Button from "@/components/Button";
 import ScreenHeader from "@/components/ScreenHeader";
 import TextField from "@/components/TextField";
 import { useStudyStore } from "@/store/useStudyStore";
@@ -64,22 +65,7 @@ export default function NewUnitScreen() {
         />
       </View>
 
-      <Pressable
-        onPress={save}
-        disabled={!canSave}
-        accessibilityRole="button"
-        accessibilityLabel="Add unit"
-        accessibilityState={{ disabled: !canSave }}
-        className={`items-center justify-center rounded-2xl py-4 ${
-          canSave ? "bg-primary active:opacity-85" : "bg-surface"
-        }`}
-      >
-        <Text
-          className={`font-jk-med text-[15px] ${canSave ? "text-canvas" : "text-muted"}`}
-        >
-          Add unit
-        </Text>
-      </Pressable>
+      <Button label="Add unit" onPress={save} disabled={!canSave} />
     </Screen>
   );
 }

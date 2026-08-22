@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, CalendarDays, Clock } from "lucide-react-native";
+import { Bell, CalendarDays, CalendarOff } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import SectionHeading from "@/components/SectionHeading";
@@ -61,11 +61,6 @@ export default function HomeScreen() {
   );
 
   const firstName = profile.name.trim().split(/\s+/)[0];
-  const dateLabel = new Date().toLocaleDateString(undefined, {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
 
   return (
     <>
@@ -88,22 +83,18 @@ export default function HomeScreen() {
           />
         </View>
 
-        {/* --- Timetable --- */}
+        {/* --- The month --- */}
         <View>
-          <SectionHeading
-            title="Timetable"
-            caption={dateLabel}
+          {/* No heading. The month name is right there in the calendar, and
+              today's date is a dark disc inside it — a title and a date line
+              above that said the same thing twice. */}
+          <MonthCalendar
+            classes={classes}
+            events={events}
+            onSelectDate={setOpenDate}
             action="Full week"
             onAction={() => router.push("/timetable")}
           />
-
-          <View className="mt-4">
-            <MonthCalendar
-              classes={classes}
-              events={events}
-              onSelectDate={setOpenDate}
-            />
-          </View>
 
           {/* The calendar is the shape of the month; this is the detail for the
               day the student is actually in. Any other day opens in a sheet. */}
@@ -115,7 +106,7 @@ export default function HomeScreen() {
             {todaysClasses.length === 0 ? (
               <EmptyState
                 compact
-                Icon={Clock}
+                Icon={CalendarOff}
                 title="No classes today"
                 message="Add when a unit meets and its sessions appear here on the day."
               />
