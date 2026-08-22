@@ -55,8 +55,14 @@ export default function BillingScreen() {
           return (
             <View
               key={card.tier}
-              style={{ borderColor: current ? COLORS.primary : COLORS.line }}
-              className="rounded-3xl border p-5"
+              style={{
+                borderColor: current ? COLORS.primary : COLORS.line,
+                backgroundColor:
+                  card.tone === "shaded" ? COLORS.surface : COLORS.canvas,
+                borderWidth: 1,
+                borderRadius: 24,
+                padding: 20,
+              }}
             >
               <View className="flex-row items-start justify-between">
                 <View className="flex-1 pr-3">

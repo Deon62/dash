@@ -97,12 +97,20 @@ export const PLAN_CARDS = [
     name: "Focus",
     tagline: "Enough for a normal semester",
     checkoutUrl: "https://paystack.shop/pay/cnt7kf6l-7",
+    /** Outlined on white — the everyday option. */
+    tone: "plain",
   },
   {
     tier: SubscriptionTier.PRO,
     name: "Synapse",
     tagline: "For a full course load and finals",
     checkoutUrl: "https://paystack.shop/pay/a-tbik1kof",
+    /**
+     * Filled. Two identical white cards make a student compare nine lines of
+     * small print to work out that one is the bigger plan; a shaded card says
+     * it before they read a word.
+     */
+    tone: "shaded",
   },
 ];
 
