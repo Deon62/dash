@@ -7,10 +7,10 @@ import {
   useWindowDimensions,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { CalendarDays, FolderClosed, Orbit } from "lucide-react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 
 import ArrowButton from "@/components/ArrowButton";
+import { CalendarArt, FiledArt, NotesArt } from "@/components/IntroArt";
 import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
@@ -18,28 +18,28 @@ import { impact } from "@/lib/haptics";
 /**
  * The three pillars, in the order they happen to a student.
  *
- * One idea per screen and no feature lists: someone who has just installed the
- * app is deciding whether to bother, not learning where the buttons are. Each
- * line says what they get, not what the app has.
+ * One idea per screen and one sentence under it. Someone who has just
+ * installed the app is deciding whether to bother, not reading documentation —
+ * every extra clause is a reason to tap Skip.
  */
 const SLIDES = [
   {
     key: "knowledge",
-    Icon: FolderClosed,
+    Art: FiledArt,
     title: "Your whole course,\nfiled by unit",
-    body: "Class times, lecture notes, slides, past papers — everything for CS201 sits under CS201, instead of scattered across a gallery, a chat and three notebooks.",
+    body: "Class times, notes and slides, each under the unit they belong to.",
   },
   {
     key: "study",
-    Icon: Orbit,
+    Art: NotesArt,
     title: "Revise from your\nown notes",
-    body: "Ask anything and the answer comes out of the material you filed, quoted back with the note it came from. Nothing invented, nothing off-syllabus — because you are marked on your lecturer's words, not the internet's.",
+    body: "Ask anything. Answers come straight from what you filed, quoted.",
   },
   {
     key: "calendar",
-    Icon: CalendarDays,
+    Art: CalendarArt,
     title: "Nothing sneaks\nup on you",
-    body: "CATs, exams, assignments and projects on one calendar, colour-coded and counting down. You see the week that is about to get heavy while there is still time to do something about it.",
+    body: "CATs, exams and deadlines on one calendar, counting down.",
   },
 ];
 
@@ -52,7 +52,10 @@ const SLIDES = [
  */
 function Aurora() {
   return (
-    <View className="absolute inset-x-0 top-0 h-96" pointerEvents="none">
+    <View
+      style={{ position: "absolute", left: 0, right: 0, top: 0, height: 440 }}
+      pointerEvents="none"
+    >
       <Svg width="100%" height="100%">
         <Defs>
           <RadialGradient id="i1" cx="50%" cy="50%" r="50%">
@@ -76,6 +79,9 @@ function Aurora() {
   );
 }
 
+/** The one horizontal margin on this screen — text, bar and arrows share it. */
+const PAGE_X = 28;
+
 export default function IntroScreen() {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -85,6 +91,7 @@ export default function IntroScreen() {
   const scrollRef = useRef(null);
   const [index, setIndex] = useState(0);
 
+  const first = index === 0;
   const last = index === SLIDES.length - 1;
 
   const goTo = (next) => {
@@ -99,7 +106,6 @@ export default function IntroScreen() {
       completeIntro();
       return;
     }
-    impact("light");
     goTo(index + 1);
   };
 
@@ -107,27 +113,53 @@ export default function IntroScreen() {
     <View className="flex-1 bg-canvas">
       <Aurora />
 
-      {/* Kept quiet, but present until the last screen — making someone sit
-          through three panels to reach a sign-in button loses people. The row
-          keeps its height when the control goes, so nothing shifts. */}
-      <View
-        style={{ paddingTop: insets.top + 8, height: insets.top + 48 }}
-        className="items-end px-5"
-      >
-        {last ? null : (
+      {/* --- Progress, across the top --- */}
+      <View style={{ paddingTop: insets.top + 16, paddingHorizontal: PAGE_X }}>
+        <View className="flex-row gap-x-1.5">
+          {SLIDES.map((slide, step) => (
+            <Pressable
+              key={slide.key}
+              onPress={() => {
+                impact("light");
+                goTo(step);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Go to screen ${step + 1}`}
+              hitSlop={{ top: 12, bottom: 12 }}
+              className="flex-1"
+            >
+              {/* Segments rather than dots: a bar that fills left to right
+                  says how far through you are, where three dots only say
+                  which one is lit. */}
+              <View
+                style={{
+                  height: 3,
+                  borderRadius: 1.5,
+                  backgroundColor: step <= index ? COLORS.primary : COLORS.line,
+                }}
+              />
+            </Pressable>
+          ))}
+        </View>
+
+        {/* Under the bar, not beside it. Sharing the row squeezed the segments
+            into two thirds of the width for the sake of one small word. */}
+        <View className="flex-row justify-end mt-3">
           <Pressable
             onPress={() => {
               impact("light");
               completeIntro();
             }}
+            disabled={last}
             accessibilityRole="button"
             accessibilityLabel="Skip the introduction"
             hitSlop={10}
-            className="px-2 py-2 active:opacity-60"
+            style={{ opacity: last ? 0 : 1 }}
+            className="active:opacity-60"
           >
             <Text className="font-jk-med text-muted text-[13.5px]">Skip</Text>
           </Pressable>
-        )}
+        </View>
       </View>
 
       <ScrollView
@@ -143,26 +175,35 @@ export default function IntroScreen() {
         {SLIDES.map((slide) => (
           <View
             key={slide.key}
-            style={{ width }}
-            className="flex-1 items-center justify-center px-9"
+            // Padding lives in the style object because one is already being
+            // passed for the width: in that combination the object wins
+            // outright and a `px-*` class is silently dropped, which is what
+            // left the copy hard against the left edge.
+            style={{ width, paddingHorizontal: PAGE_X, justifyContent: "center" }}
+            className="flex-1"
           >
+            {/* The art is centred; the words are not. Every panel sets its
+                text against the same left edge, so nothing shifts sideways as
+                the carousel pages — which is what made the copy look like it
+                was changing alignment. */}
             <View
               style={{
-                width: 88,
-                height: 88,
-                borderRadius: 44,
+                height: 190,
+                width: "100%",
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: COLORS.surface,
+                marginBottom: 40,
               }}
             >
-              <slide.Icon size={34} color={COLORS.ink} strokeWidth={1.5} />
+              <View style={{ width: "88%", height: "100%" }}>
+                <slide.Art />
+              </View>
             </View>
 
-            <Text className="font-jk-bold text-ink text-[28px] leading-[36px] text-center mt-8">
+            <Text className="font-jk-bold text-ink text-[28px] leading-[36px]">
               {slide.title}
             </Text>
-            <Text className="font-jk text-muted text-[14px] leading-[22px] text-center mt-4">
+            <Text className="font-jk text-muted text-[14.5px] leading-[22px] mt-3.5">
               {slide.body}
             </Text>
           </View>
@@ -170,41 +211,24 @@ export default function IntroScreen() {
       </ScrollView>
 
       <View
-        style={{ paddingBottom: insets.bottom + 24 }}
-        className="px-6 pt-4"
+        style={{
+          paddingBottom: insets.bottom + 28,
+          paddingTop: 24,
+          paddingHorizontal: PAGE_X,
+        }}
+        className="flex-row items-center justify-between"
       >
-        <View className="flex-row items-center justify-between">
-          <View className="flex-row gap-x-2">
-            {SLIDES.map((slide, dot) => (
-              <Pressable
-                key={slide.key}
-                onPress={() => {
-                  impact("light");
-                  goTo(dot);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={`Go to screen ${dot + 1}`}
-                hitSlop={8}
-              >
-                {/* The current dot stretches rather than just darkening — it
-                    reads as a position on a track, not a disabled button. */}
-                <View
-                  style={{
-                    width: dot === index ? 22 : 6,
-                    height: 6,
-                    borderRadius: 3,
-                    backgroundColor: dot === index ? COLORS.primary : COLORS.line,
-                  }}
-                />
-              </Pressable>
-            ))}
-          </View>
+        <ArrowButton
+          direction="back"
+          hidden={first}
+          onPress={() => goTo(index - 1)}
+          label="Previous screen"
+        />
 
-          <ArrowButton
-            onPress={advance}
-            label={last ? "Get started" : "Next screen"}
-          />
-        </View>
+        <ArrowButton
+          onPress={advance}
+          label={last ? "Get started" : "Next screen"}
+        />
       </View>
     </View>
   );

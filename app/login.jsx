@@ -23,6 +23,7 @@ import {
   normalisePhone,
   phoneHint,
 } from "@/theme/countries";
+import { COLORS } from "@/theme/colors";
 import { detectCountry } from "@/lib/geo";
 import { sendPhoneOtp, signInWithGoogle } from "@/lib/auth";
 import { useStudyStore } from "@/store/useStudyStore";
@@ -150,8 +151,10 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 56,
-          paddingBottom: insets.bottom + 32,
+          // Well clear of the notch: the heading is the first thing read and
+          // it should not start against the top of the glass.
+          paddingTop: insets.top + 96,
+          paddingBottom: insets.bottom + 28,
           paddingHorizontal: 24,
           flexGrow: 1,
         }}
@@ -159,7 +162,7 @@ export default function LoginScreen() {
         <Text className="font-jk-bold text-ink text-[30px] leading-[38px] text-center">
           Your whole course,{"\n"}in one place.
         </Text>
-        <Text className="font-jk text-muted text-[14px] leading-[20px] text-center mt-3">
+        <Text className="font-jk text-muted text-[14px] leading-[21px] text-center mt-3.5">
           Sign in to pick up your notes, deadlines and revision where you left
           them.
         </Text>
@@ -167,79 +170,81 @@ export default function LoginScreen() {
         {/* The sign-in controls sit in the vertical middle rather than packed
             under the heading — the page reads as a heading at the top, the
             thing you came to do in the middle, and small print at the foot. */}
-        <View className="flex-1 justify-center">
-          {/* Google */}
-        <Pressable
-          onPress={continueWithGoogle}
-          disabled={Boolean(busy)}
-          accessibilityRole="button"
-          accessibilityLabel="Continue with Google"
-          accessibilityState={{ disabled: Boolean(busy), busy: busy === "google" }}
-          className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 ${
-            busy ? "opacity-50" : "active:bg-surface"
-          }`}
-        >
-          <GoogleMark size={18} />
-          <Text className="font-jk-med text-ink text-[15px]">
-            {busy === "google" ? "Signing in…" : "Continue with Google"}
+        <View className="flex-1 justify-center py-10">
+          <Pressable
+            onPress={continueWithGoogle}
+            disabled={Boolean(busy)}
+            accessibilityRole="button"
+            accessibilityLabel="Continue with Google"
+            accessibilityState={{ disabled: Boolean(busy), busy: busy === "google" }}
+            className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 ${
+              busy ? "opacity-50" : "active:bg-surface"
+            }`}
+          >
+            <GoogleMark size={18} />
+            <Text className="font-jk-med text-ink text-[15px]">
+              {busy === "google" ? "Signing in…" : "Continue with Google"}
+            </Text>
+          </Pressable>
+
+          <View className="flex-row items-center gap-x-3 my-7">
+            <View className="flex-1 h-px bg-line" />
+            <Text className="font-jk text-muted text-[11px]">or</Text>
+            <View className="flex-1 h-px bg-line" />
+          </View>
+
+          {/* A rule, like every other input in the app. The Google control
+              above keeps its outline because it is a button, not a field. */}
+          <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
+            MOBILE NUMBER
           </Text>
-        </Pressable>
+          <View
+            style={{ borderBottomWidth: 1, borderBottomColor: COLORS.line }}
+            className="flex-row items-center"
+          >
+            <CountryPicker value={country} onChange={setCountry} />
+            <TextInput
+              value={digits}
+              onChangeText={(next) => setPhone(normalisePhone(next, selected))}
+              // Scroll the field clear of the keyboard. KeyboardAvoidingView
+              // alone leaves it under the keyboard on Android.
+              onFocus={() =>
+                setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)
+              }
+              placeholder={selected.iso === "KE" ? "712 345 678" : "Mobile number"}
+              placeholderTextColor="#A1A1AA"
+              keyboardType="phone-pad"
+              textContentType="telephoneNumber"
+              autoComplete="tel"
+              className="flex-1 py-3 font-jk text-ink text-[15.5px]"
+            />
+          </View>
 
-        <View className="flex-row items-center gap-x-3 my-6">
-          <View className="flex-1 h-px bg-line" />
-          <Text className="font-jk text-muted text-[11px]">or</Text>
-          <View className="flex-1 h-px bg-line" />
-        </View>
-
-        {/* Phone */}
-        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-2">
-          MOBILE NUMBER
-        </Text>
-        <View className="flex-row items-center rounded-2xl border border-line px-4">
-          <CountryPicker value={country} onChange={setCountry} />
-          <TextInput
-            value={digits}
-            onChangeText={(next) => setPhone(normalisePhone(next, selected))}
-            // Scroll the field clear of the keyboard. KeyboardAvoidingView
-            // alone leaves it under the keyboard on Android.
-            onFocus={() =>
-              setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)
-            }
-            placeholder={selected.iso === "KE" ? "712 345 678" : "Mobile number"}
-            placeholderTextColor="#A1A1AA"
-            keyboardType="phone-pad"
-            textContentType="telephoneNumber"
-            autoComplete="tel"
-            className="flex-1 py-4 font-jk text-ink text-[15px]"
-          />
-        </View>
-
-        <Text className="font-jk text-muted text-[11.5px] mt-2 ml-1">
-          {digits.length > 0 && !canContinue
-            ? phoneHint(selected)
-            : `We'll text a code to ${selected.dial} ${digits || "…"}`}
-        </Text>
-
-        {error ? (
-          <Text className="font-jk text-danger text-[12px] leading-[17px] mt-3 ml-1">
-            {error}
+          <Text className="font-jk text-muted text-[11.5px] mt-2.5">
+            {digits.length > 0 && !canContinue
+              ? phoneHint(selected)
+              : `We'll text a code to ${selected.dial} ${digits || "…"}`}
           </Text>
-        ) : null}
 
-        <View className="mt-5">
-          <Button
-            label="Continue"
-            busyLabel="Sending code…"
-            busy={busy === "phone"}
-            disabled={!canContinue || Boolean(busy)}
-            onPress={continueWithPhone}
-            Icon={ArrowRight}
-          />
+          {error ? (
+            <Text className="font-jk text-danger text-[12px] leading-[17px] mt-3">
+              {error}
+            </Text>
+          ) : null}
+
+          <View className="mt-7">
+            <Button
+              label="Continue"
+              busyLabel="Sending code…"
+              busy={busy === "phone"}
+              disabled={!canContinue || Boolean(busy)}
+              onPress={continueWithPhone}
+              Icon={ArrowRight}
+            />
+          </View>
         </View>
 
-        </View>
-
-        <Text className="font-jk text-muted text-[11px] leading-[16px] text-center pt-8">
+        <Text className="font-jk text-muted text-[11px] leading-[16px] text-center">
           By continuing you agree to the Terms and Privacy Policy.
         </Text>
       </ScrollView>

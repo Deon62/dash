@@ -1,30 +1,30 @@
 import { useMemo, useState } from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { Bell, CalendarDays, CalendarOff } from "lucide-react-native";
+import { Bell, CalendarOff } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
-import SectionHeading from "@/components/SectionHeading";
 import IconButton from "@/components/IconButton";
 import Fab from "@/components/Fab";
 import MonthCalendar from "@/components/MonthCalendar";
 import DaySheet from "@/components/DaySheet";
 import ClassRow from "@/components/ClassRow";
-import EventRow from "@/components/EventRow";
 import EventComposer from "@/components/EventComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
-import { greeting, minutesOf } from "@/lib/dates";
-
-/** How many upcoming items the dashboard shows before it stops being a summary. */
-const UPCOMING_LIMIT = 5;
+import { dayKey, greeting, minutesOf } from "@/lib/dates";
 
 /**
- * The dashboard: today, and what is coming.
+ * The dashboard: the month, and the day you are in.
  *
- * Two sections and nothing else. Everything that invites browsing — units,
- * notes, past chats — lives in the tab that owns it, so this one can answer
- * "what is happening" without becoming a second copy of the app.
+ * There is no list of what is coming. The calendar already carries it — every
+ * deadline is a dot on the day it falls, and tapping that day opens the detail.
+ * A list underneath repeated the same information in a different order, which
+ * meant two places to look and two places to keep in step.
+ *
+ * Everything that invites browsing — units, notes, past chats — lives in the
+ * tab that owns it, so this one can answer "what is happening" without becoming
+ * a second copy of the app.
  */
 export default function HomeScreen() {
   const router = useRouter();
@@ -49,16 +49,14 @@ export default function HomeScreen() {
     [classes, today]
   );
 
-  // Undated items sort last: something with no date cannot be urgent, and
-  // putting it first would bury what is.
-  const upcoming = useMemo(
-    () =>
-      events
-        .filter((event) => !event.done)
-        .sort((a, b) => (a.at ?? "9999").localeCompare(b.at ?? "9999"))
-        .slice(0, UPCOMING_LIMIT),
-    [events]
-  );
+  // The bell marks anything already due — the one thing a dot on a past date
+  // cannot say on its own, since the calendar shows the month, not the clock.
+  const overdue = useMemo(() => {
+    const now = dayKey();
+    return events.some(
+      (event) => !event.done && event.at && dayKey(event.at) <= now
+    );
+  }, [events]);
 
   const firstName = profile.name.trim().split(/\s+/)[0];
 
@@ -79,7 +77,7 @@ export default function HomeScreen() {
             Icon={Bell}
             label="Notifications"
             onPress={() => router.push("/notifications")}
-            badge={upcoming.some((event) => (event.at ?? "") <= new Date().toISOString())}
+            badge={overdue}
           />
         </View>
 
@@ -124,36 +122,11 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* --- Upcoming --- */}
-        <View>
-          <SectionHeading title="Upcoming" />
-
-          <View className="mt-2">
-            {upcoming.length === 0 ? (
-              <EmptyState
-                compact
-                Icon={CalendarDays}
-                title="Nothing coming up"
-                message="Assignments, CATs and exams you add show up here, soonest first."
-              />
-            ) : (
-              upcoming.map((event, index) => (
-                <EventRow
-                  key={event.id}
-                  event={event}
-                  unit={unitById(units, event.unitId)}
-                  onToggle={() => toggleEvent(event.id)}
-                  last={index === upcoming.length - 1}
-                />
-              ))
-            )}
-          </View>
-        </View>
       </Screen>
 
-      {/* Adding an event is the only thing you do *to* this screen, so it gets
-          the same thumb-reachable disc Knowledge uses rather than a small
-          control tucked beside a heading. */}
+      {/* Adding an event is still the one thing you do *to* this screen, even
+          though nothing lists events any more — what you add turns into a dot
+          on its day. */}
       <Fab label="Add an event" onPress={() => setComposing(true)} />
 
       <DaySheet

@@ -5,6 +5,7 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { newId } from "@/lib/ids";
 import { dayKey } from "@/lib/dates";
 import { rollUsage, newSubscription } from "@/lib/quota";
+import { ALWAYS_SHOW_INTRO } from "@/lib/devFlags";
 import { SubscriptionTier } from "@/theme/plans";
 
 /**
@@ -429,7 +430,12 @@ export const useStudyStore = create(
       storage: createJSONStorage(() => AsyncStorage),
       // `hydrated` is about this launch, not about the student — persisting it
       // would restore `true` before the read had actually happened.
-      partialize: ({ hydrated, ...rest }) => rest,
+      //
+      // While the intro is being designed, `introSeen` is left out too, so it
+      // comes back false on every cold start and the screens show again. The
+      // flag still works normally within a session; it just is not remembered.
+      partialize: ({ hydrated, introSeen, ...rest }) =>
+        ALWAYS_SHOW_INTRO ? rest : { ...rest, introSeen },
       // Flip the flag through the store rather than the callback's `state`
       // argument: on a read error that argument is undefined, and the guard
       // would then wait on a hydration that already finished, failed.
