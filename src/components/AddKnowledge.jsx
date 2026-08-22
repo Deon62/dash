@@ -7,6 +7,7 @@ import { FileText, Image as ImageIcon, Link2, NotebookPen } from "lucide-react-n
 import Sheet from "@/components/Sheet";
 import Button from "@/components/Button";
 import Disc from "@/components/Disc";
+import { canAttachFile } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import TextField from "@/components/TextField";
 import { impact, notify } from "@/lib/haptics";
@@ -68,7 +69,15 @@ function Option({ Icon, label, hint, onPress }) {
  * a PDF"; they think "this is for CS201". Asking for the unit first also means
  * the answer is never guessed from whatever tab was open.
  */
-export default function AddKnowledge({ visible, onClose, units, onSave, lockedUnitId }) {
+export default function AddKnowledge({
+  visible,
+  onClose,
+  units,
+  onSave,
+  lockedUnitId,
+  tier,
+  onBlocked,
+}) {
   const [step, setStep] = useState(lockedUnitId ? "format" : "unit");
   const [unitId, setUnitId] = useState(lockedUnitId ?? null);
   const [format, setFormat] = useState(null);
@@ -121,6 +130,15 @@ export default function AddKnowledge({ visible, onClose, units, onSave, lockedUn
     if (result.canceled || !result.assets?.length) return null;
 
     const asset = result.assets[0];
+
+    // Size is the one file limit that can be checked here — the picker reports
+    // it. Page count cannot be, because nothing in the app reads a PDF yet.
+    const allowance = canAttachFile(tier, asset.size);
+    if (!allowance.ok) {
+      onBlocked?.(allowance);
+      return null;
+    }
+
     return { kind: "pdf", title: asset.name ?? "Document", uri: asset.uri, body: "" };
   };
 

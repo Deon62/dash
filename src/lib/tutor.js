@@ -109,7 +109,7 @@ function trim(text, max = 320) {
  * drawn from, so the screen can show the student exactly which of their notes
  * is talking.
  */
-export function answer(question, { materials, unit }) {
+export function answer(question, { materials, unit, limit = 4 }) {
   const scope = unit ? unit.code : "your units";
 
   if (materials.length === 0) {
@@ -119,7 +119,9 @@ export function answer(question, { materials, unit }) {
     };
   }
 
-  const hits = retrieve(question, materials);
+  // `limit` comes from the plan: how many passages an answer may quote is the
+  // part of the tiered "source citations" promise this can honestly deliver.
+  const hits = retrieve(question, materials, { limit });
 
   if (hits.length === 0) {
     const titles = materials

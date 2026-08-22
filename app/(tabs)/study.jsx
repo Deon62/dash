@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowUp,
@@ -15,6 +15,7 @@ import {
 } from "lucide-react-native";
 
 import Sheet from "@/components/Sheet";
+import LimitSheet from "@/components/LimitSheet";
 import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
@@ -23,6 +24,14 @@ import { answer, buildFlashcards, buildQuiz } from "@/lib/tutor";
 import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
+import {
+  activeTier,
+  aiQueriesLeft,
+  canAskAi,
+  canStartQuiz,
+  citationDepth,
+  quizSize,
+} from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
 
@@ -43,6 +52,7 @@ const MODES = [
  */
 export default function StudyScreen() {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
   const params = useLocalSearchParams();
 
   const profile = useStudyStore((state) => state.profile);
@@ -56,12 +66,18 @@ export default function StudyScreen() {
   const appendMessage = useStudyStore((state) => state.appendMessage);
   const deleteChat = useStudyStore((state) => state.deleteChat);
   const recordStudy = useStudyStore((state) => state.recordStudy);
+  const subscription = useStudyStore((state) => state.subscription);
+  const usage = useStudyStore((state) => state.usage);
+  const recordAiQuery = useStudyStore((state) => state.recordAiQuery);
+  const recordQuiz = useStudyStore((state) => state.recordQuiz);
 
   const [mode, setMode] = useState("ask");
   const [draft, setDraft] = useState("");
   const [thinking, setThinking] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [scopeOpen, setScopeOpen] = useState(false);
+  /** A `{ reason, detail }` verdict from the quota layer, or null. */
+  const [blocked, setBlocked] = useState(null);
 
   const scrollRef = useRef(null);
 
@@ -92,9 +108,24 @@ export default function StudyScreen() {
 
   const messages = chat?.messages ?? [];
 
+  // What the current plan allows. Read before `ask` is defined, because `ask`
+  // closes over all three.
+  const tier = activeTier(subscription);
+  const depth = citationDepth(tier);
+  const left = aiQueriesLeft(tier, usage);
+
   const ask = (question) => {
     const text = question.trim();
     if (!text || thinking) return;
+
+    // The daily allowance is checked before the question is posted, not after:
+    // showing a student's own words in the thread and then refusing to answer
+    // them reads as a failure rather than a limit.
+    const allowance = canAskAi(tier, usage);
+    if (!allowance.ok) {
+      setBlocked(allowance);
+      return;
+    }
 
     impact("medium");
     const target = chat ?? newChat(unitId);
@@ -103,12 +134,13 @@ export default function StudyScreen() {
     setDraft("");
     setThinking(true);
     recordStudy();
+    recordAiQuery();
 
     // Retrieval is synchronous and instant. The pause is deliberate: a reply
     // that lands before the student's own message has finished animating in
     // reads as a canned response rather than an answer.
     setTimeout(() => {
-      const reply = answer(text, { materials: scoped, unit });
+      const reply = answer(text, { materials: scoped, unit, limit: depth });
       appendMessage(target.id, {
         role: "tutor",
         text: reply.text,
@@ -193,7 +225,14 @@ export default function StudyScreen() {
           ) : null}
         </ScrollView>
       ) : mode === "quiz" ? (
-        <QuizPane materials={scoped} unit={unit} />
+        <QuizPane
+          materials={scoped}
+          unit={unit}
+          tier={tier}
+          usage={usage}
+          onStart={recordQuiz}
+          onBlocked={setBlocked}
+        />
       ) : (
         <CardsPane materials={scoped} units={units} unit={unit} />
       )}
@@ -266,18 +305,32 @@ export default function StudyScreen() {
           </View>
 
           {/* The scope pill — this app's version of a model switcher. */}
-          <Pressable
-            onPress={() => {
-              impact("light");
-              setScopeOpen(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
-            className="flex-row items-center gap-x-1.5 self-start rounded-full bg-surface px-3 py-1.5 mt-2.5 active:opacity-60"
-          >
-            <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
-            <ChevronDown size={14} color="#71717A" strokeWidth={1.8} />
-          </Pressable>
+          <View className="flex-row items-center justify-between mt-2.5">
+            <Pressable
+              onPress={() => {
+                impact("light");
+                setScopeOpen(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
+              className="flex-row items-center gap-x-1.5 rounded-full bg-surface px-3 py-1.5 active:opacity-60"
+            >
+              <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
+              <ChevronDown size={14} color="#71717A" strokeWidth={1.8} />
+            </Pressable>
+
+            {/* Only shown once the allowance is nearly gone. A counter that is
+                always on screen turns every question into a transaction. */}
+            {left !== null && left <= 5 ? (
+              <Text
+                className={`font-jk text-[11.5px] ${
+                  left === 0 ? "text-danger" : "text-muted"
+                }`}
+              >
+                {left} left today
+              </Text>
+            ) : null}
+          </View>
         </View>
       </View>
 
@@ -443,6 +496,8 @@ export default function StudyScreen() {
           );
         })}
       </Sheet>
+
+      <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
     </View>
   );
 }
@@ -479,18 +534,37 @@ function Bubble({ message }) {
 
 // --- Quiz ------------------------------------------------------------------
 
-function QuizPane({ materials, unit }) {
+function QuizPane({ materials, unit, tier, usage, onStart, onBlocked }) {
   const [seed, setSeed] = useState(0);
   const [index, setIndex] = useState(0);
   const [revealed, setRevealed] = useState(false);
 
+  const size = quizSize(tier);
+
   // Rebuilt whenever the scope or the seed changes; `seed` is what "new set"
   // increments, since the question picker shuffles.
   const questions = useMemo(
-    () => buildQuiz(materials),
+    () => buildQuiz(materials, { count: size }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [materials, seed]
+    [materials, seed, size]
   );
+
+  /**
+   * A "set" is what the quota counts, not a question.
+   *
+   * Checked when a new set is asked for rather than on every reveal — a
+   * student stepping through the questions they already have is still inside
+   * the one quiz they were allowed.
+   */
+  const newSet = () => {
+    const allowance = canStartQuiz(tier, usage);
+    if (!allowance.ok) {
+      onBlocked(allowance);
+      return;
+    }
+    onStart();
+    setSeed((value) => value + 1);
+  };
 
   useEffect(() => {
     setIndex(0);
@@ -556,7 +630,7 @@ function QuizPane({ materials, unit }) {
         <Pressable
           onPress={() => {
             impact("light");
-            setSeed((value) => value + 1);
+            newSet();
           }}
           accessibilityRole="button"
           accessibilityLabel="New set of questions"
@@ -570,7 +644,7 @@ function QuizPane({ materials, unit }) {
             impact("medium");
             if (last) {
               notify("success");
-              setSeed((value) => value + 1);
+              newSet();
               return;
             }
             setIndex((value) => value + 1);

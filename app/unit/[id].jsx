@@ -21,8 +21,10 @@ import EventRow from "@/components/EventRow";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AddKnowledge from "@/components/AddKnowledge";
+import LimitSheet from "@/components/LimitSheet";
 import EventComposer from "@/components/EventComposer";
 import ClassComposer from "@/components/ClassComposer";
+import { activeTier } from "@/lib/quota";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
@@ -42,6 +44,7 @@ export default function UnitScreen() {
 
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
+  const subscription = useStudyStore((state) => state.subscription);
   const events = useStudyStore((state) => state.events);
   const classes = useStudyStore((state) => state.classes);
 
@@ -56,6 +59,9 @@ export default function UnitScreen() {
 
   const [section, setSection] = useState("knowledge");
   const [composer, setComposer] = useState(null);
+  const [blocked, setBlocked] = useState(null);
+
+  const tier = activeTier(subscription);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const unit = unitById(units, unitId);
@@ -298,9 +304,13 @@ export default function UnitScreen() {
         ) : null}
       </Screen>
 
+      <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
+
       <AddKnowledge
         visible={composer === "knowledge"}
         units={units}
+        tier={tier}
+        onBlocked={setBlocked}
         lockedUnitId={unitId}
         onClose={() => setComposer(null)}
         onSave={addMaterial}

@@ -8,7 +8,9 @@ import IconButton from "@/components/IconButton";
 import Fab from "@/components/Fab";
 import { PillButton } from "@/components/Button";
 import AddKnowledge from "@/components/AddKnowledge";
+import LimitSheet from "@/components/LimitSheet";
 import EmptyState from "@/components/EmptyState";
+import { activeTier } from "@/lib/quota";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
 
@@ -64,10 +66,14 @@ export default function KnowledgeScreen() {
 
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
+  const subscription = useStudyStore((state) => state.subscription);
   const events = useStudyStore((state) => state.events);
   const addMaterial = useStudyStore((state) => state.addMaterial);
 
   const [adding, setAdding] = useState(false);
+  const [blocked, setBlocked] = useState(null);
+
+  const tier = activeTier(subscription);
 
   const counts = useMemo(() => {
     const table = new Map(units.map((unit) => [unit.id, { items: 0, events: 0 }]));
@@ -152,9 +158,13 @@ export default function KnowledgeScreen() {
         <Fab label="Add knowledge" onPress={() => setAdding(true)} />
       ) : null}
 
+      <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
+
       <AddKnowledge
         visible={adding}
         units={units}
+        tier={tier}
+        onBlocked={setBlocked}
         onClose={() => setAdding(false)}
         onSave={addMaterial}
       />

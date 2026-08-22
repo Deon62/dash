@@ -4,6 +4,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { newId } from "@/lib/ids";
 import { dayKey } from "@/lib/dates";
+import { rollUsage, newSubscription } from "@/lib/quota";
+import { SubscriptionTier } from "@/theme/plans";
 
 /**
  * The whole app's state, on the device.
@@ -38,13 +40,21 @@ const EMPTY_SETTINGS = {
   biometricLock: false,
 };
 
-const EMPTY_BILLING = {
-  plan: "free",
-  /** Safaricom number for M-Pesa, in local format. */
-  mpesaNumber: "",
-  /** Paystack handles the card itself; this is only what it hands back. */
-  cardLast4: "",
-  cardBrand: "",
+/**
+ * Counters the plan limits are measured against.
+ *
+ * Each carries the period it belongs to, so a stale counter can be recognised
+ * and reset rather than silently spending yesterday's allowance. `quizzesEver`
+ * has no period on purpose — the trial's quiz limit is a lifetime one.
+ */
+const EMPTY_USAGE = {
+  day: dayKey(),
+  aiQueriesToday: 0,
+  week: null,
+  quizzesThisWeek: 0,
+  month: dayKey().slice(0, 7),
+  ocrPagesThisMonth: 0,
+  quizzesEver: 0,
 };
 
 function initialsFrom(name) {
@@ -63,7 +73,9 @@ const BLANK = {
   isAuthenticated: false,
   profile: { ...EMPTY_PROFILE },
   settings: { ...EMPTY_SETTINGS },
-  billing: { ...EMPTY_BILLING },
+  /** `null` until the trial is started, which happens at the end of intake. */
+  subscription: null,
+  usage: { ...EMPTY_USAGE },
   /** The three explainer screens, shown once on the very first launch. */
   introSeen: false,
   onboarded: false,
@@ -138,13 +150,65 @@ export const useStudyStore = create(
       updateSettings: (patch) =>
         set((state) => ({ settings: { ...state.settings, ...patch } })),
 
-      updateBilling: (patch) =>
-        set((state) => ({ billing: { ...state.billing, ...patch } })),
+      // --- Subscription -----------------------------------------------------
+
+      /** Starts the seven days. Never restarts one that has already run. */
+      startTrial: () =>
+        set((state) =>
+          state.subscription
+            ? {}
+            : { subscription: newSubscription(SubscriptionTier.TRIAL) }
+        ),
+
+      /**
+       * Switches the account onto a paid tier.
+       *
+       * Called after the student returns from Paystack saying they paid. The
+       * subscription it writes is marked unverified, because nothing on this
+       * device saw the money — only a server receiving Paystack's webhook can
+       * set that straight, and until one exists this is a claim, not a fact.
+       */
+      activatePlan: (tier) => set({ subscription: newSubscription(tier) }),
+
+      // --- Usage ------------------------------------------------------------
+
+      /** Rolls any counter whose period has passed. Safe to call on render. */
+      refreshUsage: () => set((state) => ({ usage: rollUsage(state.usage) })),
+
+      recordAiQuery: () =>
+        set((state) => {
+          const usage = rollUsage(state.usage);
+          return { usage: { ...usage, aiQueriesToday: usage.aiQueriesToday + 1 } };
+        }),
+
+      recordQuiz: () =>
+        set((state) => {
+          const usage = rollUsage(state.usage);
+          return {
+            usage: {
+              ...usage,
+              quizzesThisWeek: usage.quizzesThisWeek + 1,
+              quizzesEver: usage.quizzesEver + 1,
+            },
+          };
+        }),
+
+      recordOcrPages: (pages) =>
+        set((state) => {
+          const usage = rollUsage(state.usage);
+          return {
+            usage: { ...usage, ocrPagesThisMonth: usage.ocrPagesThisMonth + pages },
+          };
+        }),
 
       /** Marks the intake flow done; the guard stops redirecting after this. */
       completeOnboarding: (patch = {}) =>
         set((state) => ({
           onboarded: true,
+          // The clock starts when the account is actually usable, not on
+          // install — otherwise a student who abandons intake loses days of a
+          // trial they never began.
+          subscription: state.subscription ?? newSubscription(SubscriptionTier.TRIAL),
           profile: {
             ...state.profile,
             ...patch,

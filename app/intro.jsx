@@ -10,7 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { CalendarDays, FolderClosed, Orbit } from "lucide-react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 
-import Button from "@/components/Button";
+import ArrowButton from "@/components/ArrowButton";
 import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
@@ -43,23 +43,34 @@ const SLIDES = [
   },
 ];
 
-/** The same soft wash the sign-in screen opens with, so the two feel related. */
+/**
+ * The same soft wash the sign-in screen opens with.
+ *
+ * Identical circles and opacities, not an approximation — these two screens
+ * run back to back on a first launch, and a wash that shifts between them
+ * reads as a rendering glitch rather than a transition.
+ */
 function Aurora() {
   return (
     <View className="absolute inset-x-0 top-0 h-96" pointerEvents="none">
       <Svg width="100%" height="100%">
         <Defs>
           <RadialGradient id="i1" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#007FFA" stopOpacity="0.20" />
+            <Stop offset="0" stopColor="#007FFA" stopOpacity="0.22" />
             <Stop offset="1" stopColor="#007FFA" stopOpacity="0" />
           </RadialGradient>
           <RadialGradient id="i2" cx="50%" cy="50%" r="50%">
-            <Stop offset="0" stopColor="#00C2A8" stopOpacity="0.16" />
+            <Stop offset="0" stopColor="#00C2A8" stopOpacity="0.18" />
             <Stop offset="1" stopColor="#00C2A8" stopOpacity="0" />
           </RadialGradient>
+          <RadialGradient id="i3" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#F59E0B" stopOpacity="0.16" />
+            <Stop offset="1" stopColor="#F59E0B" stopOpacity="0" />
+          </RadialGradient>
         </Defs>
-        <Circle cx="20%" cy="18%" r="160" fill="url(#i1)" />
-        <Circle cx="86%" cy="10%" r="150" fill="url(#i2)" />
+        <Circle cx="18%" cy="16%" r="150" fill="url(#i1)" />
+        <Circle cx="88%" cy="8%" r="140" fill="url(#i2)" />
+        <Circle cx="62%" cy="40%" r="130" fill="url(#i3)" />
       </Svg>
     </View>
   );
@@ -145,7 +156,7 @@ export default function IntroScreen() {
                 backgroundColor: COLORS.surface,
               }}
             >
-              <slide.Icon size={34} color={COLORS.primary} strokeWidth={1.5} />
+              <slide.Icon size={34} color={COLORS.ink} strokeWidth={1.5} />
             </View>
 
             <Text className="font-jk-bold text-ink text-[28px] leading-[36px] text-center mt-8">
@@ -162,33 +173,38 @@ export default function IntroScreen() {
         style={{ paddingBottom: insets.bottom + 24 }}
         className="px-6 pt-4"
       >
-        <View className="flex-row justify-center gap-x-2 mb-7">
-          {SLIDES.map((slide, dot) => (
-            <Pressable
-              key={slide.key}
-              onPress={() => {
-                impact("light");
-                goTo(dot);
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`Go to screen ${dot + 1}`}
-              hitSlop={8}
-            >
-              {/* The current dot stretches rather than just darkening — it
-                  reads as a position on a track, not a disabled button. */}
-              <View
-                style={{
-                  width: dot === index ? 22 : 6,
-                  height: 6,
-                  borderRadius: 3,
-                  backgroundColor: dot === index ? COLORS.primary : COLORS.line,
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row gap-x-2">
+            {SLIDES.map((slide, dot) => (
+              <Pressable
+                key={slide.key}
+                onPress={() => {
+                  impact("light");
+                  goTo(dot);
                 }}
-              />
-            </Pressable>
-          ))}
-        </View>
+                accessibilityRole="button"
+                accessibilityLabel={`Go to screen ${dot + 1}`}
+                hitSlop={8}
+              >
+                {/* The current dot stretches rather than just darkening — it
+                    reads as a position on a track, not a disabled button. */}
+                <View
+                  style={{
+                    width: dot === index ? 22 : 6,
+                    height: 6,
+                    borderRadius: 3,
+                    backgroundColor: dot === index ? COLORS.primary : COLORS.line,
+                  }}
+                />
+              </Pressable>
+            ))}
+          </View>
 
-        <Button label={last ? "Get started" : "Next"} onPress={advance} />
+          <ArrowButton
+            onPress={advance}
+            label={last ? "Get started" : "Next screen"}
+          />
+        </View>
       </View>
     </View>
   );

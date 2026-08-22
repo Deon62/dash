@@ -3,6 +3,7 @@ import { Pressable, Text, View } from "react-native";
 import { Check, ChevronDown } from "lucide-react-native";
 
 import Sheet from "@/components/Sheet";
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -11,6 +12,10 @@ import { impact } from "@/lib/haptics";
  * Options open in a sheet rather than sitting on the page as a row of chips:
  * six years and two semesters laid out as tappable tiles turn a two-line form
  * into a screenful, and a closed field states the current value in one line.
+ *
+ * Closed, it is a rule with a value on it — the same shape as the text fields
+ * it sits beside, so a form reads as one set of lines rather than a stack of
+ * unrelated controls.
  */
 export default function Dropdown({
   label,
@@ -27,7 +32,7 @@ export default function Dropdown({
   return (
     <View>
       {label ? (
-        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-2">
+        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
           {label}
         </Text>
       ) : null}
@@ -39,11 +44,12 @@ export default function Dropdown({
         }}
         accessibilityRole="button"
         accessibilityLabel={`${label ?? "Select"}: ${selected?.label ?? placeholder}`}
-        className="flex-row items-center rounded-2xl border border-line bg-canvas px-4 py-3.5 active:bg-surface"
+        style={{ borderBottomWidth: 1, borderBottomColor: COLORS.line }}
+        className="flex-row items-center py-3 active:opacity-60"
       >
         <Text
-          className={`flex-1 text-[15px] ${
-            selected ? "font-jk-med text-ink" : "font-jk text-muted"
+          className={`flex-1 text-[15.5px] ${
+            selected ? "font-jk text-ink" : "font-jk text-muted"
           }`}
         >
           {selected?.label ?? placeholder}

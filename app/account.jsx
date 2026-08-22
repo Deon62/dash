@@ -66,7 +66,7 @@ export default function AccountScreen() {
         <AvatarPicker />
       </View>
 
-      <View className="gap-y-4">
+      <View className="gap-y-5">
         <TextField
           label="FULL NAME"
           value={name}
@@ -103,7 +103,7 @@ export default function AccountScreen() {
           autoCapitalize="words"
         />
 
-        <View className="flex-row gap-x-3">
+        <View className="flex-row gap-x-5">
           <View className="flex-1">
             <Dropdown
               label="YEAR"

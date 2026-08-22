@@ -1,123 +1,179 @@
+import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
-import { Check } from "lucide-react-native";
+import * as WebBrowser from "expo-web-browser";
+import { Check, Minus } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
-import Button from "@/components/Button";
 import ScreenHeader from "@/components/ScreenHeader";
+import Button from "@/components/Button";
+import Sheet from "@/components/Sheet";
 import { useStudyStore } from "@/store/useStudyStore";
-import { impact } from "@/lib/haptics";
+import { PLAN_CARDS, planFeatures, planFor } from "@/theme/plans";
+import { activeTier, daysRemaining, isExpired } from "@/lib/quota";
+import { COLORS } from "@/theme/colors";
+import { impact, notify } from "@/lib/haptics";
 
-const PLANS = [
-  {
-    key: "free",
-    name: "Free",
-    price: "KES 0",
-    period: "forever",
-    lines: [
-      "Every unit, note and deadline",
-      "Revision from your own material",
-      "Stored on this device",
-    ],
-  },
-  {
-    key: "pro",
-    name: "Pro",
-    price: "KES 450",
-    period: "a month",
-    lines: [
-      "Everything in Free",
-      "PDF and slide text extraction",
-      "Backup and sync across devices",
-      "Longer answers with wider context",
-    ],
-  },
-];
-
+/**
+ * Pricing.
+ *
+ * Two cards, because two things are for sale. The trial is not a product — it
+ * is the seven days every account already has, so it is stated once at the top
+ * rather than given a column of its own that nobody can buy.
+ *
+ * Every line on a card is generated from `PLAN_CONFIGS`, so a limit cannot be
+ * changed in the config and left advertised wrongly here.
+ */
 export default function BillingScreen() {
-  const router = useRouter();
+  const subscription = useStudyStore((state) => state.subscription);
+  const activatePlan = useStudyStore((state) => state.activatePlan);
 
-  const billing = useStudyStore((state) => state.billing);
-  const updateBilling = useStudyStore((state) => state.updateBilling);
+  const [confirming, setConfirming] = useState(null);
+
+  const tier = activeTier(subscription);
+  const left = daysRemaining(subscription);
+  const expired = isExpired(subscription);
+
+  const checkout = async (card) => {
+    impact("medium");
+    // Opened in the system browser rather than a WebView: this is a real
+    // payment page and the student should be able to see the address bar it
+    // is being entered on.
+    await WebBrowser.openBrowserAsync(card.checkoutUrl);
+    // Nothing here knows whether they paid, so we ask instead of assuming.
+    setConfirming(card);
+  };
 
   return (
-    <Screen bare>
-      <ScreenHeader title="Billing" />
+    <>
+      <Screen bare>
+        <ScreenHeader title="Plans" />
 
-      <View className="gap-y-3">
-        {PLANS.map((plan) => {
-          const current = plan.key === billing.plan;
+        {PLAN_CARDS.map((card) => {
+          const plan = planFor(card.tier);
+          const current = card.tier === tier && !expired;
 
           return (
             <View
-              key={plan.key}
-              className={`rounded-3xl border p-5 ${
-                current ? "border-primary bg-canvas" : "border-line bg-surface"
-              }`}
+              key={card.tier}
+              style={{ borderColor: current ? COLORS.primary : COLORS.line }}
+              className="rounded-3xl border p-5"
             >
-              <View className="flex-row items-center justify-between">
-                <Text className="font-jk-semi text-ink text-[16px]">{plan.name}</Text>
-                {current ? (
-                  <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px]">
-                    CURRENT
+              <View className="flex-row items-start justify-between">
+                <View className="flex-1 pr-3">
+                  <Text className="font-jk-bold text-ink text-[20px]">
+                    {card.name}
                   </Text>
+                  <Text className="font-jk text-muted text-[12.5px] mt-0.5">
+                    {card.tagline}
+                  </Text>
+                </View>
+
+                {/* Status rides on the card it describes rather than in a
+                    banner above both — the badge already says which plan, so
+                    the days belong beside it. */}
+                {current ? (
+                  <View className="items-end mt-1">
+                    <Text className="font-jk-med text-primary text-[11px] tracking-[0.8px]">
+                      CURRENT
+                    </Text>
+                    {left !== null ? (
+                      <Text className="font-jk text-muted text-[11px] mt-0.5">
+                        {left} {left === 1 ? "day" : "days"} left
+                      </Text>
+                    ) : null}
+                  </View>
                 ) : null}
               </View>
 
-              <View className="flex-row items-baseline mt-2">
-                <Text className="font-jk-semi text-ink text-[26px]">{plan.price}</Text>
+              <View className="flex-row items-baseline mt-4">
+                <Text className="font-jk-bold text-ink text-[28px]">
+                  KES {plan.priceKsh}
+                </Text>
                 <Text className="font-jk text-muted text-[13px] ml-1.5">
-                  {plan.period}
+                  / {plan.durationDays} days
                 </Text>
               </View>
 
-              <View className="gap-y-2 mt-4">
-                {plan.lines.map((line) => (
-                  <View key={line} className="flex-row items-start">
-                    <Check size={14} color="#71717A" strokeWidth={2} />
-                    <Text className="font-jk text-muted text-[13px] leading-[19px] flex-1 ml-2.5">
-                      {line}
+              <View className="gap-y-2.5 mt-5">
+                {planFeatures(card.tier).map((feature) => (
+                  <View key={feature.text} className="flex-row items-start">
+                    {/* A limit you do not get is listed and struck through
+                        rather than hidden — the difference between the plans
+                        is the thing being sold, so it has to be visible on
+                        both cards. */}
+                    {feature.available ? (
+                      <Check size={14} color={COLORS.primary} strokeWidth={2.4} />
+                    ) : (
+                      <Minus size={14} color={COLORS.line} strokeWidth={2.4} />
+                    )}
+                    <Text
+                      className={`text-[13px] leading-[19px] flex-1 ml-2.5 ${
+                        feature.available
+                          ? "font-jk text-ink"
+                          : "font-jk text-muted line-through"
+                      }`}
+                    >
+                      {feature.text}
                     </Text>
                   </View>
                 ))}
               </View>
 
-              {current ? null : (
-                <View className="mt-5">
-                  <Button
-                    label={`Upgrade to ${plan.name}`}
-                    // Nothing is charged here. Upgrading needs a payment
-                    // method on file, so this sends them there rather than
-                    // pretending a plan changed.
-                    onPress={() => router.push("/payment-methods")}
-                  />
-                </View>
-              )}
+              <View className="mt-6">
+                <Button
+                  label={current ? "Your current plan" : `Get ${card.name}`}
+                  disabled={current}
+                  onPress={() => checkout(card)}
+                />
+              </View>
             </View>
           );
         })}
-      </View>
 
-      <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
-        Prices are placeholders and no payment is processed yet. Upgrading will
-        run through Paystack once the account backend exists.
-      </Text>
+        <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
+          {expired
+            ? "Your plan has ended — you are back on trial limits until you renew. "
+            : ""}
+          Payment is handled by Paystack, which accepts M-Pesa, Airtel Money and
+          cards. Your plan activates once the payment clears.
+        </Text>
+      </Screen>
 
-      {billing.plan === "free" ? null : (
-        <Pressable
-          onPress={() => {
-            impact("light");
-            updateBilling({ plan: "free" });
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Cancel subscription"
-          className="self-start active:opacity-60"
-        >
-          <Text className="font-jk-med text-danger text-[14px]">
-            Cancel subscription
-          </Text>
-        </Pressable>
-      )}
-    </Screen>
+      {/* The device cannot see a Paystack charge. Until a server receives the
+          webhook, activation is the student's word — recorded as unverified so
+          it can be reconciled rather than silently trusted. */}
+      <Sheet
+        visible={Boolean(confirming)}
+        onClose={() => setConfirming(null)}
+        title="Did the payment go through?"
+        subtitle={
+          confirming
+            ? `We can't confirm it from here yet. If Paystack charged you for ${confirming.name}, unlock it now and it will be reconciled once accounts are connected.`
+            : undefined
+        }
+      >
+        <View className="gap-y-3">
+          <Button
+            label={confirming ? `Yes, unlock ${confirming.name}` : "Yes"}
+            onPress={() => {
+              notify("success");
+              activatePlan(confirming.tier);
+              setConfirming(null);
+            }}
+          />
+          <Pressable
+            onPress={() => {
+              impact("light");
+              setConfirming(null);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Not yet"
+            className="items-center py-3 active:opacity-60"
+          >
+            <Text className="font-jk-med text-muted text-[14px]">Not yet</Text>
+          </Pressable>
+        </View>
+      </Sheet>
+    </>
   );
 }

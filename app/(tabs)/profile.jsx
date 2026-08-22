@@ -3,7 +3,6 @@ import { useRouter } from "expo-router";
 import {
   CalendarDays,
   ChartNoAxesColumn,
-  CreditCard,
   IdCard,
   Layers,
   LogOut,
@@ -16,6 +15,8 @@ import IconButton from "@/components/IconButton";
 import AvatarPicker from "@/components/AvatarPicker";
 import LinkRow from "@/components/LinkRow";
 import { useStudyStore } from "@/store/useStudyStore";
+import { activeTier } from "@/lib/quota";
+import { planName } from "@/theme/plans";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -23,7 +24,7 @@ export default function ProfileScreen() {
   const profile = useStudyStore((state) => state.profile);
   const units = useStudyStore((state) => state.units);
   const classes = useStudyStore((state) => state.classes);
-  const billing = useStudyStore((state) => state.billing);
+  const subscription = useStudyStore((state) => state.subscription);
   const signOut = useStudyStore((state) => state.signOut);
 
   const enrolment = [profile.program, profile.institution].filter(Boolean).join(" · ");
@@ -88,14 +89,8 @@ export default function ProfileScreen() {
         <LinkRow
           Icon={Receipt}
           label="Billing"
-          value={billing.plan === "free" ? "Free" : "Pro"}
+          value={planName(activeTier(subscription))}
           onPress={() => router.push("/billing")}
-        />
-        <LinkRow
-          Icon={CreditCard}
-          label="Payment methods"
-          value={billing.mpesaNumber ? "M-Pesa" : undefined}
-          onPress={() => router.push("/payment-methods")}
         />
         <LinkRow Icon={LogOut} iconTone="danger" label="Log out" onPress={signOut} last />
       </View>

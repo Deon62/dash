@@ -1,11 +1,16 @@
 import { useState } from "react";
 import { Text, TextInput, View } from "react-native";
 
+import { COLORS } from "@/theme/colors";
+
 /**
  * Labelled input.
  *
- * Focus is marked in the brand blue — the one state on a form where a
- * colour is telling you something rather than decorating.
+ * A rule under the field rather than a box around it. The rest of the app
+ * separates things with hairlines — the unit list, the settings rows, the
+ * timetable — and a form of outlined rectangles in the middle of that reads as
+ * a different app. The line is also what makes focus legible: it is the only
+ * thing on the row that changes colour, so the eye goes straight to it.
  */
 export default function TextField({
   label,
@@ -22,20 +27,22 @@ export default function TextField({
   return (
     <View>
       {label ? (
-        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-2">
+        <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
           {label}
         </Text>
       ) : null}
 
       <View
-        className={`flex-row items-center rounded-2xl border bg-canvas px-4 ${
-          focused ? "border-primary" : "border-line"
-        }`}
+        style={{
+          borderBottomWidth: 1,
+          borderBottomColor: focused ? COLORS.primary : COLORS.line,
+        }}
+        className="flex-row items-center"
       >
         {Icon ? (
           <Icon
             size={17}
-            color={focused ? "#007FFA" : "#71717A"}
+            color={focused ? COLORS.primary : COLORS.muted}
             strokeWidth={1.8}
           />
         ) : null}
@@ -48,14 +55,14 @@ export default function TextField({
           multiline={multiline}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
-          style={multiline ? { minHeight: 104, textAlignVertical: "top" } : undefined}
-          className={`flex-1 py-3.5 font-jk text-ink text-[15px] ${Icon ? "ml-3" : ""}`}
+          style={multiline ? { minHeight: 96, textAlignVertical: "top" } : undefined}
+          className={`flex-1 py-3 font-jk text-ink text-[15.5px] ${Icon ? "ml-3" : ""}`}
           {...inputProps}
         />
       </View>
 
       {hint ? (
-        <Text className="font-jk text-muted text-[11.5px] leading-[16px] mt-2 ml-1">
+        <Text className="font-jk text-muted text-[11.5px] leading-[16px] mt-2">
           {hint}
         </Text>
       ) : null}
