@@ -7,6 +7,7 @@ import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { formatDateTime } from "@/lib/dates";
 import { kindLabel } from "@/theme/units";
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -68,9 +69,17 @@ export default function ArchiveScreen() {
                   hitSlop={8}
                   accessibilityRole="button"
                   accessibilityLabel={`Restore ${material.title}`}
-                  className="h-9 w-9 items-center justify-center rounded-full bg-surface active:opacity-60"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: COLORS.surface,
+                  }}
+                  className="active:opacity-60"
                 >
-                  <ArchiveRestore size={16} color="#09090B" strokeWidth={1.8} />
+                  <ArchiveRestore size={16} color={COLORS.ink} strokeWidth={1.8} />
                 </Pressable>
 
                 <Pressable
@@ -83,7 +92,7 @@ export default function ArchiveScreen() {
                   accessibilityLabel={`Delete ${material.title} for good`}
                   className="h-9 w-9 items-center justify-center rounded-full ml-2 active:bg-surface"
                 >
-                  <Trash2 size={16} color="#DC2626" strokeWidth={1.8} />
+                  <Trash2 size={16} color={COLORS.danger} strokeWidth={1.8} />
                 </Pressable>
               </View>
             );

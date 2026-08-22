@@ -2,7 +2,7 @@ import { Pressable, Text, View } from "react-native";
 import { Check, X } from "lucide-react-native";
 
 import { daysUntil, dueLabel } from "@/lib/dates";
-import { eventKindLabel } from "@/theme/units";
+import { eventLabel } from "@/theme/units";
 import { impact, notify } from "@/lib/haptics";
 
 /**
@@ -16,7 +16,7 @@ export default function EventRow({ event, unit, onToggle, onRemove, last = false
   const days = daysUntil(event.at);
   const overdue = !event.done && days !== null && days < 0;
 
-  const meta = [unit?.code, eventKindLabel(event.kind)].filter(Boolean).join(" · ");
+  const meta = [unit?.code, eventLabel(event)].filter(Boolean).join(" · ");
 
   return (
     <View

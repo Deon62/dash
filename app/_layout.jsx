@@ -79,6 +79,7 @@ export default function RootLayout() {
           {/* Only screens that need non-default options are declared. Expo
               Router registers the rest from the file tree, so adding a page
               does not mean remembering to list it here. */}
+          <Stack.Screen name="intro" options={{ animation: "fade" }} />
           <Stack.Screen name="login" options={{ animation: "fade" }} />
           <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         </Stack>

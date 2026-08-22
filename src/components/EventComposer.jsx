@@ -42,13 +42,16 @@ export default function EventComposer({
   const [title, setTitle] = useState("");
   const [unitId, setUnitId] = useState(lockedUnitId ?? null);
   const [kind, setKind] = useState("assignment");
+  const [label, setLabel] = useState("");
   const [days, setDays] = useState(7);
 
   const canSave = title.trim().length >= 2;
+  const naming = EVENT_KINDS.find((option) => option.key === kind)?.open;
 
   const close = () => {
     setTitle("");
     setKind("assignment");
+    setLabel("");
     setDays(7);
     setUnitId(lockedUnitId ?? null);
     onClose();
@@ -93,8 +96,22 @@ export default function EventComposer({
           options={EVENT_KINDS.map((option) => ({
             value: option.key,
             label: option.label,
+            hint: option.open ? "Name it yourself" : undefined,
           }))}
         />
+
+        {/* Only "Other" asks for a name, and even then it is optional — the
+            point is to let a presentation be a presentation, not to make the
+            student fill in a taxonomy before they can save a date. */}
+        {naming ? (
+          <TextField
+            label="ACTIVITY"
+            value={label}
+            onChangeText={setLabel}
+            placeholder="Presentation, lab sign-off, meeting…"
+            autoCapitalize="sentences"
+          />
+        ) : null}
 
         <Dropdown
           label="DUE"
@@ -109,7 +126,7 @@ export default function EventComposer({
           disabled={!canSave}
           onPress={() => {
             notify("success");
-            onSave({ title, unitId, kind, at: isoInDays(days) });
+            onSave({ title, unitId, kind, label, at: isoInDays(days) });
             close();
           }}
         />

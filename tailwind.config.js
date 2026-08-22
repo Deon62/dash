@@ -22,8 +22,13 @@ module.exports = {
          * something you can act on or something the app is telling you is on.
          */
         primary: "#007FFA",
-        /** Calendar marks only — a CAT, between routine and unmissable. */
-        warn: "#F59E0B",
+        /* Activity marks. Only ever drawn as dots and legend swatches, and
+           always from `src/theme/colors.js` — they are here so the names
+           resolve if a class ever needs one. */
+        pink: "#EC4899",
+        violet: "#7C3AED",
+        teal: "#0D9488",
+        amber: "#F59E0B",
         danger: "#DC2626",
       },
       // React Native has no synthetic font weights: every weight is its own

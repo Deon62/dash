@@ -6,8 +6,10 @@ import { BellRing, CalendarClock, Settings } from "lucide-react-native";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
+import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
+import { COLORS } from "@/theme/colors";
 import { daysUntil, dueLabel, formatTime, minutesOf, nowMinutes } from "@/lib/dates";
 
 /**
@@ -92,13 +94,13 @@ export default function NotificationsScreen() {
                 index === items.length - 1 ? "" : "border-b border-line"
               }`}
             >
-              <View className="h-9 w-9 items-center justify-center rounded-full bg-surface">
+              <Disc size={36}>
                 <item.Icon
                   size={16}
-                  color={item.urgent ? "#DC2626" : "#09090B"}
+                  color={item.urgent ? COLORS.danger : COLORS.ink}
                   strokeWidth={1.8}
                 />
-              </View>
+              </Disc>
 
               <View className="flex-1 ml-3.5">
                 <Text className="font-jk-med text-ink text-[14.5px] leading-[20px]">

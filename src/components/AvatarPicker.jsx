@@ -90,7 +90,21 @@ export default function AvatarPicker() {
       {/* Affordance — otherwise nothing says the avatar is tappable. The badge
           is a white disc with a coloured glyph, not the reverse: a white icon
           on a coloured disc vanished into the light parts of a photo. */}
-      <View className="absolute bottom-0 right-0 h-8 w-8 items-center justify-center rounded-full border border-line bg-canvas">
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          right: 0,
+          width: 32,
+          height: 32,
+          borderRadius: 16,
+          alignItems: "center",
+          justifyContent: "center",
+          borderWidth: 1,
+          borderColor: COLORS.line,
+          backgroundColor: COLORS.canvas,
+        }}
+      >
         <Camera size={15} color={COLORS.primary} strokeWidth={2} />
       </View>
 

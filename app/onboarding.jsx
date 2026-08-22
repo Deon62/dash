@@ -23,7 +23,18 @@ import Button from "@/components/Button";
 import Dropdown from "@/components/Dropdown";
 import { useStudyStore } from "@/store/useStudyStore";
 import { SEMESTERS, YEARS } from "@/theme/units";
+import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
+
+/** Fixed so no parent can stretch the circle into a lozenge. */
+const DISC = {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: COLORS.surface,
+};
 
 const YEAR_OPTIONS = YEARS.map((year) => ({ value: year, label: `Year ${year}` }));
 const SEMESTER_OPTIONS = SEMESTERS.map((semester) => ({
@@ -106,7 +117,8 @@ export default function OnboardingScreen() {
             accessibilityRole="button"
             accessibilityLabel="Go back"
             hitSlop={8}
-            className="h-10 w-10 items-center justify-center rounded-full bg-surface active:opacity-60 mb-5"
+            style={DISC}
+            className="active:opacity-60 mb-5"
           >
             <ArrowLeft size={18} color="#09090B" strokeWidth={1.8} />
           </Pressable>

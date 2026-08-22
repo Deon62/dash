@@ -16,6 +16,7 @@ import {
 
 import Sheet from "@/components/Sheet";
 import IconButton from "@/components/IconButton";
+import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { answer, buildFlashcards, buildQuiz } from "@/lib/tutor";
@@ -296,9 +297,9 @@ export default function StudyScreen() {
           accessibilityLabel="New chat"
           className="flex-row items-center py-3.5 border-b border-line active:opacity-60"
         >
-          <View className="h-9 w-9 items-center justify-center rounded-full bg-surface">
-            <SquarePen size={16} color="#09090B" strokeWidth={1.8} />
-          </View>
+          <Disc size={36}>
+            <SquarePen size={16} color={COLORS.ink} strokeWidth={1.8} />
+          </Disc>
           <Text className="font-jk-med text-ink text-[15px] ml-3.5">New chat</Text>
         </Pressable>
 

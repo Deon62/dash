@@ -14,6 +14,7 @@ import {
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
+import Disc from "@/components/Disc";
 import Dropdown from "@/components/Dropdown";
 import ClassRow from "@/components/ClassRow";
 import EventRow from "@/components/EventRow";
@@ -25,6 +26,7 @@ import ClassComposer from "@/components/ClassComposer";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 const SECTIONS = [
@@ -164,9 +166,9 @@ export default function UnitScreen() {
           accessibilityLabel={addLabel}
           className="flex-row items-center gap-x-2 active:opacity-60"
         >
-          <View className="h-8 w-8 items-center justify-center rounded-full bg-surface">
-            <Plus size={16} color="#09090B" strokeWidth={1.8} />
-          </View>
+          <Disc size={32}>
+            <Plus size={16} color={COLORS.ink} strokeWidth={1.8} />
+          </Disc>
           <Text className="font-jk-med text-ink text-[14px]">{addLabel}</Text>
         </Pressable>
 

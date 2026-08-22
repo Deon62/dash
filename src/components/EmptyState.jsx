@@ -1,5 +1,8 @@
 import { Text, View } from "react-native";
 
+import Disc from "@/components/Disc";
+import { COLORS } from "@/theme/colors";
+
 /**
  * Centred message for a section with nothing in it yet.
  *
@@ -10,9 +13,9 @@ export default function EmptyState({ Icon, title, message, action, compact = fal
   return (
     <View className={`items-center ${compact ? "py-8" : "py-12"}`}>
       {Icon ? (
-        <View className="h-14 w-14 items-center justify-center rounded-full bg-surface">
-          <Icon size={22} color="#71717A" strokeWidth={1.6} />
-        </View>
+        <Disc size={56}>
+          <Icon size={22} color={COLORS.muted} strokeWidth={1.6} />
+        </Disc>
       ) : null}
 
       <Text className="font-jk-semi text-ink text-[15px] text-center mt-5">

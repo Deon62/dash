@@ -2,7 +2,18 @@ import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { ArrowLeft } from "lucide-react-native";
 
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
+
+/** Fixed so no parent can stretch the circle into a lozenge. */
+const DISC = {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: COLORS.surface,
+};
 
 /**
  * Back control, title and an optional right-hand action.
@@ -31,7 +42,8 @@ export default function ScreenHeader({ title, right, onBack }) {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={8}
-          className="h-10 w-10 items-center justify-center rounded-full bg-surface active:opacity-60"
+          style={DISC}
+          className="active:opacity-60"
         >
           <ArrowLeft size={18} color="#09090B" strokeWidth={1.8} />
         </Pressable>

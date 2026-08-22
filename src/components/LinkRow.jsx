@@ -1,6 +1,8 @@
 import { Pressable, Switch, Text, View } from "react-native";
 import { ChevronRight } from "lucide-react-native";
 
+import Disc from "@/components/Disc";
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -12,6 +14,8 @@ import { impact } from "@/lib/haptics";
  */
 export default function LinkRow({
   Icon,
+  /** Colours the glyph alone. `destructive` colours the label with it. */
+  iconTone = "ink",
   label,
   value,
   hint,
@@ -25,13 +29,13 @@ export default function LinkRow({
   const body = (
     <>
       {Icon ? (
-        <View className="h-9 w-9 items-center justify-center rounded-full bg-surface">
+        <Disc size={36}>
           <Icon
             size={16}
-            color={destructive ? "#DC2626" : "#09090B"}
+            color={destructive || iconTone === "danger" ? COLORS.danger : COLORS.ink}
             strokeWidth={1.8}
           />
-        </View>
+        </Disc>
       ) : null}
 
       <View className="flex-1 ml-3.5 pr-3">

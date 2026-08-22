@@ -13,21 +13,27 @@ export const COLORS = {
   ink: "#09090B",
   muted: "#71717A",
   primary: "#007FFA",
-  warn: "#F59E0B",
+  pink: "#EC4899",
+  violet: "#7C3AED",
+  teal: "#0D9488",
+  amber: "#F59E0B",
   danger: "#DC2626",
 };
 
 /**
  * What each kind of mark on the calendar is drawn in.
  *
- * Three meanings, three colours, and no more: classes are the routine, a CAT
- * is a warning, an exam is the one you cannot miss. Everything else shares the
- * neutral so the three that matter stay distinguishable at four pixels wide.
+ * One colour per activity, and they are only ever six pixels wide, so they are
+ * pulled far apart in hue rather than shaded: red beside orange at that size is
+ * one colour. Exam keeps red because red already means "unmissable" everywhere
+ * else in the app, and blue stays with classes because classes are the routine
+ * the rest is scheduled around.
  */
 export const MARK_COLORS = {
   class: COLORS.primary,
-  cat: COLORS.warn,
+  cat: COLORS.pink,
   exam: COLORS.danger,
-  assignment: COLORS.muted,
-  other: COLORS.muted,
+  assignment: COLORS.violet,
+  project: COLORS.teal,
+  other: COLORS.amber,
 };

@@ -64,6 +64,8 @@ const BLANK = {
   profile: { ...EMPTY_PROFILE },
   settings: { ...EMPTY_SETTINGS },
   billing: { ...EMPTY_BILLING },
+  /** The three explainer screens, shown once on the very first launch. */
+  introSeen: false,
   onboarded: false,
   units: [],
   classes: [],
@@ -115,6 +117,9 @@ export const useStudyStore = create(
        * the deliberate version of that.
        */
       signOut: () => set({ isAuthenticated: false }),
+
+      /** Dismisses the explainer. Never shown again, even after a sign-out. */
+      completeIntro: () => set({ introSeen: true }),
 
       resetEverything: () => set({ ...BLANK, hydrated: true }),
 
@@ -235,13 +240,16 @@ export const useStudyStore = create(
        * `unitId` may be null — not everything a student has to turn up for
        * belongs to a unit.
        */
-      addEvent: ({ unitId = null, title, at, kind = "assignment" }) => {
+      addEvent: ({ unitId = null, title, at, kind = "assignment", label = "" }) => {
         const event = {
           id: newId(),
           unitId,
           title: title.trim(),
           at,
           kind,
+          // Only `other` uses this — what the student called an activity the
+          // fixed list does not have a name for.
+          label: kind === "other" ? label.trim() : "",
           done: false,
           createdAt: new Date().toISOString(),
         };

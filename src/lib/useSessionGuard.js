@@ -9,16 +9,18 @@ const AUTH_ROUTES = new Set(["login", "verify"]);
 /**
  * Keeps the student on a screen they are allowed to be on.
  *
- * Three states, in order: signed out goes to /login, signed in but not through
- * intake goes to /onboarding, and anyone past both belongs in the tabs. Mounted
- * once from the root layout, below the navigator — redirecting before there is
- * anything to redirect within silently does nothing.
+ * Four states, in order: a first-ever launch goes to /intro, signed out goes to
+ * /login, signed in but not through intake goes to /onboarding, and anyone past
+ * all three belongs in the tabs. Mounted once from the root layout, below the
+ * navigator — redirecting before there is anything to redirect within silently
+ * does nothing.
  */
 export function useSessionGuard() {
   const router = useRouter();
   const segments = useSegments();
 
   const hydrated = useStudyStore((state) => state.hydrated);
+  const introSeen = useStudyStore((state) => state.introSeen);
   const isAuthenticated = useStudyStore((state) => state.isAuthenticated);
   const onboarded = useStudyStore((state) => state.onboarded);
 
@@ -31,6 +33,24 @@ export function useSessionGuard() {
     const root = segments[0];
     const onAuthScreen = AUTH_ROUTES.has(root);
     const onOnboarding = root === "onboarding";
+    const onIntro = root === "intro";
+
+    // The explainer comes before everything, including the sign-in wall: it is
+    // what tells a first-time visitor why they would want an account at all.
+    if (!introSeen) {
+      if (!onIntro) router.replace("/intro");
+      return;
+    }
+
+    // Leaving the intro goes straight to wherever they actually belong, not
+    // via the tabs — bouncing through a screen they are not allowed on yet
+    // shows a frame of it before the next redirect pulls it away.
+    if (onIntro) {
+      if (!isAuthenticated) router.replace("/login");
+      else if (!onboarded) router.replace("/onboarding");
+      else router.replace("/(tabs)");
+      return;
+    }
 
     if (!isAuthenticated) {
       if (!onAuthScreen) router.replace("/login");
@@ -43,7 +63,7 @@ export function useSessionGuard() {
     }
 
     if (onAuthScreen || onOnboarding) router.replace("/(tabs)");
-  }, [hydrated, isAuthenticated, onboarded, segments, router]);
+  }, [hydrated, introSeen, isAuthenticated, onboarded, segments, router]);
 
   return hydrated;
 }

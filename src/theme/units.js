@@ -39,16 +39,36 @@ export function kindLabel(key) {
   return MATERIAL_KINDS.find((kind) => kind.key === key)?.label ?? "Note";
 }
 
-/** Event kinds shown on Home. */
+/**
+ * What a dated thing can be.
+ *
+ * `other` is deliberately last and deliberately open: a student's semester has
+ * things in it no fixed list will cover — a presentation, a lab sign-off, a
+ * supervisor meeting — and the alternative to naming it themselves is filing
+ * it as an assignment it is not.
+ */
 export const EVENT_KINDS = [
   { key: "assignment", label: "Assignment" },
   { key: "cat", label: "CAT" },
   { key: "exam", label: "Exam" },
-  { key: "other", label: "Other" },
+  { key: "project", label: "Project" },
+  { key: "other", label: "Other", open: true },
 ];
 
 export function eventKindLabel(key) {
   return EVENT_KINDS.find((kind) => kind.key === key)?.label ?? "Other";
+}
+
+/**
+ * What to call one event.
+ *
+ * An `other` event carries whatever the student typed; everything else uses
+ * its kind's name. Falling back to "Other" rather than an empty string keeps
+ * the row's meta line from ending in a stray separator.
+ */
+export function eventLabel(event) {
+  if (event?.kind === "other" && event.label) return event.label;
+  return eventKindLabel(event?.kind);
 }
 
 export const YEARS = [1, 2, 3, 4, 5, 6];

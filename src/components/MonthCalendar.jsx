@@ -12,6 +12,24 @@ const DOT = 6;
 /** Monday-first column headings, matching how a timetable is printed. */
 const COLUMNS = ["M", "T", "W", "T", "F", "S", "S"];
 
+/**
+ * Draw order, and the order the legend is read in.
+ *
+ * Most urgent first: only three dots fit under a date, so the ones that get cut
+ * should be the ones that matter least on the day.
+ */
+const DOT_ORDER = ["exam", "cat", "assignment", "project", "class", "other"];
+
+/** What each mark means. Six colours need saying out loud. */
+const LEGEND = [
+  { kind: "class", label: "Classes" },
+  { kind: "cat", label: "CATs" },
+  { kind: "exam", label: "Exams" },
+  { kind: "assignment", label: "Assignments" },
+  { kind: "project", label: "Projects" },
+  { kind: "other", label: "Other" },
+];
+
 /** Grid position of a weekday, Monday at 0 and Sunday at 6. */
 function column(day) {
   return (day + 6) % 7;
@@ -21,8 +39,18 @@ function daysInMonth(year, month) {
   return new Date(year, month + 1, 0).getDate();
 }
 
-/** Draw order, so the same kind of day always looks the same. */
-const DOT_ORDER = ["class", "cat", "exam", "assignment", "other"];
+function Dot({ kind }) {
+  return (
+    <View
+      style={{
+        width: DOT,
+        height: DOT,
+        borderRadius: DOT / 2,
+        backgroundColor: MARK_COLORS[kind],
+      }}
+    />
+  );
+}
 
 /**
  * A dot per kind of thing happening, capped at three.
@@ -30,7 +58,7 @@ const DOT_ORDER = ["class", "cat", "exam", "assignment", "other"];
  * Built from whatever keys the day actually carries rather than from a fixed
  * list: an event whose `kind` is missing or something the app has not heard of
  * used to match nothing and draw no dot at all, so the day looked empty when it
- * was not. Anything unrecognised falls back to the neutral mark.
+ * was not. Anything unrecognised falls back to the catch-all mark.
  */
 function Dots({ marks }) {
   const kinds = Object.keys(marks)
@@ -45,15 +73,7 @@ function Dots({ marks }) {
   return (
     <View style={{ height: DOT, marginTop: 4 }} className="flex-row gap-x-1">
       {[...new Set(kinds)].slice(0, 3).map((kind) => (
-        <View
-          key={kind}
-          style={{
-            width: DOT,
-            height: DOT,
-            borderRadius: DOT / 2,
-            backgroundColor: MARK_COLORS[kind],
-          }}
-        />
+        <Dot key={kind} kind={kind} />
       ))}
     </View>
   );
@@ -66,7 +86,13 @@ function Dots({ marks }) {
  * cluster, which week is empty. Detail belongs in the sheet a tap opens, not
  * on a 40-pixel cell.
  */
-export default function MonthCalendar({ classes, events, onSelectDate, action, onAction }) {
+export default function MonthCalendar({
+  classes,
+  events,
+  onSelectDate,
+  action,
+  onAction,
+}) {
   const today = new Date();
   const [cursor, setCursor] = useState({
     year: today.getFullYear(),
@@ -191,7 +217,9 @@ export default function MonthCalendar({ classes, events, onSelectDate, action, o
       <View className="flex-row flex-wrap mt-1">
         {cells.map((cell) => {
           if (cell.blank) {
-            return <View key={cell.key} style={{ width: `${100 / 7}%` }} className="h-12" />;
+            return (
+              <View key={cell.key} style={{ width: `${100 / 7}%` }} className="h-12" />
+            );
           }
 
           const isToday = cell.key === todayKey;
@@ -212,16 +240,24 @@ export default function MonthCalendar({ classes, events, onSelectDate, action, o
               style={{ width: `${100 / 7}%` }}
               className="h-12 items-center justify-center active:opacity-60"
             >
-              {/* Today is a dark disc, every month, whether or not anything
-                  is on. It is the one fixed landmark in the grid. */}
+              {/* Today is a dark disc, every month, whether or not anything is
+                  on — the one fixed landmark in the grid. Its number is set
+                  white inline rather than by a class, because a colour that
+                  fails to apply here leaves black text on a black disc and the
+                  date disappears entirely. */}
               <View
-                style={isToday ? { backgroundColor: COLORS.ink } : undefined}
-                className="h-8 w-8 items-center justify-center rounded-full"
+                style={{
+                  width: 30,
+                  height: 30,
+                  borderRadius: 15,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: isToday ? COLORS.ink : "transparent",
+                }}
               >
                 <Text
-                  className={`text-[13px] ${
-                    isToday ? "font-jk-semi text-canvas" : "font-jk text-ink"
-                  }`}
+                  style={{ color: isToday ? COLORS.canvas : COLORS.ink }}
+                  className={`text-[13px] ${isToday ? "font-jk-semi" : "font-jk"}`}
                 >
                   {cell.number}
                 </Text>
@@ -233,19 +269,12 @@ export default function MonthCalendar({ classes, events, onSelectDate, action, o
         })}
       </View>
 
-      {/* Legend. Three dots mean nothing until something says what they are,
-          and this is cheaper than making the user tap to find out. */}
-      <View className="flex-row flex-wrap gap-x-4 gap-y-1.5 mt-3">
-        {[
-          { kind: "class", label: "Classes" },
-          { kind: "cat", label: "CATs" },
-          { kind: "exam", label: "Exams" },
-        ].map((item) => (
+      {/* Legend. Six colours mean nothing until something says what they are,
+          and this is cheaper than making the student tap every day to find out. */}
+      <View className="flex-row flex-wrap gap-x-4 gap-y-2 mt-4">
+        {LEGEND.map((item) => (
           <View key={item.kind} className="flex-row items-center gap-x-1.5">
-            <View
-              style={{ backgroundColor: MARK_COLORS[item.kind] }}
-              className="h-1.5 w-1.5 rounded-full"
-            />
+            <Dot kind={item.kind} />
             <Text className="font-jk text-muted text-[11.5px]">{item.label}</Text>
           </View>
         ))}

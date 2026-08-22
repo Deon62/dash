@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowRight } from "lucide-react-native";
+import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 
 import GoogleMark from "@/components/GoogleMark";
 import Button from "@/components/Button";
@@ -26,6 +27,40 @@ import { detectCountry } from "@/lib/geo";
 import { sendPhoneOtp, signInWithGoogle } from "@/lib/auth";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
+
+/**
+ * Soft colour wash behind the top of the screen.
+ *
+ * The only colour on the page that is not doing a job, and it earns the
+ * exception: this is the first screen anyone sees, and a sign-in page in pure
+ * greyscale reads as unfinished. It stays behind the type, well under the
+ * threshold where it would compete with the one blue button below it.
+ */
+function Aurora() {
+  return (
+    <View className="absolute inset-x-0 top-0 h-80" pointerEvents="none">
+      <Svg width="100%" height="100%">
+        <Defs>
+          <RadialGradient id="a" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#007FFA" stopOpacity="0.22" />
+            <Stop offset="1" stopColor="#007FFA" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="b" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#00C2A8" stopOpacity="0.18" />
+            <Stop offset="1" stopColor="#00C2A8" stopOpacity="0" />
+          </RadialGradient>
+          <RadialGradient id="c" cx="50%" cy="50%" r="50%">
+            <Stop offset="0" stopColor="#F59E0B" stopOpacity="0.16" />
+            <Stop offset="1" stopColor="#F59E0B" stopOpacity="0" />
+          </RadialGradient>
+        </Defs>
+        <Circle cx="18%" cy="16%" r="150" fill="url(#a)" />
+        <Circle cx="88%" cy="8%" r="140" fill="url(#b)" />
+        <Circle cx="62%" cy="40%" r="130" fill="url(#c)" />
+      </Svg>
+    </View>
+  );
+}
 
 export default function LoginScreen() {
   const router = useRouter();
@@ -108,12 +143,14 @@ export default function LoginScreen() {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
       className="flex-1 bg-canvas"
     >
+      <Aurora />
+
       <ScrollView
         ref={scrollRef}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
         contentContainerStyle={{
-          paddingTop: insets.top + 88,
+          paddingTop: insets.top + 56,
           paddingBottom: insets.bottom + 32,
           paddingHorizontal: 24,
           flexGrow: 1,
@@ -127,14 +164,18 @@ export default function LoginScreen() {
           them.
         </Text>
 
-        {/* Google */}
+        {/* The sign-in controls sit in the vertical middle rather than packed
+            under the heading — the page reads as a heading at the top, the
+            thing you came to do in the middle, and small print at the foot. */}
+        <View className="flex-1 justify-center">
+          {/* Google */}
         <Pressable
           onPress={continueWithGoogle}
           disabled={Boolean(busy)}
           accessibilityRole="button"
           accessibilityLabel="Continue with Google"
           accessibilityState={{ disabled: Boolean(busy), busy: busy === "google" }}
-          className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 mt-10 ${
+          className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 ${
             busy ? "opacity-50" : "active:bg-surface"
           }`}
         >
@@ -196,7 +237,9 @@ export default function LoginScreen() {
           />
         </View>
 
-        <Text className="font-jk text-muted text-[11px] leading-[16px] text-center mt-auto pt-10">
+        </View>
+
+        <Text className="font-jk text-muted text-[11px] leading-[16px] text-center pt-8">
           By continuing you agree to the Terms and Privacy Policy.
         </Text>
       </ScrollView>

@@ -15,7 +15,18 @@ import { ArrowLeft } from "lucide-react-native";
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
 import Button from "@/components/Button";
 import { useStudyStore } from "@/store/useStudyStore";
+import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
+
+/** Fixed so no parent can stretch the circle into a lozenge. */
+const DISC = {
+  width: 40,
+  height: 40,
+  borderRadius: 20,
+  alignItems: "center",
+  justifyContent: "center",
+  backgroundColor: COLORS.surface,
+};
 
 const CODE_LENGTH = 6;
 const RESEND_SECONDS = 30;
@@ -100,7 +111,8 @@ export default function VerifyScreen() {
           accessibilityRole="button"
           accessibilityLabel="Go back"
           hitSlop={8}
-          className="h-10 w-10 items-center justify-center rounded-full bg-surface active:opacity-60"
+          style={DISC}
+          className="active:opacity-60"
         >
           <ArrowLeft size={18} color="#09090B" strokeWidth={1.8} />
         </Pressable>

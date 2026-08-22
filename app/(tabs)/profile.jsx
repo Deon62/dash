@@ -97,7 +97,7 @@ export default function ProfileScreen() {
           value={billing.mpesaNumber ? "M-Pesa" : undefined}
           onPress={() => router.push("/payment-methods")}
         />
-        <LinkRow Icon={LogOut} label="Log out" onPress={signOut} last />
+        <LinkRow Icon={LogOut} iconTone="danger" label="Log out" onPress={signOut} last />
       </View>
 
       {/* Everything is on the phone, so this really is the whole account —

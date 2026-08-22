@@ -6,6 +6,8 @@ import { FileText, Image as ImageIcon, Link2, NotebookPen } from "lucide-react-n
 
 import Sheet from "@/components/Sheet";
 import Button from "@/components/Button";
+import Disc from "@/components/Disc";
+import { COLORS } from "@/theme/colors";
 import TextField from "@/components/TextField";
 import { impact, notify } from "@/lib/haptics";
 
@@ -47,9 +49,9 @@ function Option({ Icon, label, hint, onPress }) {
       accessibilityLabel={label}
       className="flex-row items-center py-3.5 active:opacity-60"
     >
-      <View className="h-10 w-10 items-center justify-center rounded-full bg-surface">
-        <Icon size={17} color="#09090B" strokeWidth={1.8} />
-      </View>
+      <Disc size={40}>
+        <Icon size={17} color={COLORS.ink} strokeWidth={1.8} />
+      </Disc>
       <View className="flex-1 ml-3.5">
         <Text className="font-jk-med text-ink text-[15px]">{label}</Text>
         <Text className="font-jk text-muted text-[12px] mt-0.5">{hint}</Text>
