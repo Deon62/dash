@@ -13,22 +13,12 @@ const DOT = 6;
 const COLUMNS = ["M", "T", "W", "T", "F", "S", "S"];
 
 /**
- * Draw order, and the order the legend is read in.
+ * Draw order for the marks under a date.
  *
- * Most urgent first: only three dots fit under a date, so the ones that get cut
- * should be the ones that matter least on the day.
+ * Most urgent first: only three dots fit, so the ones that get cut should be
+ * the ones that matter least on the day.
  */
 const DOT_ORDER = ["exam", "cat", "assignment", "project", "class", "other"];
-
-/** What each mark means. Six colours need saying out loud. */
-const LEGEND = [
-  { kind: "class", label: "Classes" },
-  { kind: "cat", label: "CATs" },
-  { kind: "exam", label: "Exams" },
-  { kind: "assignment", label: "Assignments" },
-  { kind: "project", label: "Projects" },
-  { kind: "other", label: "Other" },
-];
 
 /** Grid position of a weekday, Monday at 0 and Sunday at 6. */
 function column(day) {
@@ -71,7 +61,7 @@ function Dots({ marks }) {
   if (kinds.length === 0) return <View style={{ height: DOT, marginTop: 4 }} />;
 
   return (
-    <View style={{ height: DOT, marginTop: 4 }} className="flex-row gap-x-1">
+    <View style={{ height: DOT, marginTop: 4, flexDirection: "row", columnGap: 4 }}>
       {[...new Set(kinds)].slice(0, 3).map((kind) => (
         <Dot key={kind} kind={kind} />
       ))}
@@ -83,8 +73,12 @@ function Dots({ marks }) {
  * Month grid with a dot for everything on each day.
  *
  * The whole point is the shape of the month at a glance — where the exams
- * cluster, which week is empty. Detail belongs in the sheet a tap opens, not
- * on a 40-pixel cell.
+ * cluster, which week is empty.
+ *
+ * There is no key under the grid. Six labelled swatches took as much room as
+ * the calendar itself to explain something one tap answers properly: the day
+ * sheet names every item on the day, which is what a student wanted the moment
+ * a dot caught their eye.
  */
 export default function MonthCalendar({
   classes,
@@ -217,9 +211,7 @@ export default function MonthCalendar({
       <View className="flex-row flex-wrap mt-1">
         {cells.map((cell) => {
           if (cell.blank) {
-            return (
-              <View key={cell.key} style={{ width: `${100 / 7}%` }} className="h-12" />
-            );
+            return <View key={cell.key} style={{ width: `${100 / 7}%`, height: 48 }} />;
           }
 
           const isToday = cell.key === todayKey;
@@ -237,8 +229,13 @@ export default function MonthCalendar({
                 day: "numeric",
                 month: "long",
               })}
-              style={{ width: `${100 / 7}%` }}
-              className="h-12 items-center justify-center active:opacity-60"
+              style={{
+                width: `${100 / 7}%`,
+                height: 48,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+              className="active:opacity-60"
             >
               {/* Today is a dark disc, every month, whether or not anything is
                   on — the one fixed landmark in the grid. Its number is set
@@ -267,17 +264,6 @@ export default function MonthCalendar({
             </Pressable>
           );
         })}
-      </View>
-
-      {/* Legend. Six colours mean nothing until something says what they are,
-          and this is cheaper than making the student tap every day to find out. */}
-      <View className="flex-row flex-wrap gap-x-4 gap-y-2 mt-4">
-        {LEGEND.map((item) => (
-          <View key={item.kind} className="flex-row items-center gap-x-1.5">
-            <Dot kind={item.kind} />
-            <Text className="font-jk text-muted text-[11.5px]">{item.label}</Text>
-          </View>
-        ))}
       </View>
     </View>
   );

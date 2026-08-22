@@ -67,9 +67,19 @@ export default function AvatarPicker() {
       }
       className="active:opacity-80"
     >
+      {/* Dark rather than brand blue: with no photo this is a plain disc on a
+          white page, and it has to be visible as a shape before the initials
+          inside it mean anything. */}
       <View
-        style={{ width: SIZE, height: SIZE, borderRadius: SIZE / 2 }}
-        className="items-center justify-center bg-primary overflow-hidden"
+        style={{
+          width: SIZE,
+          height: SIZE,
+          borderRadius: SIZE / 2,
+          alignItems: "center",
+          justifyContent: "center",
+          overflow: "hidden",
+          backgroundColor: COLORS.ink,
+        }}
       >
         {profile.avatarUri ? (
           <Image

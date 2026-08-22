@@ -220,19 +220,25 @@ export default function LoginScreen() {
             />
           </View>
 
-          <Text className="font-jk text-muted text-[11.5px] mt-2.5">
+          <Text
+            style={{ marginTop: 12 }}
+            className="font-jk text-muted text-[11.5px] leading-[17px]"
+          >
             {digits.length > 0 && !canContinue
               ? phoneHint(selected)
               : `We'll text a code to ${selected.dial} ${digits || "…"}`}
           </Text>
 
           {error ? (
-            <Text className="font-jk text-danger text-[12px] leading-[17px] mt-3">
+            <Text className="font-jk text-danger text-[12px] leading-[17px] mt-2">
               {error}
             </Text>
           ) : null}
 
-          <View className="mt-7">
+          {/* Inline, because a `mt-*` class next to an inline style is the
+              combination NativeWind drops — which is what left this button
+              pressed up against the line above it. */}
+          <View style={{ marginTop: 32 }}>
             <Button
               label="Continue"
               busyLabel="Sending code…"
