@@ -1,13 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
@@ -29,7 +21,7 @@ import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { answer, buildFlashcards, buildQuiz } from "@/lib/tutor";
 import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
-import { useKeyboardVisible } from "@/lib/useKeyboardVisible";
+import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { impact, notify } from "@/lib/haptics";
 
 const MODES = [
@@ -71,11 +63,12 @@ export default function StudyScreen() {
 
   const scrollRef = useRef(null);
 
-  // The tab bar is absolutely positioned over the page, so the composer
-  // reserves its height — but only while the bar is actually there. It hides
-  // itself when the keyboard is up, and holding the gap open anyway would sit
-  // the field a tab bar's height above the keys for no reason.
-  const keyboardUp = useKeyboardVisible();
+  // The composer is lifted by hand rather than by KeyboardAvoidingView: with
+  // edge-to-edge on, Android never resizes the window for the keyboard, so the
+  // KAV had nothing to react to and the field stayed underneath it. Below the
+  // keyboard sits the tab bar's reserved strip — but only while the bar is
+  // there, and it hides itself when the keyboard is up.
+  const keyboard = useKeyboard();
 
   const chat = chats.find((entry) => entry.id === activeChatId) ?? null;
   const unitId = chat?.unitId ?? null;
@@ -130,15 +123,7 @@ export default function StudyScreen() {
   const firstName = profile.name.trim().split(/\s+/)[0];
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      // Zero, not the status-bar inset: this view already starts at the top of
-      // the screen, and offsetting it again leaves the composer sitting that
-      // far behind the keyboard.
-      keyboardVerticalOffset={0}
-      style={{ paddingTop: insets.top }}
-      className="flex-1 bg-canvas"
-    >
+    <View style={{ paddingTop: insets.top }} className="flex-1 bg-canvas">
       {/* --- Chrome. No title: the page is the conversation. --- */}
       <View className="flex-row items-center justify-between px-5 py-2">
         <IconButton
@@ -210,7 +195,11 @@ export default function StudyScreen() {
 
       {/* --- Composer --- */}
       <View
-        style={{ paddingBottom: keyboardUp ? 10 : getTabBarHeight(insets) + 8 }}
+        style={{
+          paddingBottom: keyboard.visible
+            ? keyboard.height + 10
+            : getTabBarHeight(insets) + 8,
+        }}
         className="px-5 pt-2"
       >
         <View className="rounded-3xl border border-line bg-canvas px-3.5 py-3">
@@ -436,7 +425,7 @@ export default function StudyScreen() {
           );
         })}
       </Sheet>
-    </KeyboardAvoidingView>
+    </View>
   );
 }
 

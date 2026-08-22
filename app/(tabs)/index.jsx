@@ -7,6 +7,8 @@ import Screen from "@/components/Screen";
 import SectionHeading from "@/components/SectionHeading";
 import IconButton from "@/components/IconButton";
 import Fab from "@/components/Fab";
+import MonthCalendar from "@/components/MonthCalendar";
+import DaySheet from "@/components/DaySheet";
 import ClassRow from "@/components/ClassRow";
 import EventRow from "@/components/EventRow";
 import EventComposer from "@/components/EventComposer";
@@ -35,6 +37,7 @@ export default function HomeScreen() {
   const toggleEvent = useStudyStore((state) => state.toggleEvent);
 
   const [composing, setComposing] = useState(false);
+  const [openDate, setOpenDate] = useState(null);
 
   const today = new Date().getDay();
 
@@ -94,7 +97,21 @@ export default function HomeScreen() {
             onAction={() => router.push("/timetable")}
           />
 
-          <View className="mt-2">
+          <View className="mt-4">
+            <MonthCalendar
+              classes={classes}
+              events={events}
+              onSelectDate={setOpenDate}
+            />
+          </View>
+
+          {/* The calendar is the shape of the month; this is the detail for the
+              day the student is actually in. Any other day opens in a sheet. */}
+          <View className="mt-5 border-t border-line pt-3">
+            <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
+              TODAY
+            </Text>
+
             {todaysClasses.length === 0 ? (
               <EmptyState
                 compact
@@ -147,6 +164,15 @@ export default function HomeScreen() {
           the same thumb-reachable disc Knowledge uses rather than a small
           control tucked beside a heading. */}
       <Fab label="Add an event" onPress={() => setComposing(true)} />
+
+      <DaySheet
+        date={openDate}
+        units={units}
+        classes={classes}
+        events={events}
+        onToggleEvent={toggleEvent}
+        onClose={() => setOpenDate(null)}
+      />
 
       <EventComposer
         visible={composing}

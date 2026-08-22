@@ -22,6 +22,8 @@ module.exports = {
          * something you can act on or something the app is telling you is on.
          */
         primary: "#007FFA",
+        /** Calendar marks only — a CAT, between routine and unmissable. */
+        warn: "#F59E0B",
         danger: "#DC2626",
       },
       // React Native has no synthetic font weights: every weight is its own
