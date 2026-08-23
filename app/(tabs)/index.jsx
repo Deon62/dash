@@ -80,7 +80,7 @@ export default function HomeScreen() {
           <View className="flex-row items-center gap-x-2">
             <StreakBadge
               days={study.streakDays}
-              onPress={() => router.push("/usage")}
+              onPress={() => router.push("/streak")}
             />
             <IconButton
               Icon={Bell}

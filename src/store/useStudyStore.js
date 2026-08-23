@@ -58,6 +58,9 @@ const EMPTY_USAGE = {
   quizzesEver: 0,
 };
 
+/** How much streak history is worth keeping: a week to draw, a month of slack. */
+const STREAK_HISTORY_DAYS = 60;
+
 function initialsFrom(name) {
   return (
     (name ?? "")
@@ -86,7 +89,21 @@ const BLANK = {
   events: [],
   chats: [],
   activeChatId: null,
-  study: { streakDays: 0, lastStudyDay: null, questionsAsked: 0 },
+  study: {
+    streakDays: 0,
+    /** Best run ever, kept when the current one breaks. */
+    longestStreak: 0,
+    lastStudyDay: null,
+    questionsAsked: 0,
+    /**
+     * Day keys the student actually revised on, newest last.
+     *
+     * Capped, because the streak screen only ever draws a week and nothing
+     * reads further back — an uncapped list would grow for the life of the
+     * install to answer a question about the last seven days.
+     */
+    days: [],
+  },
 };
 
 export const useStudyStore = create(
@@ -408,22 +425,31 @@ export const useStudyStore = create(
       recordStudy: () =>
         set((state) => {
           const today = dayKey();
-          const { lastStudyDay, streakDays, questionsAsked } = state.study;
+          const { lastStudyDay, streakDays, longestStreak, questionsAsked, days } =
+            state.study;
 
           if (lastStudyDay === today) {
-            return { study: { ...state.study, questionsAsked: questionsAsked + 1 } };
+            return {
+              study: { ...state.study, questionsAsked: questionsAsked + 1 },
+            };
           }
 
           const yesterday = dayKey(Date.now() - 86400000);
+          const nextStreak = lastStudyDay === yesterday ? streakDays + 1 : 1;
 
           return {
             study: {
-              streakDays: lastStudyDay === yesterday ? streakDays + 1 : 1,
+              streakDays: nextStreak,
+              // A broken streak still happened. Keeping the best run is what
+              // makes starting again feel like continuing rather than losing.
+              longestStreak: Math.max(longestStreak ?? 0, nextStreak),
               lastStudyDay: today,
               questionsAsked: questionsAsked + 1,
+              days: [...(days ?? []), today].slice(-STREAK_HISTORY_DAYS),
             },
           };
         }),
+
     }),
     {
       name: "study-brain-v1",
