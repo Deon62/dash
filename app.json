@@ -13,14 +13,14 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.ardena.als",
-      "buildNumber": "1",
       "infoPlist": {
-        "CFBundleDisplayName": "ALS"
+        "CFBundleDisplayName": "ALS",
+        "NSSpeechRecognitionUsageDescription": "ALS uses speech recognition to turn what you say into text in the chat.",
+        "NSMicrophoneUsageDescription": "ALS uses the microphone so you can speak your question instead of typing it."
       }
     },
     "android": {
       "package": "com.ardena.als",
-      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#09090B",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -30,7 +30,9 @@
       "permissions": [
         "android.permission.READ_MEDIA_IMAGES",
         "android.permission.VIBRATE",
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.USE_BIOMETRIC",
+        "android.permission.USE_FINGERPRINT"
       ],
       "blockedPermissions": [
         "android.permission.CAMERA",
@@ -97,14 +99,15 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "f58709fb-40b6-4afc-89e8-95b1cdab128c"
+        "projectId": "5e47477f-1072-4803-94ca-b977c33f32d1"
       }
     },
     "runtimeVersion": {
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/f58709fb-40b6-4afc-89e8-95b1cdab128c"
-    }
+      "url": "https://u.expo.dev/5e47477f-1072-4803-94ca-b977c33f32d1"
+    },
+    "owner": "ardenaprod"
   }
 }
