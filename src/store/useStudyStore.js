@@ -79,6 +79,14 @@ const BLANK = {
   settings: { ...EMPTY_SETTINGS },
   /** `null` until the trial is started, which happens at the end of intake. */
   subscription: null,
+  /**
+   * The Friends plan, once there is one.
+   *
+   * `{ inviteCode, seats, members: [{ id, name, isOwner }] }`. Held locally so
+   * the invite screen renders offline; the server is the authority on who
+   * actually holds a seat, and a pull overwrites this wholesale.
+   */
+  group: null,
   usage: { ...EMPTY_USAGE },
   /** The three explainer screens, shown once on the very first launch. */
   introSeen: false,
@@ -187,6 +195,39 @@ export const useStudyStore = create(
        * set that straight, and until one exists this is a claim, not a fact.
        */
       activatePlan: (tier) => set({ subscription: newSubscription(tier) }),
+
+      /** Replaces the local copy of the group with whatever the server said. */
+      setGroup: (group) => set({ group }),
+
+      /**
+       * Adds someone optimistically, so the list moves the moment you invite.
+       *
+       * Reconciled on the next sync — a seat the server refused disappears
+       * again, which is the right way round: showing a friend as joined and
+       * being wrong is recoverable, refusing to show them until a round trip
+       * completes is just a slow app.
+       */
+      addGroupMember: (member) =>
+        set((state) => {
+          if (!state.group) return {};
+          const members = state.group.members ?? [];
+          if (members.some((existing) => existing.id === member.id)) return {};
+          return { group: { ...state.group, members: [...members, member] } };
+        }),
+
+      removeGroupMember: (memberId) =>
+        set((state) =>
+          state.group
+            ? {
+                group: {
+                  ...state.group,
+                  members: (state.group.members ?? []).filter(
+                    (member) => member.id !== memberId
+                  ),
+                },
+              }
+            : {}
+        ),
 
       // --- Usage ------------------------------------------------------------
 

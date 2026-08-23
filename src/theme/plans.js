@@ -6,9 +6,14 @@
  * decides against it, and when a real backend arrives it should serve exactly
  * this shape so the two cannot drift.
  *
- * Two of the three tiers are sold. `TRIAL` is not a product — it is the state
- * every new account starts in, for seven days, whichever plan they eventually
+ * Three of the four tiers are sold. `TRIAL` is not a product — it is the state
+ * a new account starts in, for fourteen days, whichever plan they eventually
  * pick.
+ *
+ * The server grants that fortnight **once per person, for good**: deleting an
+ * account and signing up again does not restart it. This file is the copy the
+ * app reads so it can refuse before making a request; the server's copy is the
+ * one that decides.
  */
 
 export const SubscriptionTier = {
@@ -33,9 +38,9 @@ export const UNIT_HARD_CAP = 10;
 export const PLAN_CONFIGS = {
   [SubscriptionTier.TRIAL]: {
     id: SubscriptionTier.TRIAL,
-    name: "7-Day Free Trial",
+    name: "14-Day Free Trial",
     priceKsh: 0,
-    durationDays: 7,
+    durationDays: 14,
     limits: {
       maxCourseUnits: 2,
       totalPdfPagesPool: 100,
@@ -75,7 +80,10 @@ export const PLAN_CONFIGS = {
   [SubscriptionTier.FRIENDS]: {
     id: SubscriptionTier.FRIENDS,
     name: "Friends",
-    priceKsh: 1000,
+    // KES 250 each for five. Under Synapse's 350 a head, which is the whole
+    // proposition, and over Focus so it never undercuts the plan a single
+    // student would otherwise buy.
+    priceKsh: 1250,
     durationDays: 30,
     /** How many students one payment covers, the payer included. */
     seats: 5,
@@ -113,6 +121,18 @@ export function seatsFor(tier) {
 }
 
 /**
+ * What each person pays.
+ *
+ * Derived rather than stored beside the total: two numbers that have to agree
+ * eventually stop agreeing, and this is the one a student checks against their
+ * M-Pesa message.
+ */
+export function pricePerSeat(tier) {
+  const plan = planFor(tier);
+  return Math.round(plan.priceKsh / Math.max(1, seatsFor(tier)));
+}
+
+/**
  * What the student is shown and sold.
  *
  * The tier ids stay `standard` and `pro` because that is what the config, the
@@ -123,7 +143,7 @@ export const PLAN_CARDS = [
     tier: SubscriptionTier.STANDARD,
     name: "Focus",
     tagline: "Enough for a normal semester",
-    checkoutUrl: "https://paystack.shop/pay/cnt7kf6l-7",
+    checkoutUrl: "https://paystack.shop/pay/tzni-kn48p",
     /** Outlined on white — the everyday option. */
     tone: "plain",
   },
@@ -131,7 +151,7 @@ export const PLAN_CARDS = [
     tier: SubscriptionTier.PRO,
     name: "Synapse",
     tagline: "For a full load, and finals week",
-    checkoutUrl: "https://paystack.shop/pay/a-tbik1kof",
+    checkoutUrl: "https://paystack.shop/pay/sux85xe8ff",
     /**
      * Filled. Two identical white cards make a student compare nine lines of
      * small print to work out that one is the bigger plan; a shaded card says
@@ -143,9 +163,7 @@ export const PLAN_CARDS = [
     tier: SubscriptionTier.FRIENDS,
     name: "Friends",
     tagline: "Synapse for five, split five ways",
-    // No link yet — a group plan needs the seats created server-side before a
-    // payment means anything, so this one asks rather than pretending.
-    checkoutUrl: null,
+    checkoutUrl: "https://paystack.shop/pay/ijx1r5fivo",
     tone: "plain",
     /** Shown instead of the flat price: what it costs each person. */
     perSeatNote: true,

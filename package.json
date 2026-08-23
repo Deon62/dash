@@ -15,6 +15,7 @@
     "@react-native-async-storage/async-storage": "2.2.0",
     "expo": "~54.0.37",
     "expo-build-properties": "~1.0.10",
+    "expo-clipboard": "~8.0.8",
     "expo-constants": "~18.0.14",
     "expo-crypto": "~15.0.9",
     "expo-document-picker": "~14.0.8",

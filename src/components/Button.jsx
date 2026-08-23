@@ -12,6 +12,11 @@ import { impact } from "@/lib/haptics";
  * accent. Unavailable is carried by opacity instead, which keeps the shape and
  * the colour and still says "not yet".
  *
+ * Three weights. `primary` is the blue. `outline` is a rule, for an action
+ * standing beside the blue one. `soft` is a grey fill, for the second of two
+ * real choices — full-sized, so it is not an afterthought the way a text link
+ * would be, but next to the blue it plainly comes second.
+ *
  * The fill is an inline style rather than a class: this component passes a
  * style object of its own, and in that combination the object wins outright.
  */
@@ -26,6 +31,8 @@ export default function Button({
 }) {
   const inactive = disabled || busy;
   const outline = variant === "outline";
+  const soft = variant === "soft";
+  const dark = outline || soft;
 
   return (
     <Pressable
@@ -39,23 +46,32 @@ export default function Button({
       accessibilityLabel={label}
       accessibilityState={{ disabled: inactive, busy }}
       style={{
-        backgroundColor: outline ? "transparent" : COLORS.primary,
+        backgroundColor: outline
+          ? "transparent"
+          : soft
+            ? COLORS.surface
+            : COLORS.primary,
         borderRadius: 16,
         borderWidth: outline ? 1 : 0,
         borderColor: COLORS.line,
         opacity: inactive ? 0.4 : 1,
+        paddingVertical: 16,
+        // Horizontal padding matters even though most uses are full width: in
+        // a centred slot the button shrinks to its label, and without this the
+        // text sits hard against both edges.
+        paddingHorizontal: 28,
       }}
-      className="flex-row items-center justify-center gap-x-2 py-4 active:opacity-80"
+      className="flex-row items-center justify-center gap-x-2 active:opacity-80"
     >
       <Text
-        style={{ color: outline ? COLORS.ink : COLORS.canvas }}
+        style={{ color: dark ? COLORS.ink : COLORS.canvas }}
         className="font-jk-med text-[15px]"
       >
         {busy ? (busyLabel ?? label) : label}
       </Text>
 
       {Icon && !busy ? (
-        <Icon size={16} color={outline ? COLORS.ink : COLORS.canvas} strokeWidth={1.8} />
+        <Icon size={16} color={dark ? COLORS.ink : COLORS.canvas} strokeWidth={1.8} />
       ) : null}
     </Pressable>
   );
