@@ -1,13 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowRight } from "lucide-react-native";
@@ -27,6 +19,7 @@ import { COLORS } from "@/theme/colors";
 import { detectCountry } from "@/lib/geo";
 import { sendPhoneOtp, signInWithGoogle } from "@/lib/auth";
 import { useStudyStore } from "@/store/useStudyStore";
+import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -66,6 +59,7 @@ function Aurora() {
 export default function LoginScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
+  const keyboard = useKeyboard();
 
   const signInWithEmail = useStudyStore((state) => state.signInWithEmail);
 
@@ -139,11 +133,23 @@ export default function LoginScreen() {
     signInWithEmail(result.email);
   };
 
+  // Scroll the number into view once the keyboard is up. The padding below
+  // makes the room; this is what moves into it.
+  useEffect(() => {
+    if (!keyboard.visible) return undefined;
+    const id = setTimeout(
+      () => scrollRef.current?.scrollToEnd({ animated: true }),
+      60
+    );
+    return () => clearTimeout(id);
+  }, [keyboard.visible, keyboard.height]);
+
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-canvas"
-    >
+    /* No KeyboardAvoidingView. With edge-to-edge enabled the Android window is
+       never resized for the keyboard, so it has nothing to react to and left
+       the number sitting underneath — the measured height below is what
+       actually works, on both platforms. */
+    <View className="flex-1 bg-canvas">
       <Aurora />
 
       <ScrollView
@@ -154,7 +160,7 @@ export default function LoginScreen() {
           // Well clear of the notch: the heading is the first thing read and
           // it should not start against the top of the glass.
           paddingTop: insets.top + 96,
-          paddingBottom: insets.bottom + 28,
+          paddingBottom: insets.bottom + 28 + keyboard.height,
           paddingHorizontal: 24,
           flexGrow: 1,
         }}
@@ -210,11 +216,6 @@ export default function LoginScreen() {
             <TextInput
               value={digits}
               onChangeText={(next) => setPhone(normalisePhone(next, selected))}
-              // Scroll the field clear of the keyboard. KeyboardAvoidingView
-              // alone leaves it under the keyboard on Android.
-              onFocus={() =>
-                setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 250)
-              }
               placeholder={selected.iso === "KE" ? "712 345 678" : "Mobile number"}
               placeholderTextColor="#A1A1AA"
               keyboardType="phone-pad"
@@ -258,6 +259,6 @@ export default function LoginScreen() {
           By continuing you agree to the Terms and Privacy Policy.
         </Text>
       </ScrollView>
-    </KeyboardAvoidingView>
+    </View>
   );
 }

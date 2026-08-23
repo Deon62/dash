@@ -43,14 +43,19 @@ function Dot({ kind }) {
 }
 
 /**
- * A dot per kind of thing happening, capped at three.
+ * A dot per kind of thing happening, capped at three, for days still to come.
  *
  * Built from whatever keys the day actually carries rather than from a fixed
  * list: an event whose `kind` is missing or something the app has not heard of
  * used to match nothing and draw no dot at all, so the day looked empty when it
  * was not. Anything unrecognised falls back to the catch-all mark.
  */
-function Dots({ marks }) {
+function Dots({ marks, past }) {
+  // A dot is a heads-up, and there is nothing to be warned about on a day that
+  // has already happened. The row still takes its height so the weeks below do
+  // not ride up.
+  if (past) return <View style={{ height: DOT, marginTop: 4 }} />;
+
   const kinds = Object.keys(marks)
     .filter((kind) => marks[kind] > 0)
     .map((kind) => (MARK_COLORS[kind] ? kind : "other"))
@@ -215,6 +220,10 @@ export default function MonthCalendar({
           }
 
           const isToday = cell.key === todayKey;
+          // Compared as keys, not timestamps: `dayKey` is sortable and already
+          // anchored to the local day, so there is no hour-of-day edge to get
+          // wrong at either end of the month.
+          const isPast = cell.key < todayKey;
 
           return (
             <Pressable
@@ -252,15 +261,24 @@ export default function MonthCalendar({
                   backgroundColor: isToday ? COLORS.ink : "transparent",
                 }}
               >
+                {/* Faint rather than struck through: a line through every
+                    date up to today draws more attention to the half of the
+                    month that no longer matters than to the half that does. */}
                 <Text
-                  style={{ color: isToday ? COLORS.canvas : COLORS.ink }}
+                  style={{
+                    color: isToday
+                      ? COLORS.canvas
+                      : isPast
+                        ? COLORS.faint
+                        : COLORS.ink,
+                  }}
                   className={`text-[13px] ${isToday ? "font-jk-semi" : "font-jk"}`}
                 >
                   {cell.number}
                 </Text>
               </View>
 
-              <Dots marks={cell.marks} />
+              <Dots marks={cell.marks} past={isPast} />
             </Pressable>
           );
         })}

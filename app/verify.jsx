@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
-import Button from "@/components/Button";
 import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
@@ -77,6 +76,20 @@ export default function VerifyScreen() {
     // and a returning one straight to the tabs.
     signIn(String(phone ?? ""));
   };
+
+  /**
+   * Submits itself on the sixth digit.
+   *
+   * There is nothing to decide at this point — the code is either right or it
+   * is not — so a button asking the student to confirm what they just typed is
+   * a step that only exists to be tapped. Autofill from the SMS lands all six
+   * at once and this catches that too.
+   */
+  useEffect(() => {
+    if (complete) verify();
+    // `verify` is redefined every render; keying on the code is what makes
+    // this fire once per completed attempt rather than on each keystroke.
+  }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const resend = async () => {
     if (secondsLeft > 0 || busy) return;
@@ -175,15 +188,13 @@ export default function VerifyScreen() {
           </Text>
         ) : null}
 
-        <View className="mt-6">
-          <Button
-            label="Verify"
-            busyLabel="Checking…"
-            busy={busy}
-            disabled={!complete || busy}
-            onPress={verify}
-          />
-        </View>
+        {/* Where the Verify button was. Something has to acknowledge the
+            sixth digit, or the screen looks like it swallowed it. */}
+        {busy ? (
+          <Text className="font-jk text-muted text-[13px] text-center mt-8">
+            Checking…
+          </Text>
+        ) : null}
 
         <Pressable
           onPress={resend}
@@ -191,7 +202,7 @@ export default function VerifyScreen() {
           accessibilityRole="button"
           accessibilityLabel="Resend code"
           accessibilityState={{ disabled: secondsLeft > 0 }}
-          className="self-center mt-6 active:opacity-60"
+          className="self-center mt-8 active:opacity-60"
         >
           <Text
             className={`text-[13px] ${

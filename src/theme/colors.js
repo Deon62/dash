@@ -21,6 +21,14 @@ export const COLORS = {
   hairline: "#F1F1F3",
   ink: "#09090B",
   muted: "#71717A",
+  /**
+   * Text that is still there but no longer live: a date already past, a
+   * placeholder waiting to be typed over.
+   *
+   * A step lighter than `muted`, which is for text you are meant to read. This
+   * is for text you are meant to skip.
+   */
+  faint: "#A1A1AA",
   primary: "#007FFA",
   pink: "#EC4899",
   violet: "#7C3AED",
