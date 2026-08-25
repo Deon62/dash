@@ -33,12 +33,12 @@ const SLIDES = [
     key: "study",
     Art: NotesArt,
     title: "An AI that studies\nwhat you study",
-    body: "It reads your material, not the internet. Ask anything and it answers from your own lecture — and tells you which one.",
+    body: "It reads your material, not the internet. Ask anything and it answers from your own notes, slides and papers — and tells you which one.",
   },
   {
     key: "calendar",
     Art: CalendarArt,
-    title: "Never get ambushed\nby a CAT again",
+    title: "Never get ambushed\nby a deadline again",
     body: "Every deadline on one calendar, counting down from the moment you add it.",
   },
 ];

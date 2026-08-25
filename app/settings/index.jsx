@@ -64,7 +64,7 @@ export default function SettingsScreen() {
         <LinkRow
           Icon={BellRing}
           label="Notification preferences"
-          hint="Deadlines, class reminders"
+          hint="Deadlines, session reminders"
           onPress={() => router.push("/settings/notifications")}
         />
         <LinkRow

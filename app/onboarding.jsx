@@ -160,7 +160,7 @@ export default function OnboardingScreen() {
                 label="PROGRAMME"
                 value={program}
                 onChangeText={setProgram}
-                placeholder="BSc Computer Science"
+                placeholder="MSc Computer Science"
                 Icon={GraduationCap}
                 autoCapitalize="words"
               />
@@ -168,7 +168,7 @@ export default function OnboardingScreen() {
                 label="INSTITUTION"
                 value={institution}
                 onChangeText={setInstitution}
-                placeholder="University name"
+                placeholder="Institution name"
                 Icon={Building2}
                 autoCapitalize="words"
               />

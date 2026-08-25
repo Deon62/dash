@@ -30,7 +30,7 @@ export function weekOrder(day) {
  */
 export const MATERIAL_KINDS = [
   { key: "note", label: "Note", hint: "Type or paste text" },
-  { key: "pdf", label: "PDF", hint: "Lecture slides, past papers" },
+  { key: "pdf", label: "PDF", hint: "Slides, papers, past exams" },
   { key: "image", label: "Image", hint: "Photos of handwritten notes" },
   { key: "link", label: "Link", hint: "An article or a video" },
 ];
@@ -72,4 +72,11 @@ export function eventLabel(event) {
 }
 
 export const YEARS = [1, 2, 3, 4, 5, 6];
-export const SEMESTERS = [1, 2];
+/**
+ * Three, not two.
+ *
+ * Two covers a conventional undergraduate year, but plenty of postgraduate
+ * programmes run on trimesters — and a student whose semester is not on the
+ * list has to file their work under one they are not in.
+ */
+export const SEMESTERS = [1, 2, 3];

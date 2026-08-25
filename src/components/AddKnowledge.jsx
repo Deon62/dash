@@ -22,7 +22,7 @@ const FORMATS = [
   {
     key: "pdf",
     label: "PDF",
-    hint: "Lecture slides, past papers",
+    hint: "Slides, papers, past exams",
     Icon: FileText,
   },
   {
@@ -232,7 +232,7 @@ export default function AddKnowledge({
             label="TITLE"
             value={title}
             onChangeText={setTitle}
-            placeholder={format === "link" ? "What is this?" : "Lecture 4 — Hashing"}
+            placeholder={format === "link" ? "What is this?" : "Week 4 — Hashing"}
             autoFocus
           />
 

@@ -138,6 +138,16 @@ export function pricePerSeat(tier) {
  * The tier ids stay `standard` and `pro` because that is what the config, the
  * store and any future server speak; the names are what a student reads.
  */
+/**
+ * `checkoutUrl` is the fallback, not the plan.
+ *
+ * These are fixed Paystack pages: the same link for every student, so the
+ * charge that comes back names no account and the server has only the email
+ * typed into the form to reconcile against — which most accounts, signed in by
+ * phone, do not have. Once the app holds a real token, `billing.checkout()` in
+ * `src/api/endpoints.js` asks the server for a link minted for one student and
+ * one plan, and these are only for builds with no backend configured.
+ */
 export const PLAN_CARDS = [
   {
     tier: SubscriptionTier.STANDARD,
@@ -192,7 +202,7 @@ export function unitCap(tier) {
 
 const TIMETABLE_COPY = {
   manual: "Timetable you enter yourself",
-  alerts: "Timetable with deadline and class alerts",
+  alerts: "Timetable with deadline and session alerts",
   ai_sync: "AI timetable sync from your documents",
 };
 

@@ -25,11 +25,11 @@ export default function NotificationSettingsScreen() {
         />
         <LinkRow
           Icon={BellRing}
-          label="Class reminders"
+          label="Session reminders"
           hint="Fifteen minutes before a session starts"
           toggle
-          toggleValue={settings.classReminders}
-          onToggle={(classReminders) => updateSettings({ classReminders })}
+          toggleValue={settings.sessionReminders}
+          onToggle={(sessionReminders) => updateSettings({ sessionReminders })}
           last
         />
       </View>

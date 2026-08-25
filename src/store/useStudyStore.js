@@ -29,14 +29,14 @@ const EMPTY_PROFILE = {
   program: "",
   /** 1-6. */
   yearOfStudy: null,
-  /** 1 or 2. */
+  /** 1-3. Trimester programmes are common at postgraduate level. */
   semester: null,
   memberSince: String(new Date().getFullYear()),
 };
 
 const EMPTY_SETTINGS = {
   deadlineReminders: true,
-  classReminders: true,
+  sessionReminders: true,
   /** Ask for a fingerprint or face before opening the app. */
   biometricLock: false,
 };
@@ -92,7 +92,7 @@ const BLANK = {
   introSeen: false,
   onboarded: false,
   units: [],
-  classes: [],
+  sessions: [],
   materials: [],
   events: [],
   chats: [],
@@ -301,7 +301,7 @@ export const useStudyStore = create(
       removeUnit: (id) =>
         set((state) => ({
           units: state.units.filter((unit) => unit.id !== id),
-          classes: state.classes.filter((entry) => entry.unitId !== id),
+          sessions: state.sessions.filter((entry) => entry.unitId !== id),
           materials: state.materials.filter((entry) => entry.unitId !== id),
           events: state.events.filter((entry) => entry.unitId !== id),
         })),
@@ -309,13 +309,13 @@ export const useStudyStore = create(
       // --- Timetable --------------------------------------------------------
 
       /** `{ unitId, day: 0-6, start: "08:00", end: "10:00", room }` */
-      addClass: (entry) =>
+      addSession: (entry) =>
         set((state) => ({
-          classes: [...state.classes, { id: newId(), ...entry }],
+          sessions: [...state.sessions, { id: newId(), ...entry }],
         })),
 
-      removeClass: (id) =>
-        set((state) => ({ classes: state.classes.filter((c) => c.id !== id) })),
+      removeSession: (id) =>
+        set((state) => ({ sessions: state.sessions.filter((c) => c.id !== id) })),
 
       // --- Knowledge --------------------------------------------------------
 
@@ -495,6 +495,32 @@ export const useStudyStore = create(
     {
       name: "study-brain-v1",
       storage: createJSONStorage(() => AsyncStorage),
+      version: 2,
+      /**
+       * Renames carried forward, so nobody loses a timetable to vocabulary.
+       *
+       * v2 renamed `classes` to `sessions` — the app is for postgraduates as
+       * well as undergraduates, and what they attend is as often a seminar, a
+       * lab or a supervision as a class. Without this, an existing install
+       * rehydrates a state with no `sessions` key and the timetable comes back
+       * empty, which reads as data loss rather than a rename.
+       */
+      migrate: (persisted, version) => {
+        if (!persisted || version >= 2) return persisted;
+
+        const { classes, settings, ...rest } = persisted;
+
+        return {
+          ...rest,
+          sessions: classes ?? rest.sessions ?? [],
+          settings: settings
+            ? (({ classReminders, ...keep }) => ({
+                ...keep,
+                sessionReminders: classReminders ?? keep.sessionReminders ?? true,
+              }))(settings)
+            : settings,
+        };
+      },
       // `hydrated` is about this launch, not about the student — persisting it
       // would restore `true` before the read had actually happened.
       //

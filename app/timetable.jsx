@@ -6,8 +6,8 @@ import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
 import { PillButton } from "@/components/Button";
-import ClassRow from "@/components/ClassRow";
-import ClassComposer from "@/components/ClassComposer";
+import SessionRow from "@/components/SessionRow";
+import SessionComposer from "@/components/SessionComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { DAYS } from "@/theme/units";
@@ -21,9 +21,9 @@ import { minutesOf } from "@/lib/dates";
  */
 export default function TimetableScreen() {
   const units = useStudyStore((state) => state.units);
-  const classes = useStudyStore((state) => state.classes);
-  const addClass = useStudyStore((state) => state.addClass);
-  const removeClass = useStudyStore((state) => state.removeClass);
+  const sessions = useStudyStore((state) => state.sessions);
+  const addSession = useStudyStore((state) => state.addSession);
+  const removeSession = useStudyStore((state) => state.removeSession);
 
   const [composing, setComposing] = useState(false);
 
@@ -32,7 +32,7 @@ export default function TimetableScreen() {
   const byDay = useMemo(() => {
     const table = new Map(DAYS.map((day) => [day.index, []]));
 
-    for (const entry of classes) {
+    for (const entry of sessions) {
       table.get(entry.day)?.push(entry);
     }
     for (const list of table.values()) {
@@ -40,29 +40,29 @@ export default function TimetableScreen() {
     }
 
     return table;
-  }, [classes]);
+  }, [sessions]);
 
   return (
     <>
       <Screen bare>
         <ScreenHeader
-          title="Class timetable"
+          title="Timetable"
           right={
             <IconButton
               Icon={Plus}
-              label="Add a class"
+              label="Add a session"
               onPress={() => setComposing(true)}
             />
           }
         />
 
-        {classes.length === 0 ? (
+        {sessions.length === 0 ? (
           <EmptyState
             Icon={Plus}
             title="Nothing scheduled"
             message="Add when each unit meets and today's sessions appear on Home."
             action={
-              <PillButton label="Add a class" Icon={Plus} onPress={() => setComposing(true)} />
+              <PillButton label="Add a session" Icon={Plus} onPress={() => setComposing(true)} />
             }
           />
         ) : (
@@ -92,12 +92,12 @@ export default function TimetableScreen() {
                   </Text>
                 ) : (
                   entries.map((entry, index) => (
-                    <ClassRow
+                    <SessionRow
                       key={entry.id}
                       entry={entry}
                       unit={unitById(units, entry.unitId)}
                       today={day.index === today}
-                      onRemove={() => removeClass(entry.id)}
+                      onRemove={() => removeSession(entry.id)}
                       last={index === entries.length - 1}
                     />
                   ))
@@ -108,11 +108,11 @@ export default function TimetableScreen() {
         )}
       </Screen>
 
-      <ClassComposer
+      <SessionComposer
         visible={composing}
         units={units}
         onClose={() => setComposing(false)}
-        onSave={addClass}
+        onSave={addSession}
       />
     </>
   );

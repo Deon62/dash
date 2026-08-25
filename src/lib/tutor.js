@@ -114,7 +114,7 @@ export function answer(question, { materials, unit, limit = 4 }) {
 
   if (materials.length === 0) {
     return {
-      text: `There is nothing filed under ${scope} yet, so I have nothing to revise from. Add a note or a lecture summary in Knowledge and ask me again.`,
+      text: `There is nothing filed under ${scope} yet, so I have nothing to revise from. Add a note or a summary of your reading in Knowledge and ask me again.`,
       sources: [],
     };
   }
@@ -132,7 +132,7 @@ export function answer(question, { materials, unit, limit = 4 }) {
     return {
       text: `Nothing in ${scope} matches that. What you do have on file: ${titles}${
         materials.length > 3 ? `, and ${materials.length - 3} more` : ""
-      }. Try wording it the way your notes do, or file the lecture it came from.`,
+      }. Try wording it the way your notes do, or file the material it came from.`,
       sources: [],
     };
   }

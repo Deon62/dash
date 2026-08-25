@@ -45,11 +45,11 @@ export const COLORS = {
  * One colour per activity, and they are only ever six pixels wide, so they are
  * pulled far apart in hue rather than shaded: red beside orange at that size is
  * one colour. Exam keeps red because red already means "unmissable" everywhere
- * else in the app, and blue stays with classes because classes are the routine
+ * else in the app, and blue stays with sessions because sessions are the routine
  * the rest is scheduled around.
  */
 export const MARK_COLORS = {
-  class: COLORS.primary,
+  session: COLORS.primary,
   cat: COLORS.pink,
   exam: COLORS.danger,
   assignment: COLORS.violet,

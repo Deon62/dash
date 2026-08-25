@@ -18,7 +18,7 @@ const COLUMNS = ["M", "T", "W", "T", "F", "S", "S"];
  * Most urgent first: only three dots fit, so the ones that get cut should be
  * the ones that matter least on the day.
  */
-const DOT_ORDER = ["exam", "cat", "assignment", "project", "class", "other"];
+const DOT_ORDER = ["exam", "cat", "assignment", "project", "session", "other"];
 
 /** Grid position of a weekday, Monday at 0 and Sunday at 6. */
 function column(day) {
@@ -86,7 +86,7 @@ function Dots({ marks, past }) {
  * a dot caught their eye.
  */
 export default function MonthCalendar({
-  classes,
+  sessions,
   events,
   onSelectDate,
   action,
@@ -100,15 +100,15 @@ export default function MonthCalendar({
 
   const todayKey = dayKey(today);
 
-  // Classes repeat weekly, so they are counted per weekday once and reused for
+  // Sessions repeat weekly, so they are counted per weekday once and reused for
   // every date in that column. Events are dated, so they are bucketed by day.
-  const weeklyClasses = useMemo(() => {
+  const weeklySessions = useMemo(() => {
     const table = new Map();
-    for (const entry of classes) {
+    for (const entry of sessions) {
       table.set(entry.day, (table.get(entry.day) ?? 0) + 1);
     }
     return table;
-  }, [classes]);
+  }, [sessions]);
 
   const eventsByDay = useMemo(() => {
     const table = new Map();
@@ -141,14 +141,14 @@ export default function MonthCalendar({
         date,
         number: index + 1,
         marks: {
-          class: weeklyClasses.get(date.getDay()) ?? 0,
+          session: weeklySessions.get(date.getDay()) ?? 0,
           ...(eventsByDay.get(key) ?? {}),
         },
       };
     });
 
     return [...blanks, ...dates];
-  }, [cursor, eventsByDay, weeklyClasses]);
+  }, [cursor, eventsByDay, weeklySessions]);
 
   const monthLabel = new Date(cursor.year, cursor.month, 1).toLocaleDateString(
     undefined,

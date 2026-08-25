@@ -16,14 +16,14 @@ import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import Dropdown from "@/components/Dropdown";
-import ClassRow from "@/components/ClassRow";
+import SessionRow from "@/components/SessionRow";
 import EventRow from "@/components/EventRow";
 import EmptyState from "@/components/EmptyState";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AddKnowledge from "@/components/AddKnowledge";
 import LimitSheet from "@/components/LimitSheet";
 import EventComposer from "@/components/EventComposer";
-import ClassComposer from "@/components/ClassComposer";
+import SessionComposer from "@/components/SessionComposer";
 import { activeTier } from "@/lib/quota";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
@@ -34,7 +34,7 @@ import { impact } from "@/lib/haptics";
 const SECTIONS = [
   { value: "knowledge", label: "Knowledge" },
   { value: "events", label: "Deadlines" },
-  { value: "times", label: "Class times" },
+  { value: "times", label: "Session times" },
 ];
 
 export default function UnitScreen() {
@@ -46,15 +46,15 @@ export default function UnitScreen() {
   const materials = useStudyStore((state) => state.materials);
   const subscription = useStudyStore((state) => state.subscription);
   const events = useStudyStore((state) => state.events);
-  const classes = useStudyStore((state) => state.classes);
+  const sessions = useStudyStore((state) => state.sessions);
 
   const addMaterial = useStudyStore((state) => state.addMaterial);
   const archiveMaterial = useStudyStore((state) => state.archiveMaterial);
   const addEvent = useStudyStore((state) => state.addEvent);
   const toggleEvent = useStudyStore((state) => state.toggleEvent);
   const removeEvent = useStudyStore((state) => state.removeEvent);
-  const addClass = useStudyStore((state) => state.addClass);
-  const removeClass = useStudyStore((state) => state.removeClass);
+  const addSession = useStudyStore((state) => state.addSession);
+  const removeSession = useStudyStore((state) => state.removeSession);
   const removeUnit = useStudyStore((state) => state.removeUnit);
 
   const [section, setSection] = useState("knowledge");
@@ -80,15 +80,15 @@ export default function UnitScreen() {
         }),
     [events, unitId]
   );
-  const unitClasses = useMemo(
+  const unitSessions = useMemo(
     () =>
-      classes
+      sessions
         .filter((entry) => entry.unitId === unitId)
         .sort(
           (a, b) =>
             weekOrder(a.day) - weekOrder(b.day) || minutesOf(a.start) - minutesOf(b.start)
         ),
-    [classes, unitId]
+    [sessions, unitId]
   );
 
   // The unit can vanish under us — deleting it leaves this screen mounted for
@@ -106,7 +106,7 @@ export default function UnitScreen() {
       ? "Add knowledge"
       : section === "events"
         ? "Add a deadline"
-        : "Add a class time";
+        : "Add a session time";
 
   return (
     <>
@@ -159,7 +159,7 @@ export default function UnitScreen() {
                 ? `${unitMaterials.length} filed`
                 : option.value === "events"
                   ? `${unitEvents.filter((event) => !event.done).length} open`
-                  : `${unitClasses.length} a week`,
+                  : `${unitSessions.length} a week`,
           }))}
           sheetTitle="Show"
         />
@@ -276,27 +276,27 @@ export default function UnitScreen() {
           )
         ) : null}
 
-        {/* --- Class times --- */}
+        {/* --- Session times --- */}
         {section === "times" ? (
-          unitClasses.length === 0 ? (
+          unitSessions.length === 0 ? (
             <EmptyState
               Icon={CalendarClock}
-              title="No class times"
+              title="No session times"
               message="Add when this unit meets and today's sessions appear on Home automatically."
             />
           ) : (
             <View>
-              {unitClasses.map((entry, index) => (
+              {unitSessions.map((entry, index) => (
                 <View key={entry.id}>
                   <Text className="font-jk text-muted text-[11px] tracking-[0.8px] mt-2">
                     {DAYS.find((day) => day.index === entry.day)?.long.toUpperCase()}
                   </Text>
-                  <ClassRow
+                  <SessionRow
                     entry={entry}
                     unit={unit}
                     today={entry.day === new Date().getDay()}
-                    onRemove={() => removeClass(entry.id)}
-                    last={index === unitClasses.length - 1}
+                    onRemove={() => removeSession(entry.id)}
+                    last={index === unitSessions.length - 1}
                   />
                 </View>
               ))}
@@ -323,18 +323,18 @@ export default function UnitScreen() {
         onClose={() => setComposer(null)}
         onSave={(payload) => addEvent({ ...payload, unitId })}
       />
-      <ClassComposer
+      <SessionComposer
         visible={composer === "times"}
         units={units}
         lockedUnitId={unitId}
         onClose={() => setComposer(null)}
-        onSave={(payload) => addClass({ ...payload, unitId })}
+        onSave={(payload) => addSession({ ...payload, unitId })}
       />
 
       <ConfirmDialog
         visible={confirmingDelete}
         title={`Delete ${unit.code}?`}
-        message="Its knowledge, deadlines and class times go with it. This can't be undone."
+        message="Its knowledge, deadlines and session times go with it. This can't be undone."
         confirmLabel="Delete"
         destructive
         onCancel={() => setConfirmingDelete(false)}

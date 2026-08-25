@@ -25,7 +25,7 @@ const TIMES = Array.from({ length: 29 }, (_, index) => {
 });
 
 /** Sheet for adding a slot to the timetable. */
-export default function ClassComposer({ visible, onClose, onSave, units, lockedUnitId }) {
+export default function SessionComposer({ visible, onClose, onSave, units, lockedUnitId }) {
   const [unitId, setUnitId] = useState(lockedUnitId ?? units[0]?.id ?? null);
   const [day, setDay] = useState(new Date().getDay());
   const [start, setStart] = useState("08:00");
@@ -41,7 +41,7 @@ export default function ClassComposer({ visible, onClose, onSave, units, lockedU
   };
 
   return (
-    <Sheet visible={visible} onClose={close} title="Add a class">
+    <Sheet visible={visible} onClose={close} title="Add a session">
       <View className="gap-y-4">
         {lockedUnitId ? null : (
           <Dropdown
@@ -89,7 +89,7 @@ export default function ClassComposer({ visible, onClose, onSave, units, lockedU
 
         {ordered ? null : (
           <Text className="font-jk text-danger text-[12.5px]">
-            The class has to end after it starts.
+            The session has to end after it starts.
           </Text>
         )}
 
@@ -101,7 +101,7 @@ export default function ClassComposer({ visible, onClose, onSave, units, lockedU
         />
 
         <Button
-          label="Add class"
+          label="Add session"
           disabled={!canSave}
           onPress={() => {
             notify("success");

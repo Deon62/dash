@@ -62,7 +62,7 @@ export default function NewUnitScreen() {
           autoCapitalize="words"
         />
         <TextField
-          label="LECTURER"
+          label="TAUGHT BY"
           value={lecturer}
           onChangeText={setLecturer}
           placeholder="Optional"

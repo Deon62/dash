@@ -27,7 +27,7 @@ export default function ProfileScreen() {
 
   const profile = useStudyStore((state) => state.profile);
   const units = useStudyStore((state) => state.units);
-  const classes = useStudyStore((state) => state.classes);
+  const sessions = useStudyStore((state) => state.sessions);
   const subscription = useStudyStore((state) => state.subscription);
   const signOut = useStudyStore((state) => state.signOut);
 
@@ -81,8 +81,8 @@ export default function ProfileScreen() {
         />
         <LinkRow
           Icon={CalendarDays}
-          label="Class timetable"
-          value={classes.length ? `${classes.length}/wk` : undefined}
+          label="Timetable"
+          value={sessions.length ? `${sessions.length}/wk` : undefined}
           onPress={() => router.push("/timetable")}
         />
         <LinkRow

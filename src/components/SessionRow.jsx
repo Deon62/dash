@@ -8,11 +8,11 @@ import { impact } from "@/lib/haptics";
  * One slot on the timetable.
  *
  * `live` is worked out here rather than passed in so every caller gets the
- * highlight for free — a student glancing at Home should see which class they
+ * highlight for free — a student glancing at Home should see which session they
  * are supposed to be sitting in right now. That highlight is the one place
  * the blue earns its keep on this screen.
  */
-export default function ClassRow({ entry, unit, today = false, onRemove, last = false }) {
+export default function SessionRow({ entry, unit, today = false, onRemove, last = false }) {
   const start = minutesOf(entry.start);
   const end = minutesOf(entry.end);
   const now = nowMinutes();
@@ -37,7 +37,7 @@ export default function ClassRow({ entry, unit, today = false, onRemove, last = 
       </View>
 
       {/* A hairline rule rather than a coloured spine: it separates the clock
-          from the class without adding another colour to the page. */}
+          from the session without adding another colour to the page. */}
       <View
         className={`w-px self-stretch mr-4 ${live ? "bg-primary" : "bg-line"}`}
       />
@@ -67,7 +67,7 @@ export default function ClassRow({ entry, unit, today = false, onRemove, last = 
           }}
           hitSlop={10}
           accessibilityRole="button"
-          accessibilityLabel={`Remove ${unit?.code ?? "class"} at ${formatTime(entry.start)}`}
+          accessibilityLabel={`Remove ${unit?.code ?? "session"} at ${formatTime(entry.start)}`}
           className="h-8 w-8 items-center justify-center rounded-full active:bg-surface"
         >
           <X size={15} color="#71717A" strokeWidth={1.8} />

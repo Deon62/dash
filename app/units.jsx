@@ -16,7 +16,7 @@ export default function UnitsScreen() {
 
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
-  const classes = useStudyStore((state) => state.classes);
+  const sessions = useStudyStore((state) => state.sessions);
 
   return (
     <Screen bare>
@@ -46,7 +46,7 @@ export default function UnitsScreen() {
             const items = materials.filter(
               (material) => material.unitId === unit.id && !material.archived
             ).length;
-            const sessions = classes.filter((entry) => entry.unitId === unit.id).length;
+            const sessions = sessions.filter((entry) => entry.unitId === unit.id).length;
 
             return (
               <Pressable
@@ -70,7 +70,7 @@ export default function UnitsScreen() {
                   </Text>
                   <Text className="font-jk text-muted text-[12px] mt-1.5">
                     {items} {items === 1 ? "item" : "items"} ·{" "}
-                    {sessions} {sessions === 1 ? "class" : "classes"} a week
+                    {sessions} {sessions === 1 ? "session" : "sessions"} a week
                     {unit.lecturer ? ` · ${unit.lecturer}` : ""}
                   </Text>
                 </View>

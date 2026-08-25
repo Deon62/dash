@@ -23,7 +23,7 @@ export default function NotificationsScreen() {
   const router = useRouter();
 
   const units = useStudyStore((state) => state.units);
-  const classes = useStudyStore((state) => state.classes);
+  const sessions = useStudyStore((state) => state.sessions);
   const events = useStudyStore((state) => state.events);
 
   const items = useMemo(() => {
@@ -48,15 +48,15 @@ export default function NotificationsScreen() {
       });
     }
 
-    for (const entry of classes) {
+    for (const entry of sessions) {
       if (entry.day !== today) continue;
       if (minutesOf(entry.end) <= now) continue;
 
       const unit = unitById(units, entry.unitId);
       list.push({
-        id: `class-${entry.id}`,
+        id: `session-${entry.id}`,
         Icon: BellRing,
-        title: `${unit?.code ?? "Class"} at ${formatTime(entry.start)}`,
+        title: `${unit?.code ?? "Session"} at ${formatTime(entry.start)}`,
         body: [unit?.title, entry.room].filter(Boolean).join(" · "),
         urgent: false,
         sort: -0.5,
@@ -64,7 +64,7 @@ export default function NotificationsScreen() {
     }
 
     return list.sort((a, b) => a.sort - b.sort);
-  }, [classes, events, units]);
+  }, [sessions, events, units]);
 
   return (
     <Screen bare>
@@ -83,7 +83,7 @@ export default function NotificationsScreen() {
         <EmptyState
           Icon={BellRing}
           title="Nothing needs you"
-          message="No classes left today and nothing due in the next three days."
+          message="No sessions left today and nothing due in the next three days."
         />
       ) : (
         <View>

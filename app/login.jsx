@@ -174,7 +174,7 @@ export default function LoginScreen() {
         </Text>
         <Text className="font-jk text-muted text-[14.5px] leading-[22px] text-center mt-3.5">
           Feed it your notes, slides and past papers. It learns your units and
-          revises with you — quoting the exact lecture it got the answer from.
+          revises with you — quoting the exact source it got the answer from.
         </Text>
 
         {/* The sign-in controls sit in the vertical middle rather than packed

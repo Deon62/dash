@@ -9,7 +9,7 @@ import StreakBadge from "@/components/StreakBadge";
 import Fab from "@/components/Fab";
 import MonthCalendar from "@/components/MonthCalendar";
 import DaySheet from "@/components/DaySheet";
-import ClassRow from "@/components/ClassRow";
+import SessionRow from "@/components/SessionRow";
 import EventComposer from "@/components/EventComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
@@ -32,7 +32,7 @@ export default function HomeScreen() {
 
   const profile = useStudyStore((state) => state.profile);
   const units = useStudyStore((state) => state.units);
-  const classes = useStudyStore((state) => state.classes);
+  const sessions = useStudyStore((state) => state.sessions);
   const events = useStudyStore((state) => state.events);
   const addEvent = useStudyStore((state) => state.addEvent);
   const toggleEvent = useStudyStore((state) => state.toggleEvent);
@@ -43,12 +43,12 @@ export default function HomeScreen() {
 
   const today = new Date().getDay();
 
-  const todaysClasses = useMemo(
+  const todaysSessions = useMemo(
     () =>
-      classes
+      sessions
         .filter((entry) => entry.day === today)
         .sort((a, b) => minutesOf(a.start) - minutesOf(b.start)),
-    [classes, today]
+    [sessions, today]
   );
 
   // The bell marks anything already due — the one thing a dot on a past date
@@ -97,7 +97,7 @@ export default function HomeScreen() {
               today's date is a dark disc inside it — a title and a date line
               above that said the same thing twice. */}
           <MonthCalendar
-            classes={classes}
+            sessions={sessions}
             events={events}
             onSelectDate={setOpenDate}
             action="Full week"
@@ -111,21 +111,21 @@ export default function HomeScreen() {
               TODAY
             </Text>
 
-            {todaysClasses.length === 0 ? (
+            {todaysSessions.length === 0 ? (
               <EmptyState
                 compact
                 Icon={CalendarOff}
-                title="No classes today"
+                title="No sessions today"
                 message="Add when a unit meets and its sessions appear here on the day."
               />
             ) : (
-              todaysClasses.map((entry, index) => (
-                <ClassRow
+              todaysSessions.map((entry, index) => (
+                <SessionRow
                   key={entry.id}
                   entry={entry}
                   unit={unitById(units, entry.unitId)}
                   today
-                  last={index === todaysClasses.length - 1}
+                  last={index === todaysSessions.length - 1}
                 />
               ))
             )}
@@ -142,7 +142,7 @@ export default function HomeScreen() {
       <DaySheet
         date={openDate}
         units={units}
-        classes={classes}
+        sessions={sessions}
         events={events}
         onToggleEvent={toggleEvent}
         onClose={() => setOpenDate(null)}

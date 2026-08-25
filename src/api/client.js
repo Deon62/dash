@@ -16,8 +16,24 @@
  *    down with an unhandled rejection.
  */
 
-/** Set at build time. Absent means "no backend", which is the current state. */
-export const API_BASE_URL = process.env.EXPO_PUBLIC_API_URL ?? null;
+/**
+ * Set at build time. Absent means "no backend", which is a supported state:
+ * every screen reads from the store and works offline.
+ *
+ * The origin only — a trailing slash is stripped here rather than trusted,
+ * because `https://host/` joined to `/api/v1/me` gives a double slash and a
+ * 404 that looks like a routing bug on the server.
+ */
+export const API_BASE_URL =
+  process.env.EXPO_PUBLIC_API_URL?.replace(/\/+$/, "") || null;
+
+/**
+ * The version lives here, not in twenty-odd path strings.
+ *
+ * `/health` sits outside it, which is why this is a prefix applied by
+ * `endpoints.js` rather than glued on inside `request`.
+ */
+export const API_V1 = "/api/v1";
 
 export const isBackendConfigured = Boolean(API_BASE_URL);
 
@@ -87,6 +103,7 @@ function safeParse(text) {
 export const api = {
   get: (path, options) => request(path, { ...options, method: "GET" }),
   post: (path, body, options) => request(path, { ...options, method: "POST", body }),
+  put: (path, body, options) => request(path, { ...options, method: "PUT", body }),
   patch: (path, body, options) => request(path, { ...options, method: "PATCH", body }),
   delete: (path, options) => request(path, { ...options, method: "DELETE" }),
 };

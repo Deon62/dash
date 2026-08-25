@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { Text, View } from "react-native";
 
 import Sheet from "@/components/Sheet";
-import ClassRow from "@/components/ClassRow";
+import SessionRow from "@/components/SessionRow";
 import EventRow from "@/components/EventRow";
 import { unitById } from "@/store/useStudyStore";
 import { dayKey, minutesOf } from "@/lib/dates";
@@ -17,18 +17,18 @@ export default function DaySheet({
   date,
   onClose,
   units,
-  classes,
+  sessions,
   events,
   onToggleEvent,
 }) {
   const key = date ? dayKey(date) : null;
 
-  const dayClasses = useMemo(() => {
+  const daySessions = useMemo(() => {
     if (!date) return [];
-    return classes
+    return sessions
       .filter((entry) => entry.day === date.getDay())
       .sort((a, b) => minutesOf(a.start) - minutesOf(b.start));
-  }, [classes, date]);
+  }, [sessions, date]);
 
   const dayEvents = useMemo(() => {
     if (!key) return [];
@@ -46,8 +46,8 @@ export default function DaySheet({
     : "";
 
   const counts = [
-    dayClasses.length
-      ? `${dayClasses.length} ${dayClasses.length === 1 ? "class" : "classes"}`
+    daySessions.length
+      ? `${daySessions.length} ${daySessions.length === 1 ? "session" : "sessions"}`
       : null,
     dayEvents.length
       ? `${dayEvents.length} ${dayEvents.length === 1 ? "deadline" : "deadlines"}`
@@ -63,20 +63,20 @@ export default function DaySheet({
       title={title}
       subtitle={counts.length ? counts.join(" · ") : "Nothing scheduled"}
     >
-      {dayClasses.length > 0 ? (
+      {daySessions.length > 0 ? (
         <View>
           <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
-            CLASSES
+            SESSIONS
           </Text>
-          {dayClasses.map((entry, index) => (
-            <ClassRow
+          {daySessions.map((entry, index) => (
+            <SessionRow
               key={entry.id}
               entry={entry}
               unit={unitById(units, entry.unitId)}
               // The "now" highlight is only true information on today; on any
-              // other date it would mark a class that is not running.
+              // other date it would mark a session that is not running.
               today={isToday}
-              last={index === dayClasses.length - 1}
+              last={index === daySessions.length - 1}
             />
           ))}
         </View>
@@ -99,7 +99,7 @@ export default function DaySheet({
         </View>
       ) : null}
 
-      {dayClasses.length === 0 && dayEvents.length === 0 ? (
+      {daySessions.length === 0 && dayEvents.length === 0 ? (
         <Text className="font-jk text-muted text-[13.5px] leading-[20px] py-2">
           A free day. Nothing on the timetable and nothing due.
         </Text>
