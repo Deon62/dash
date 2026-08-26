@@ -137,14 +137,18 @@ export const billing = {
    * Opens a payment page for this student and this plan.
    *
    * The link comes from the server rather than being shipped in the app, and
-   * that is the whole point: a fixed `paystack.shop/pay/...` link is the same
+   * that is the whole point: a fixed, shareable payment link is the same
    * page for everyone, so the charge it produces names no account. The server
    * initialises the transaction with the caller's user id in the metadata, so
    * the payment arrives already tied to a student — otherwise there is nothing
    * to reconcile against but an email most accounts do not have.
    *
-   * Returns `{ authorization_url, reference }`. Open the URL, then hand the
+   * Returns `{ checkout_url, reference }`. Open the URL, then hand the
    * reference to `verifyPayment` when the browser closes.
+   *
+   * `authorization_url` is also present and identical — the old name, kept by
+   * the server for one release so a build already on a phone keeps working.
+   * Read `checkout_url`.
    */
   checkout: (tier, token) => api.post(v1("/billing/checkout"), { tier }, { token }),
 
@@ -152,7 +156,7 @@ export const billing = {
    * Confirms a payment server-side.
    *
    * Safe to call repeatedly — the reference is unique, so a second call
-   * returns the same subscription rather than extending it again. Paystack's
+   * returns the same subscription rather than extending it again. Kora's
    * webhook is what makes a payment true; this is the fast path so a student
    * who has just paid does not wait on it.
    */

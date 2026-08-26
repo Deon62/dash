@@ -208,7 +208,7 @@ export function newSubscription(tier, now = new Date()) {
     expiresAt: expires.toISOString(),
     /**
      * False until a server has seen the payment. Nothing on the device can
-     * confirm a Paystack charge, so this records what the app was told rather
+     * confirm a Kora charge, so this records what the app was told rather
      * than what it knows.
      */
     verified: plan.priceKsh === 0,

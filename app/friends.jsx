@@ -2,7 +2,6 @@ import { useState } from "react";
 import { Linking, Pressable, Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
-import * as WebBrowser from "expo-web-browser";
 import {
   Check,
   Copy,
@@ -22,9 +21,9 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import Disc from "@/components/Disc";
 import { useStudyStore } from "@/store/useStudyStore";
 import { activeTier } from "@/lib/quota";
+import { confirmCheckout, startCheckout } from "@/lib/checkout";
 import { newInviteCode } from "@/lib/inviteCode";
 import {
-  PLAN_CARDS,
   SubscriptionTier,
   planFor,
   pricePerSeat,
@@ -94,7 +93,13 @@ export default function FriendsScreen() {
   const activatePlan = useStudyStore((state) => state.activatePlan);
   const profile = useStudyStore((state) => state.profile);
 
+  const authToken = useStudyStore((state) => state.authToken);
+
   const [confirming, setConfirming] = useState(false);
+  /** The reference the server minted, so the sheet can verify rather than ask. */
+  const [paymentReference, setPaymentReference] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [removing, setRemoving] = useState(null);
   const [inviting, setInviting] = useState(false);
@@ -113,18 +118,44 @@ export default function FriendsScreen() {
   const invite = group?.inviteCode ?? "";
   const payer = members.find((member) => member.isOwner);
 
-  const checkoutUrl = PLAN_CARDS.find((card) => card.tier === FRIENDS)?.checkoutUrl;
-
   const pay = async () => {
     impact("medium");
-    // The system browser, not a WebView: this is a real payment page and the
-    // student should be able to see the address bar it is entered on.
-    await WebBrowser.openBrowserAsync(checkoutUrl);
+    setNotice(null);
+
+    // Minted by the server for this student — see `src/lib/checkout.js`. The
+    // fixed payment link this replaced produced a charge that named nobody.
+    const { reference, error } = await startCheckout(FRIENDS, authToken);
+
+    if (error) {
+      setNotice(error);
+      return;
+    }
+
+    setPaymentReference(reference);
     // Nothing here can see a charge, so it asks rather than assuming.
     setConfirming(true);
   };
 
-  const startGroup = () => {
+  const startGroup = async () => {
+    // Ask the server first when there is a reference and a token. A verified
+    // group is a fact; the local path below is only the student's word, which
+    // is exactly what `verified: false` on the subscription records.
+    if (paymentReference && authToken) {
+      setBusy(true);
+      const { error, pending } = await confirmCheckout(paymentReference, authToken);
+      setBusy(false);
+
+      if (error) {
+        setNotice(
+          pending
+            ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
+            : error
+        );
+        return;
+      }
+    }
+
+    setPaymentReference(null);
     activatePlan(FRIENDS);
     setGroup({
       inviteCode: newInviteCode(),
@@ -405,9 +436,18 @@ export default function FriendsScreen() {
 
         {/* Only where it is load-bearing: before paying. Once the plan is
             running, a paragraph about card processors is furniture. */}
+        {notice ? (
+          <Text
+            className="font-jk text-[11.5px] leading-[17px]"
+            style={{ color: COLORS.danger }}
+          >
+            {notice}
+          </Text>
+        ) : null}
+
         {onPlan ? null : (
           <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
-            Payment goes through Paystack, which takes M-Pesa, Airtel Money and
+            Payment goes through Kora, which takes M-Pesa, Airtel Money and
             cards.
           </Text>
         )}
@@ -419,7 +459,11 @@ export default function FriendsScreen() {
         visible={confirming}
         onClose={() => setConfirming(false)}
         title="Did the payment go through?"
-        subtitle={`We can't confirm it from here yet. If Paystack charged you KES ${plan.priceKsh}, unlock the group now and it will be reconciled once accounts are connected.`}
+        subtitle={
+          paymentReference
+            ? `Tap below and we'll check with our records. If Kora took KES ${plan.priceKsh}, the group unlocks for real.`
+            : `We can't confirm it from here. If Kora charged you KES ${plan.priceKsh}, unlock the group now and it will be reconciled once your account is connected.`
+        }
       >
         <View className="gap-y-3">
           <Button label="Yes, give me the code" onPress={startGroup} />

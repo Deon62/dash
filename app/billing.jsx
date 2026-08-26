@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import * as WebBrowser from "expo-web-browser";
 import { Check, Minus } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
@@ -18,6 +17,7 @@ import {
   seatsFor,
 } from "@/theme/plans";
 import { activeTier, daysRemaining, isExpired } from "@/lib/quota";
+import { confirmCheckout, startCheckout } from "@/lib/checkout";
 import { newInviteCode } from "@/lib/inviteCode";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
@@ -41,7 +41,13 @@ export default function BillingScreen() {
   const group = useStudyStore((state) => state.group);
   const profile = useStudyStore((state) => state.profile);
 
+  const authToken = useStudyStore((state) => state.authToken);
+
   const [confirming, setConfirming] = useState(null);
+  /** The reference the server gave us, so the sheet can verify rather than ask. */
+  const [reference, setReference] = useState(null);
+  const [notice, setNotice] = useState(null);
+  const [busy, setBusy] = useState(false);
 
   const tier = activeTier(subscription);
   const left = daysRemaining(subscription);
@@ -55,17 +61,44 @@ export default function BillingScreen() {
 
   const checkout = async (card) => {
     impact("medium");
+    setBusy(true);
+    setNotice(null);
 
-    // Opened in the system browser rather than a WebView: this is a real
-    // payment page and the student should be able to see the address bar it
-    // is being entered on.
-    await WebBrowser.openBrowserAsync(card.checkoutUrl);
-    // Nothing here knows whether they paid, so we ask instead of assuming.
+    // The link is minted by the server for this student and this plan — see
+    // `src/lib/checkout.js`. There is no hardcoded payment page any more.
+    const { reference: opened, error } = await startCheckout(card.tier, authToken);
+    setBusy(false);
+
+    if (error) {
+      setNotice(error);
+      return;
+    }
+
+    setReference(opened);
+    // The browser closing says nothing about whether money moved, so we ask.
     setConfirming(card);
   };
 
-  const unlock = () => {
+  const unlock = async () => {
     const card = confirming;
+
+    // Ask the server first when it can answer. A verified plan is a fact; the
+    // local fallback below is only a claim, and the difference is the whole
+    // reason `verified` exists on the subscription.
+    if (reference && authToken) {
+      setBusy(true);
+      const { error, pending } = await confirmCheckout(reference, authToken);
+      setBusy(false);
+
+      if (error) {
+        setNotice(
+          pending
+            ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
+            : error
+        );
+        return;
+      }
+    }
 
     notify("success");
     activatePlan(card.tier);
@@ -85,6 +118,7 @@ export default function BillingScreen() {
     }
 
     setConfirming(null);
+    setReference(null);
   };
 
   return (
@@ -218,25 +252,34 @@ export default function BillingScreen() {
           );
         })}
 
+        {notice ? (
+          <Text className="font-jk text-[11.5px] leading-[17px]" style={{ color: COLORS.danger }}>
+            {notice}
+          </Text>
+        ) : null}
+
         <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
           {expired
             ? "Your plan has ended — the free limits apply until you renew. "
             : ""}
-          Payment is handled by Paystack, which accepts M-Pesa, Airtel Money and
+          Payment is handled by Kora, which accepts M-Pesa, Airtel Money and
           cards. Your plan activates once the payment clears.
         </Text>
       </Screen>
 
-      {/* The device cannot see a Paystack charge. Until a server receives the
-          webhook, activation is the student's word — recorded as unverified so
-          it can be reconciled rather than silently trusted. */}
+      {/* The device cannot see a charge. With a token we ask the server, which
+          has either had Kora's webhook or can verify the reference itself.
+          Without one, activation is the student's word — recorded as
+          unverified so it can be reconciled rather than silently trusted. */}
       <Sheet
         visible={Boolean(confirming)}
         onClose={() => setConfirming(null)}
         title="Did the payment go through?"
         subtitle={
           confirming
-            ? `We can't confirm it from here yet. If Paystack charged you for ${confirming.name}, unlock it now and it will be reconciled once accounts are connected.`
+            ? reference
+              ? `Checking with our records confirms it properly. If Kora charged you for ${confirming.name}, tap below and the plan unlocks for real.`
+              : `We can't confirm it from here. If Kora charged you for ${confirming.name}, unlock it now and it will be reconciled once your account is connected.`
             : undefined
         }
       >
@@ -244,6 +287,7 @@ export default function BillingScreen() {
           <Button
             label={confirming ? `Yes, unlock ${confirming.name}` : "Yes"}
             onPress={unlock}
+            disabled={busy}
           />
           <Pressable
             onPress={() => {

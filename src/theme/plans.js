@@ -139,21 +139,30 @@ export function pricePerSeat(tier) {
  * store and any future server speak; the names are what a student reads.
  */
 /**
- * `checkoutUrl` is the fallback, not the plan.
+ * There is deliberately no `checkoutUrl` here any more.
  *
- * These are fixed Paystack pages: the same link for every student, so the
- * charge that comes back names no account and the server has only the email
- * typed into the form to reconcile against — which most accounts, signed in by
- * phone, do not have. Once the app holds a real token, `billing.checkout()` in
- * `src/api/endpoints.js` asks the server for a link minted for one student and
- * one plan, and these are only for builds with no backend configured.
+ * These cards used to carry three fixed `paystack.shop/pay/...` links. Two
+ * things were wrong with that, and only one of them was the provider.
+ *
+ * A fixed link is the same page for every student, so the charge that comes
+ * back names no account — the server is left reconciling against an email
+ * typed into a form, which most accounts, signed in by phone, never have. And
+ * the price lives on the provider's dashboard rather than in the plan table,
+ * so the two drift silently.
+ *
+ * `billing.checkout()` in `src/api/endpoints.js` asks the server for a Kora
+ * checkout minted for one student and one plan, with the payer's id in the
+ * metadata. That is the only payment path now; a card with a hardcoded URL
+ * would quietly bypass it.
+ *
+ * A build with no backend configured therefore cannot take a payment at all,
+ * which is the honest outcome: it could never have credited one either.
  */
 export const PLAN_CARDS = [
   {
     tier: SubscriptionTier.STANDARD,
     name: "Focus",
     tagline: "Enough for a normal semester",
-    checkoutUrl: "https://paystack.shop/pay/tzni-kn48p",
     /** Outlined on white — the everyday option. */
     tone: "plain",
   },
@@ -161,7 +170,6 @@ export const PLAN_CARDS = [
     tier: SubscriptionTier.PRO,
     name: "Synapse",
     tagline: "For a full load, and finals week",
-    checkoutUrl: "https://paystack.shop/pay/sux85xe8ff",
     /**
      * Filled. Two identical white cards make a student compare nine lines of
      * small print to work out that one is the bigger plan; a shaded card says
@@ -173,7 +181,6 @@ export const PLAN_CARDS = [
     tier: SubscriptionTier.FRIENDS,
     name: "Friends",
     tagline: "Synapse for five, split five ways",
-    checkoutUrl: "https://paystack.shop/pay/ijx1r5fivo",
     tone: "plain",
     /** Shown instead of the flat price: what it costs each person. */
     perSeatNote: true,

@@ -129,8 +129,13 @@ export const useStudyStore = create(
       // --- Session ----------------------------------------------------------
 
       /**
-       * Signs the student in locally. Called once the code passes; there is no
-       * token because there is no server to issue one.
+       * Signs the student in locally. Called once the code passes.
+       *
+       * Still local: `src/lib/auth.js` validates the code on the device and
+       * mints no token, so `authToken` below stays null and anything that
+       * needs the server — paying, sync — reports that rather than failing
+       * oddly. Wiring `account.requestOtp` / `account.verifyOtp` from
+       * `src/api/endpoints.js` is what fills it in.
        */
       signIn: (phone) =>
         set((state) => ({
@@ -138,6 +143,18 @@ export const useStudyStore = create(
           isAuthenticated: true,
           profile: { ...state.profile, phone: phone ?? state.profile.phone },
         })),
+
+      /**
+       * The server's access token, or null.
+       *
+       * Kept out of `profile` because it is a credential, not a preference: it
+       * is the thing to clear on sign-out and the thing never to log. Null is
+       * a supported state and the app is built for it — every screen reads
+       * from the store and works with no server at all.
+       */
+      authToken: null,
+
+      setAuthToken: (authToken) => set({ authToken }),
 
       /** Google, also local for now. Carries an email instead of a number. */
       signInWithEmail: (email) =>
@@ -154,7 +171,7 @@ export const useStudyStore = create(
        * notes on what a student thinks of as "log out". `resetEverything` is
        * the deliberate version of that.
        */
-      signOut: () => set({ isAuthenticated: false }),
+      signOut: () => set({ isAuthenticated: false, authToken: null }),
 
       /** Dismisses the explainer. Never shown again, even after a sign-out. */
       completeIntro: () => set({ introSeen: true }),
@@ -189,10 +206,11 @@ export const useStudyStore = create(
       /**
        * Switches the account onto a paid tier.
        *
-       * Called after the student returns from Paystack saying they paid. The
+       * Called after the student returns from checkout saying they paid. The
        * subscription it writes is marked unverified, because nothing on this
-       * device saw the money — only a server receiving Paystack's webhook can
-       * set that straight, and until one exists this is a claim, not a fact.
+       * device saw the money — only the server, receiving Kora's webhook or
+       * verifying the reference, can set that straight. Until then it is a
+       * claim, not a fact, and `/billing/verify` is what settles it.
        */
       activatePlan: (tier) => set({ subscription: newSubscription(tier) }),
 
