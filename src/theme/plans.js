@@ -261,11 +261,5 @@ export function planFeatures(tier) {
     { text: quizLine, available: true },
     { text: TIMETABLE_COPY[limits.timetableMode], available: true },
     { text: CITATION_COPY[limits.sourceCitations], available: true },
-    {
-      text: limits.allowOcrScans
-        ? `Scan handwritten notes, ${limits.monthlyOcrPageLimit} pages a month`
-        : "Scan handwritten notes",
-      available: limits.allowOcrScans,
-    },
   ];
 }

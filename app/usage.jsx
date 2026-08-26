@@ -117,13 +117,7 @@ export default function UsageScreen() {
           used={weekly ? usage.quizzesThisWeek : usage.quizzesEver}
           limit={quiz.count}
         />
-        <UsageMeter label="Course units" used={units.length} limit={unitCap(tier)} />
-        <UsageMeter
-          label="Scanned pages this month"
-          used={usage.ocrPagesThisMonth}
-          limit={limits.allowOcrScans ? limits.monthlyOcrPageLimit : 0}
-          last
-        />
+        <UsageMeter label="Course units" used={units.length} limit={unitCap(tier)} last />
       </View>
 
       <View>

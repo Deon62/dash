@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import * as DocumentPicker from "expo-document-picker";
 import * as ImagePicker from "expo-image-picker";
-import { FileText, Image as ImageIcon, Link2, NotebookPen } from "lucide-react-native";
+import { FileText, Link2, NotebookPen, ScanText } from "lucide-react-native";
 
 import Sheet from "@/components/Sheet";
 import Button from "@/components/Button";
@@ -27,9 +27,9 @@ const FORMATS = [
   },
   {
     key: "image",
-    label: "Image",
-    hint: "A photo of handwritten notes",
-    Icon: ImageIcon,
+    label: "Handwritten notes",
+    hint: "Pick a photo of a page from your library",
+    Icon: ScanText,
   },
   {
     key: "link",

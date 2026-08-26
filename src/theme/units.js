@@ -31,7 +31,7 @@ export function weekOrder(day) {
 export const MATERIAL_KINDS = [
   { key: "note", label: "Note", hint: "Type or paste text" },
   { key: "pdf", label: "PDF", hint: "Slides, papers, past exams" },
-  { key: "image", label: "Image", hint: "Photos of handwritten notes" },
+  { key: "image", label: "Handwritten notes", hint: "A photo of a page" },
   { key: "link", label: "Link", hint: "An article or a video" },
 ];
 
