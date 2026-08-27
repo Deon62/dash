@@ -75,7 +75,7 @@
         {
           "backgroundColor": "#09090B",
           "image": "./assets/splash-icon.png",
-          "imageWidth": 220
+          "imageWidth": 150
         }
       ],
       "expo-web-browser",
@@ -108,6 +108,9 @@
     "updates": {
       "url": "https://u.expo.dev/5e47477f-1072-4803-94ca-b977c33f32d1"
     },
-    "owner": "ardenaprod"
+    "owner": "ardenaprod",
+    "androidStatusBar": {
+      "barStyle": "light-content"
+    }
   }
 }

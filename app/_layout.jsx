@@ -2,6 +2,7 @@ import "../global.css";
 import "@/lib/cssInterop";
 
 import { useEffect, useState } from "react";
+import { Image, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
@@ -18,6 +19,8 @@ import {
 import { useStudyStore } from "@/store/useStudyStore";
 import { useSessionGuard } from "@/lib/useSessionGuard";
 import { useAccountSync } from "@/lib/bootstrap";
+import AppLock from "@/components/AppLock";
+import { COLORS } from "@/theme/colors";
 
 /**
  * Guards the routes. A component rather than a hook call in RootLayout so it
@@ -37,6 +40,34 @@ function SessionGuard() {
 function AccountSync() {
   useAccountSync();
   return null;
+}
+
+/**
+ * What fills the screen between the native splash and the first route.
+ *
+ * The same dark ground and the same wordmark, so the handover is invisible:
+ * the native splash goes away, this is already underneath it, and the app
+ * appears when it is genuinely ready. Returning `null` here — which is what
+ * this used to do — meant a white flash between a dark splash and a dark
+ * splash, which reads as the app having crashed and restarted.
+ */
+function Booting() {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: COLORS.ink,
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Image
+        source={require("../assets/splash-icon.png")}
+        style={{ width: 150, height: 94 }}
+        resizeMode="contain"
+      />
+    </View>
+  );
 }
 
 // Hold the splash until the editorial typeface is in memory — swapping fonts
@@ -75,7 +106,7 @@ export default function RootLayout() {
   }, [ready, timedOut]);
 
   // Degrade to the system face rather than stranding the user on a splash.
-  if (!ready && !timedOut) return null;
+  if (!ready && !timedOut) return <Booting />;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
@@ -96,6 +127,11 @@ export default function RootLayout() {
         </Stack>
         <SessionGuard />
         <AccountSync />
+
+        {/* Over the navigator, not instead of it: unmounting the routes to
+            show a lock would throw away every screen's state and drop the
+            student back at the tabs when they unlock. */}
+        <AppLock />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

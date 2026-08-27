@@ -22,7 +22,20 @@ export function useSessionGuard() {
   const hydrated = useStudyStore((state) => state.hydrated);
   const introSeen = useStudyStore((state) => state.introSeen);
   const isAuthenticated = useStudyStore((state) => state.isAuthenticated);
-  const onboarded = useStudyStore((state) => state.onboarded);
+  const onboardedFlag = useStudyStore((state) => state.onboarded);
+  const name = useStudyStore((state) => state.profile.name);
+
+  /**
+   * Intake is done if the flag says so — or if the account plainly shows it.
+   *
+   * The flag alone is one stored boolean between a student and their own
+   * coursework, and if anything ever loses it they are sent back through a
+   * form they have already filled in, on every launch, with no way out that
+   * they can find. A profile with a name on it is proof the form was
+   * completed, on this phone or another one, and it cannot be lost without
+   * the name going too.
+   */
+  const onboarded = onboardedFlag || name.trim().length > 0;
 
   useEffect(() => {
     // Waiting on hydration matters: redirecting before the stored session has
@@ -37,7 +50,12 @@ export function useSessionGuard() {
 
     // The explainer comes before everything, including the sign-in wall: it is
     // what tells a first-time visitor why they would want an account at all.
-    if (!introSeen) {
+    //
+    // Only a visitor, though. Someone already signed in has an account, so
+    // being shown the pitch for having one is at best strange and at worst a
+    // loop they cannot leave — which is exactly what it looks like if the flag
+    // is ever lost while the session survives.
+    if (!introSeen && !isAuthenticated) {
       if (!onIntro) router.replace("/intro");
       return;
     }
