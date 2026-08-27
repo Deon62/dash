@@ -9,15 +9,21 @@ import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
+import { systemAlerts } from "@/lib/systemAlerts";
 import { COLORS } from "@/theme/colors";
 import { daysUntil, dueLabel, formatTime, minutesOf, nowMinutes } from "@/lib/dates";
 
 /**
  * What the app would have told you about.
  *
- * Derived from the timetable and the deadline list rather than stored: with no
- * push notifications wired up there is no inbox to keep, and a list built from
- * live data can never show a reminder for something already handed in.
+ * Two sources, one list. Deadlines and sessions come from the student's own
+ * coursework; the rest is the app reporting on itself — a sync that has not
+ * got through, a file that has not uploaded, a payment still clearing.
+ *
+ * Everything is derived rather than stored. A list built from live state can
+ * never show a reminder for something already handed in, and an alert about a
+ * failure cannot outlive the failure: the sync that succeeds removes its own
+ * warning without anything having to remember to.
  */
 export default function NotificationsScreen() {
   const router = useRouter();
@@ -25,6 +31,34 @@ export default function NotificationsScreen() {
   const units = useStudyStore((state) => state.units);
   const sessions = useStudyStore((state) => state.sessions);
   const events = useStudyStore((state) => state.events);
+
+  // The slices the alerts are built from, each selected on its own.
+  //
+  // Not `useStudyStore(systemAlerts)`, tempting as that is: a selector that
+  // builds an array returns a new one on every call, and React compares
+  // snapshots by identity — so it would decide the store had changed every
+  // render and spin. Selecting stable references and deriving in a memo below
+  // is the version that settles.
+  const materials = useStudyStore((state) => state.materials);
+  const chats = useStudyStore((state) => state.chats);
+  const tombstones = useStudyStore((state) => state.tombstones);
+  const subscription = useStudyStore((state) => state.subscription);
+  const syncError = useStudyStore((state) => state.syncError);
+
+  const alerts = useMemo(
+    () =>
+      systemAlerts({
+        units,
+        sessions,
+        materials,
+        events,
+        chats,
+        tombstones,
+        subscription,
+        syncError,
+      }),
+    [units, sessions, materials, events, chats, tombstones, subscription, syncError],
+  );
 
   const items = useMemo(() => {
     const today = new Date().getDay();
@@ -63,8 +97,8 @@ export default function NotificationsScreen() {
       });
     }
 
-    return list.sort((a, b) => a.sort - b.sort);
-  }, [sessions, events, units]);
+    return [...alerts, ...list].sort((a, b) => a.sort - b.sort);
+  }, [sessions, events, units, alerts]);
 
   return (
     <Screen bare>
@@ -83,7 +117,7 @@ export default function NotificationsScreen() {
         <EmptyState
           Icon={BellRing}
           title="Nothing needs you"
-          message="No sessions left today and nothing due in the next three days."
+          message="No sessions left today, nothing due in the next three days, and everything is saved to your account."
         />
       ) : (
         <View>

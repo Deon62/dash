@@ -18,6 +18,7 @@ import Button from "@/components/Button";
 import Sheet from "@/components/Sheet";
 import TextField from "@/components/TextField";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Notice, { toneForError } from "@/components/Notice";
 import Disc from "@/components/Disc";
 import { useStudyStore } from "@/store/useStudyStore";
 import { activeTier } from "@/lib/quota";
@@ -91,6 +92,7 @@ export default function FriendsScreen() {
   const [confirming, setConfirming] = useState(false);
   /** The reference the server minted, so the sheet can verify rather than ask. */
   const [paymentReference, setPaymentReference] = useState(null);
+  /** `{ tone, title, message, retry }`, or null. See `Notice`. */
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -128,7 +130,12 @@ export default function FriendsScreen() {
     const { reference, error } = await startCheckout(FRIENDS);
 
     if (error) {
-      setNotice(error);
+      setNotice({
+        tone: toneForError(error),
+        title: "We couldn't open the payment page",
+        message: `${error} Nothing has been charged.`,
+        retry: pay,
+      });
       return;
     }
 
@@ -150,10 +157,25 @@ export default function FriendsScreen() {
 
     if (error) {
       setBusy(false);
+      // The sheet closes over the answer otherwise, and a student would have to
+      // dismiss the question to read the reply to it.
+      setConfirming(false);
+
       setNotice(
         pending
-          ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
-          : error
+          ? {
+              tone: "waiting",
+              title: "Your payment is still clearing",
+              message:
+                "Mobile money can take a minute or two to confirm. Nothing has gone wrong — check again shortly and the group is yours as soon as it lands.",
+              retry: startGroup,
+            }
+          : {
+              tone: toneForError(error),
+              title: "We couldn't confirm that payment",
+              message: `${error} If you were charged, the payment is safe and the group will appear on its own once it reaches us.`,
+              retry: startGroup,
+            }
       );
       return;
     }
@@ -164,7 +186,13 @@ export default function FriendsScreen() {
     setBusy(false);
 
     if (created.error) {
-      setNotice(created.error);
+      setConfirming(false);
+      setNotice({
+        tone: toneForError(created.error),
+        title: "Your payment went through, but the group didn't open",
+        message: `${created.error} You have not lost anything — try again and your seats will be there.`,
+        retry: startGroup,
+      });
       return;
     }
 
@@ -237,6 +265,20 @@ export default function FriendsScreen() {
     <>
       <Screen bare>
         <ScreenHeader title="Friends" />
+
+        {/* Under the heading for the same reason as on the plans page: this is
+            the answer to something the student just did, and the rest of this
+            screen is long. */}
+        {notice ? (
+          <Notice
+            tone={notice.tone}
+            title={notice.title}
+            message={notice.message}
+            actionLabel={busy ? undefined : "Try again"}
+            onAction={notice.retry}
+            onDismiss={() => setNotice(null)}
+          />
+        ) : null}
 
         {owns ? (
           <>
@@ -433,17 +475,6 @@ export default function FriendsScreen() {
           }
         />
 
-        {/* Only where it is load-bearing: before paying. Once the plan is
-            running, a paragraph about card processors is furniture. */}
-        {notice ? (
-          <Text
-            className="font-jk text-[11.5px] leading-[17px]"
-            style={{ color: COLORS.danger }}
-          >
-            {notice}
-          </Text>
-        ) : null}
-
         {onPlan ? null : (
           <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
             Payment goes through Kora, which takes M-Pesa, Airtel Money and
@@ -527,7 +558,14 @@ export default function FriendsScreen() {
           // The seat is the server's to free — it is what the next person's
           // join request is checked against.
           const { error } = await removeMember(target.id);
-          if (error) setNotice(error);
+          if (error) {
+            setNotice({
+              tone: toneForError(error),
+              title: "That seat could not be freed",
+              message: `${error} They are still on the plan — try again in a moment.`,
+              retry: () => setRemoving(target),
+            });
+          }
         }}
       />
     </>

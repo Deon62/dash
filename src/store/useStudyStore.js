@@ -12,16 +12,30 @@ import { ALWAYS_SHOW_INTRO } from "@/lib/devFlags";
  *
  * The server at `EXPO_PUBLIC_API_URL` is the source of truth. What is written
  * here is a cache of it, so a student on a train still sees their notes, plus
- * an outbox: every row carries `updatedAt`, every deletion leaves a tombstone,
- * and `src/lib/sync.js` pushes whatever is newer than the last successful push
- * before pulling back what the server has.
+ * an outbox: a row the device writes is marked `dirty`, a deletion leaves a
+ * tombstone, and `src/lib/sync.js` pushes both before pulling back what the
+ * server has.
  *
  * Everything time-shaped is an ISO string rather than a Date, because a Date
  * does not survive the JSON round-trip persistence does.
  */
 
-/** Stamped on every row the device writes. The whole sync story is this field. */
+/** Stamped on every row the device writes. This is what resolves conflicts. */
 const stamp = () => new Date().toISOString();
+
+/**
+ * What every local write puts on a row.
+ *
+ * `dirty` is a flag rather than a timestamp comparison, and that is the whole
+ * point. Deciding "has the server got this yet" by testing `updatedAt` against
+ * the moment of the last push sounds equivalent and is not: phone clocks drift,
+ * and a row that arrived from another device carries *that* device's clock. One
+ * skewed clock and rows that synced days ago still read as unsent — permanently,
+ * because no later push can move past a timestamp already in the future.
+ *
+ * A flag that the push itself clears cannot be wrong about that.
+ */
+const touched = () => ({ updatedAt: stamp(), dirty: true });
 
 const EMPTY_PROFILE = {
   name: "",
@@ -69,14 +83,10 @@ const EMPTY_USAGE = {
  *
  * A deleted row cannot simply vanish: the server would still hold it, and the
  * next pull would put it straight back. The id and the moment it was deleted
- * are kept until a push has carried them across.
- */
-/**
- * A tombstone keeps the parent unit alongside the id.
- *
- * Not decoration: the server validates a deleted row against the same schema
- * as a live one and writes every field it is given, so a burial that arrived
- * with no `unit_id` would either be refused or point the row at nothing.
+ * are kept until a push has carried them across — along with the parent unit,
+ * because the server validates a burial against the same schema as a live row
+ * and one arriving without a `unit_id` would either be refused or point the
+ * row at nothing.
  */
 const EMPTY_TOMBSTONES = {
   units: [],
@@ -163,7 +173,7 @@ const BLANK = {
    * on the next one so a pull carries changes rather than the whole account.
    */
   syncCursor: null,
-  /** Device time of the last successful push. Rows newer than this are dirty. */
+  /** When the last push succeeded. Shown, not used to decide what to send. */
   pushedAt: null,
   tombstones: { ...EMPTY_TOMBSTONES },
   /** Whether a sync is in flight, so two cannot overlap and duplicate a push. */
@@ -270,16 +280,44 @@ export const useStudyStore = create(
       setSyncError: (syncError) => set({ syncError }),
 
       /**
-       * Marks everything pushed up to this moment.
+       * Clears the outbox for exactly what a push carried.
        *
-       * The timestamp is taken *before* the request rather than after, so an
-       * edit made while it was in flight stays dirty and goes next time.
+       * Matched on id *and* version, not wholesale. A note edited while the
+       * request was in flight is a different row from the one that went, and
+       * clearing it by id alone would drop that edit — the note would appear
+       * to save and then quietly un-save itself. Comparing `updatedAt` against
+       * the version that was actually sent leaves the newer one dirty, so it
+       * goes with the next push.
        */
-      markPushed: (pushedAt, cursor) =>
-        set({
-          pushedAt,
-          syncCursor: cursor ?? get().syncCursor,
-          tombstones: { ...EMPTY_TOMBSTONES },
+      markPushed: (sent) =>
+        set((state) => {
+          const clean = (rows, versions) =>
+            versions?.size
+              ? rows.map((row) =>
+                  versions.get(row.id) === row.updatedAt
+                    ? { ...row, dirty: false }
+                    : row,
+                )
+              : rows;
+
+          const buried = (rows, ids) =>
+            ids?.size ? rows.filter((row) => !ids.has(row.id)) : rows;
+
+          return {
+            pushedAt: stamp(),
+            units: clean(state.units, sent.units),
+            sessions: clean(state.sessions, sent.sessions),
+            materials: clean(state.materials, sent.materials),
+            events: clean(state.events, sent.events),
+            chats: clean(state.chats, sent.chats),
+            tombstones: {
+              units: buried(state.tombstones.units, sent.graves?.units),
+              sessions: buried(state.tombstones.sessions, sent.graves?.sessions),
+              materials: buried(state.tombstones.materials, sent.graves?.materials),
+              events: buried(state.tombstones.events, sent.graves?.events),
+              chats: buried(state.tombstones.chats, sent.graves?.chats),
+            },
+          };
         }),
 
       setCursor: (syncCursor) => set({ syncCursor }),
@@ -405,7 +443,7 @@ export const useStudyStore = create(
             ...state.profile,
             ...patch,
             initials: initialsFrom(patch.name ?? state.profile.name),
-            updatedAt: stamp(),
+            ...touched(),
           },
         })),
 
@@ -418,7 +456,7 @@ export const useStudyStore = create(
           title: title.trim(),
           lecturer: lecturer.trim(),
           createdAt: stamp(),
-          updatedAt: stamp(),
+          ...touched(),
         };
 
         set((state) => ({ units: [...state.units, unit] }));
@@ -428,7 +466,7 @@ export const useStudyStore = create(
       updateUnit: (id, patch) =>
         set((state) => ({
           units: state.units.map((unit) =>
-            unit.id === id ? { ...unit, ...patch, updatedAt: stamp() } : unit
+            unit.id === id ? { ...unit, ...patch, ...touched() } : unit
           ),
         })),
 
@@ -468,7 +506,7 @@ export const useStudyStore = create(
       /** `{ unitId, day: 0-6, start: "08:00", end: "10:00", room }` */
       addSession: (entry) =>
         set((state) => ({
-          sessions: [...state.sessions, { id: newId(), ...entry, updatedAt: stamp() }],
+          sessions: [...state.sessions, { id: newId(), ...entry, ...touched() }],
         })),
 
       removeSession: (id) =>
@@ -503,7 +541,7 @@ export const useStudyStore = create(
           uri,
           archived: false,
           addedAt: stamp(),
-          updatedAt: stamp(),
+          ...touched(),
           /**
            * Where an attached file has got to: `queued` before the bytes have
            * been sent, `uploading` while they are going, `pending` once they
@@ -527,7 +565,7 @@ export const useStudyStore = create(
         set((state) => ({
           materials: state.materials.map((material) =>
             material.id === id
-              ? { ...material, archived, updatedAt: stamp() }
+              ? { ...material, archived, ...touched() }
               : material
           ),
         })),
@@ -537,7 +575,7 @@ export const useStudyStore = create(
         set((state) => ({
           materials: state.materials.map((material) =>
             material.id === id
-              ? { ...material, ...patch, updatedAt: stamp() }
+              ? { ...material, ...patch, ...touched() }
               : material
           ),
         })),
@@ -577,7 +615,7 @@ export const useStudyStore = create(
           label: kind === "other" ? label.trim() : "",
           done: false,
           createdAt: stamp(),
-          updatedAt: stamp(),
+          ...touched(),
         };
 
         set((state) => ({ events: [...state.events, event] }));
@@ -588,7 +626,7 @@ export const useStudyStore = create(
         set((state) => ({
           events: state.events.map((event) =>
             event.id === id
-              ? { ...event, done: !event.done, updatedAt: stamp() }
+              ? { ...event, done: !event.done, ...touched() }
               : event
           ),
         })),
@@ -625,7 +663,7 @@ export const useStudyStore = create(
           mode: "ask",
           messages: [],
           createdAt: stamp(),
-          updatedAt: stamp(),
+          ...touched(),
         };
 
         set((state) => ({ chats: [chat, ...state.chats], activeChatId: chat.id }));
@@ -637,7 +675,7 @@ export const useStudyStore = create(
       setChatUnit: (id, unitId) =>
         set((state) => ({
           chats: state.chats.map((chat) =>
-            chat.id === id ? { ...chat, unitId, updatedAt: stamp() } : chat
+            chat.id === id ? { ...chat, unitId, ...touched() } : chat
           ),
         })),
 
@@ -655,7 +693,7 @@ export const useStudyStore = create(
             return {
               ...chat,
               messages,
-              updatedAt: stamp(),
+              ...touched(),
               // The first thing asked names the conversation. A student
               // scanning the drawer recognises their own question long before
               // they recognise a date.
@@ -719,7 +757,7 @@ export const useStudyStore = create(
     {
       name: "study-brain-v1",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 3,
+      version: 4,
       /**
        * Renames and reshapes carried forward, so nobody loses a timetable to
        * vocabulary or a semester of notes to a schema change.
@@ -782,6 +820,32 @@ export const useStudyStore = create(
             tokenExpiresAt: null,
             subscription: null,
             serverUsage: null,
+          };
+        }
+
+        if (version < 4) {
+          // Before v4 an unsent row was inferred by comparing `updatedAt`
+          // against the last push, which a drifting phone clock could make
+          // permanently wrong. Everything is marked unsent once here: the
+          // server upserts on ids the device chose, so re-sending a row it
+          // already has costs one request and changes nothing.
+          // `updatedAt` is also guaranteed here. It is the version a push is
+          // acknowledged by, so a row missing one could never be marked clean
+          // and would be re-sent for ever.
+          const soil = (rows) =>
+            (rows ?? []).map((row) => ({
+              ...row,
+              updatedAt: row.updatedAt ?? row.createdAt ?? row.addedAt ?? stamp(),
+              dirty: true,
+            }));
+
+          state = {
+            ...state,
+            units: soil(state.units),
+            sessions: soil(state.sessions),
+            materials: soil(state.materials),
+            events: soil(state.events),
+            chats: soil(state.chats),
           };
         }
 

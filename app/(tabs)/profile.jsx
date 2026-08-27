@@ -30,8 +30,6 @@ export default function ProfileScreen() {
   const units = useStudyStore((state) => state.units);
   const sessions = useStudyStore((state) => state.sessions);
   const subscription = useStudyStore((state) => state.subscription);
-  const syncing = useStudyStore((state) => state.syncing);
-  const syncError = useStudyStore((state) => state.syncError);
 
   const enrolment = [profile.program, profile.institution].filter(Boolean).join(" · ");
   const term = [
@@ -107,16 +105,11 @@ export default function ProfileScreen() {
         />
       </View>
 
-      {/* Whether the account is level with this phone. Silent when it is —
-          "saved" on every screen is noise, and the only state worth a line is
-          the one a student might act on. */}
-      <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-4">
-        {syncing
-          ? "Saving to your account…"
-          : syncError
-            ? `${syncError} Your work is safe here and will go up when you are back online.`
-            : "Your coursework is saved to your account and follows you to any phone you sign in on."}
-      </Text>
+      {/* Nothing about syncing here. It is a background condition, not
+          something this page is about, and a card wedged under the links was
+          in the way on every visit for the sake of a state that is almost
+          never true. It lives in Notifications now, with everything else the
+          app has to say for itself. */}
 
       {/* Logging out clears this handset — the coursework is on the account,
           not here — so it is worth confirming rather than doing on a mis-tap

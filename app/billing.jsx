@@ -7,6 +7,7 @@ import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import Button from "@/components/Button";
 import Sheet from "@/components/Sheet";
+import Notice, { toneForError } from "@/components/Notice";
 import { useStudyStore } from "@/store/useStudyStore";
 import {
   PLAN_CARDS,
@@ -44,6 +45,14 @@ export default function BillingScreen() {
   const [confirming, setConfirming] = useState(null);
   /** The reference the server gave us, so the sheet can verify rather than ask. */
   const [reference, setReference] = useState(null);
+  /**
+   * `{ tone, title, message, retry }`, or null.
+   *
+   * A shape rather than a bare string because these are not all the same kind
+   * of event: a payment still clearing is not a failure, and telling somebody
+   * their money has vanished when it is thirty seconds from landing is the
+   * worst thing this screen can do.
+   */
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
   /** Prices as the server has them, keyed by tier. Empty until they land. */
@@ -52,6 +61,14 @@ export default function BillingScreen() {
   const tier = activeTier(subscription);
   const left = daysRemaining(subscription);
   const expired = isExpired(subscription);
+
+  // A payment that was still clearing usually lands while this screen is open,
+  // through the webhook rather than through anything the student did. When it
+  // does, the plan changes underneath — and the card explaining that we could
+  // not confirm it yet is now describing something that already happened.
+  useEffect(() => {
+    setNotice(null);
+  }, [subscription?.tier, subscription?.verified]);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,7 +104,12 @@ export default function BillingScreen() {
     setBusy(false);
 
     if (error) {
-      setNotice(error);
+      setNotice({
+        tone: toneForError(error),
+        title: "We couldn't open the payment page",
+        message: `${error} Nothing has been charged.`,
+        retry: () => checkout(card),
+      });
       return;
     }
 
@@ -104,23 +126,37 @@ export default function BillingScreen() {
    * outcome, not a failure: mobile money takes a minute and the webhook will
    * credit the plan when it lands.
    */
-  const unlock = async () => {
-    const card = confirming;
-
+  const unlock = async (card = confirming) => {
     setBusy(true);
     const { error, pending } = await confirmCheckout(reference);
     setBusy(false);
 
     if (error) {
+      // The sheet closes either way. Leaving it open over the answer means the
+      // student has to dismiss a question in order to read the reply to it.
+      setConfirming(null);
+
       setNotice(
         pending
-          ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
-          : error
+          ? {
+              tone: "waiting",
+              title: "Your payment is still clearing",
+              message:
+                "Mobile money can take a minute or two to confirm. Nothing has gone wrong — check again shortly and your plan unlocks as soon as it lands.",
+              retry: () => unlock(card),
+            }
+          : {
+              tone: toneForError(error),
+              title: "We couldn't confirm that payment",
+              message: `${error} If you were charged, the payment is safe and your plan will unlock on its own once it reaches us.`,
+              retry: () => unlock(card),
+            }
       );
       return;
     }
 
     notify("success");
+    setNotice(null);
     setConfirming(null);
     setReference(null);
 
@@ -134,6 +170,25 @@ export default function BillingScreen() {
     <>
       <Screen bare>
         <ScreenHeader title="Plans" />
+
+        {/* Directly under the heading, not at the foot of three tall cards.
+            This is the reply to a question the student just asked — "did my
+            payment go through" — and an answer they have to scroll past the
+            whole shop to find is one they will not find at all.
+
+            It stays on this screen rather than moving to Notifications with
+            the app's other status: those are conditions you may or may not
+            look at, this is the response to a button pressed a second ago. */}
+        {notice ? (
+          <Notice
+            tone={notice.tone}
+            title={notice.title}
+            message={notice.message}
+            actionLabel={busy ? undefined : "Check again"}
+            onAction={notice.retry}
+            onDismiss={() => setNotice(null)}
+          />
+        ) : null}
 
         {PLAN_CARDS.map((card) => {
           // The server's price where it has arrived, the shipped one until
@@ -263,12 +318,6 @@ export default function BillingScreen() {
           );
         })}
 
-        {notice ? (
-          <Text className="font-jk text-[11.5px] leading-[17px]" style={{ color: COLORS.danger }}>
-            {notice}
-          </Text>
-        ) : null}
-
         <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
           {expired
             ? "Your plan has ended — the free limits apply until you renew. "
@@ -295,7 +344,7 @@ export default function BillingScreen() {
             label={confirming ? `Check my ${confirming.name} payment` : "Check"}
             busyLabel="Checking…"
             busy={busy}
-            onPress={unlock}
+            onPress={() => unlock()}
             disabled={busy}
           />
           <Pressable

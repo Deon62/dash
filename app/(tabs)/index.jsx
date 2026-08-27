@@ -13,6 +13,7 @@ import SessionRow from "@/components/SessionRow";
 import EventComposer from "@/components/EventComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
+import { hasSystemAlerts } from "@/lib/systemAlerts";
 import { dayKey, greeting, minutesOf } from "@/lib/dates";
 
 /**
@@ -51,6 +52,11 @@ export default function HomeScreen() {
     [sessions, today]
   );
 
+  // Anything the app itself needs to say: a sync that has not got through, a
+  // file that has not uploaded, a payment still clearing. See
+  // `src/lib/systemAlerts.js` — it is the same list the bell opens onto.
+  const systemPending = useStudyStore(hasSystemAlerts);
+
   // The bell marks anything already due — the one thing a dot on a past date
   // cannot say on its own, since the calendar shows the month, not the clock.
   const overdue = useMemo(() => {
@@ -86,7 +92,9 @@ export default function HomeScreen() {
               Icon={Bell}
               label="Notifications"
               onPress={() => router.push("/notifications")}
-              badge={overdue}
+              // Anything the app itself needs to say counts as well, or a
+              // stalled sync would sit in a screen nothing points at.
+              badge={overdue || systemPending}
             />
           </View>
         </View>

@@ -175,8 +175,11 @@ export default function KnowledgeScreen() {
           either way, but until the file lands the tutor cannot read it. */}
       <ConfirmDialog
         visible={Boolean(notice)}
-        title="That file did not upload"
-        message={notice}
+        title="We couldn't upload that file"
+        // The item is filed either way, so the first thing to say is that
+        // nothing was lost. The retry is automatic, which is worth saying too
+        // — otherwise the only obvious move is to add the same file again.
+        message={`${notice} It is still saved under your unit, and we will try again on its own next time you are online.`}
         confirmLabel="OK"
         onConfirm={() => setNotice(null)}
         onDismiss={() => setNotice(null)}

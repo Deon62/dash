@@ -5,6 +5,7 @@ import { useRouter } from "expo-router";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import Button from "@/components/Button";
+import Notice, { toneForError } from "@/components/Notice";
 import { joinGroup } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
 import { notify } from "@/lib/haptics";
@@ -107,12 +108,16 @@ export default function JoinScreen() {
       />
 
       {error ? (
-        <Text
-          className="font-jk text-[12px] leading-[17px]"
-          style={{ color: COLORS.danger }}
-        >
-          {error}
-        </Text>
+        <Notice
+          tone={toneForError(error)}
+          // A code that does not work is the one failure here that might be
+          // the student's typing — so it says what to check without ever
+          // saying they got it wrong. Most of the time it is a plan that has
+          // lapsed or a seat somebody else took first.
+          title="That code didn't get you in"
+          message={`${error} Check it against the one your friend sent, or ask them whether the plan is still running.`}
+          onDismiss={() => setError("")}
+        />
       ) : null}
 
       <Button

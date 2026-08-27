@@ -15,6 +15,7 @@ import {
 import Sheet from "@/components/Sheet";
 import LimitSheet from "@/components/LimitSheet";
 import ConfirmDialog from "@/components/ConfirmDialog";
+import Notice, { toneForError } from "@/components/Notice";
 import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
@@ -571,8 +572,10 @@ export default function StudyScreen() {
 
       <ConfirmDialog
         visible={Boolean(failure)}
-        title="That did not go through"
-        message={failure}
+        title="We couldn't answer that one"
+        // Their question is still in the thread above, so "ask again" means
+        // tapping send on what is already typed rather than retyping it.
+        message={`${failure} Your question is still here — try sending it again in a moment.`}
         confirmLabel="OK"
         onConfirm={() => setFailure(null)}
         onDismiss={() => setFailure(null)}
@@ -686,15 +689,28 @@ function QuizPane({ unit, tier, usage, onStart, onBlocked }) {
   // Nothing is fetched on mount: a quiz costs a request and counts against a
   // weekly allowance, so it starts when the student asks for one.
   if (questions.length === 0) {
+    // A failed first attempt gets the card rather than being folded into the
+    // empty state's own copy. "Ready when you are" sitting above the reason it
+    // was not ready reads as the app not having noticed.
+    if (error && !loading) {
+      return (
+        <View className="flex-1 justify-center px-5">
+          <Notice
+            tone={toneForError(error)}
+            message={error}
+            actionLabel="Try again"
+            onAction={newSet}
+          />
+        </View>
+      );
+    }
+
     return (
       <View className="flex-1 justify-center px-5">
         <EmptyState
           Icon={MessageSquare}
           title={loading ? "Building your quiz…" : "Ready when you are"}
-          message={
-            error ||
-            `Questions are written from what you have filed${unit ? ` under ${unit.code}` : ""}. Start a set and they appear here.`
-          }
+          message={`Questions are written from what you have filed${unit ? ` under ${unit.code}` : ""}. Start a set and they appear here.`}
           action={
             loading ? null : (
               <Pressable
@@ -793,9 +809,13 @@ function QuizPane({ unit, tier, usage, onStart, onBlocked }) {
       ) : null}
 
       {error ? (
-        <Text className="font-jk text-[12px] leading-[17px]" style={{ color: COLORS.danger }}>
-          {error}
-        </Text>
+        <Notice
+          tone={toneForError(error)}
+          message={error}
+          actionLabel={loading ? undefined : "Try again"}
+          onAction={newSet}
+          onDismiss={() => setError("")}
+        />
       ) : null}
 
       <View className="flex-row gap-x-2.5">

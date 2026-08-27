@@ -20,7 +20,15 @@ import { sync } from "@/lib/sync";
  * file: a note is filed the moment it is typed, and its row goes up with the
  * next sync whether or not there is a connection right now.
  */
-export async function fileMaterial({ unitId, title, body = "", kind = "note", uri = null, filename, mimeType, size }) {
+export async function fileMaterial({
+  unitId,
+  title,
+  body = "",
+  kind = "note",
+  uri = null,
+  filename,
+  mimeType,
+}) {
   const material = useStudyStore.getState().addMaterial({
     unitId,
     title,
@@ -30,17 +38,15 @@ export async function fileMaterial({ unitId, title, body = "", kind = "note", ur
   });
 
   // Carried on the row rather than passed around: a retry after a failed
-  // upload happens long after this call returned, and it needs them too.
+  // upload happens long after this call returned, and it needs them too. The
+  // size is deliberately not among them — it is measured from the file itself
+  // at upload time, because the picker's own figure is often missing.
   if (uri) {
-    useStudyStore.getState().updateMaterial(material.id, {
-      filename,
-      mimeType,
-      byteSize: size,
-    });
+    useStudyStore.getState().updateMaterial(material.id, { filename, mimeType });
   }
 
   const upload = uri
-    ? await uploadMaterial({ ...material, filename, mimeType, byteSize: size })
+    ? await uploadMaterial({ ...material, filename, mimeType })
     : { error: null };
 
   // Unawaited: the item is on screen and the student is done with this sheet.

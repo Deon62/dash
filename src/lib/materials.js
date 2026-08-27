@@ -18,13 +18,21 @@ import { useStudyStore } from "@/store/useStudyStore";
  * they added immediately and the upload catches up. `uploadStatus` on the row
  * is what the screens read to say where it has got to.
  *
- * The bytes go up as `multipart/form-data` holding a `{ uri, name, type }`
- * descriptor. That is deliberate and it is the only shape that works here:
- * React Native's networking layer streams the file off disk itself when it
- * sees one, so a 50MB PDF never passes through JavaScript — and, unlike every
- * other approach, it needs no filesystem module at all. Supabase Storage takes
- * the first file part whatever it is named, which is why the field name is the
- * empty string that its own client library uses.
+ * The bytes are read off disk with `fetch("file://…")`, which React Native
+ * answers from its own networking layer, and PUT to the signed URL as a raw
+ * body with the file's content type. That is the shape Supabase Storage
+ * documents for a direct upload, and it is chosen over a `multipart/form-data`
+ * descriptor deliberately: multipart would stream from disk without holding
+ * the file in memory, but React Native has a long history of producing
+ * zero-byte multipart uploads against this exact endpoint, and a file that
+ * uploads "successfully" as nothing is far worse than one that costs some
+ * memory. The plan caps a single file at 50MB, which a phone can hold.
+ *
+ * Reading it first also settles the size question. `expo-image-picker` does
+ * not always report `fileSize` — it is routinely undefined on Android — and
+ * the server needs a real byte count to check the plan's file limit before it
+ * will sign anything. Measuring the blob is the only way to know rather than
+ * guess.
  */
 
 /** What the picker reports, mapped to what the server files it as. */
@@ -43,6 +51,32 @@ const MIME = {
 const UPLOAD_TIMEOUT_MS = 180000;
 
 /**
+ * Reads a picked file into memory and measures it.
+ *
+ * Resolves to `{ blob, error }`. The URI comes from the system picker and
+ * points at a file the app has already been granted, but it can still be gone
+ * by the time an upload is retried — a cache the OS cleared, a photo deleted —
+ * so this is allowed to fail and say so plainly.
+ */
+async function readFile(uri) {
+  try {
+    const response = await fetch(uri);
+    const blob = await response.blob();
+
+    if (!blob?.size) {
+      return { blob: null, error: "That file is empty or could not be read." };
+    }
+
+    return { blob, error: null };
+  } catch {
+    return {
+      blob: null,
+      error: "That file is no longer on this phone, so it could not be sent.",
+    };
+  }
+}
+
+/**
  * Uploads one already-filed material's attachment.
  *
  * Returns `{ error }`. The row is marked `pending` or `failed` either way, so
@@ -59,16 +93,18 @@ export async function uploadMaterial(material) {
     return { error };
   };
 
-  // Measured by the picker when the file was chosen, not read back off disk.
-  // The server needs a real number — it checks the plan's file-size limit
-  // before signing anything — and a zero would be refused as malformed.
-  const byteSize = material.byteSize ?? 0;
-  if (!byteSize) {
-    return fail("That file's size could not be read, so it was not uploaded.");
-  }
-
   const mimeType = material.mimeType ?? MIME[material.kind] ?? "application/octet-stream";
   const filename = material.filename ?? material.title;
+
+  updateMaterial(material.id, { uploadStatus: "uploading" });
+
+  // Read before asking for a URL. The size the server checks the plan against
+  // has to be the real one, and the picker's own figure is missing often
+  // enough that trusting it means refusing uploads that were always fine.
+  const { blob, error: unreadable } = await readFile(material.uri);
+  if (unreadable) return fail(unreadable);
+
+  const byteSize = blob.size;
 
   const signed = await authed((token) =>
     materialsApi.uploadUrl(
@@ -89,13 +125,6 @@ export async function uploadMaterial(material) {
   // already uploaded and has already cost the student their data.
   if (signed.error) return fail(signed.error);
 
-  updateMaterial(material.id, { uploadStatus: "uploading" });
-
-  const body = new FormData();
-  // Supabase's own client sends the file under an empty field name, and the
-  // storage service takes the first file part regardless of what it is called.
-  body.append("", { uri: material.uri, name: filename, type: mimeType });
-
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), UPLOAD_TIMEOUT_MS);
 
@@ -103,15 +132,18 @@ export async function uploadMaterial(material) {
     const response = await fetch(signed.data.upload_url, {
       method: "PUT",
       signal: controller.signal,
-      // No Content-Type header: it has to carry the multipart boundary, and
-      // only whoever serialises the body knows what that is. Setting it by
-      // hand here produces a boundary that does not match the body and an
-      // upload the server cannot parse.
-      body,
+      headers: {
+        "Content-Type": mimeType,
+        // Storage rejects an overwrite by default, and a retry of an upload
+        // that half-landed is exactly when that happens. The material id is
+        // the object path, so replacing it is always the right answer.
+        "x-upsert": "true",
+      },
+      body: blob,
     });
 
     if (!response.ok) {
-      return fail(`The upload did not complete (${response.status}).`);
+      return fail(`The file could not be stored (${response.status}).`);
     }
   } catch (error) {
     return fail(

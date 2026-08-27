@@ -26,10 +26,37 @@ import { useStudyStore } from "@/store/useStudyStore";
  * revising for an exam which version of their own note they meant.
  */
 
-/** Rows the server has not seen: anything edited since the last good push. */
-function dirty(rows, pushedAt) {
-  if (!pushedAt) return rows;
-  return rows.filter((row) => !row.updatedAt || row.updatedAt > pushedAt);
+/** The tables a push carries, in the order the payload names them. */
+const TABLES = ["units", "sessions", "materials", "events", "chats"];
+
+/**
+ * Whether this device is holding work the server has not got.
+ *
+ * The question a screen actually wants to ask. A sync that failed an hour ago
+ * is only worth telling someone about if something is still stranded by it —
+ * a failure with nothing left to send is history, and a card about it is a
+ * warning with no subject.
+ */
+export function hasPendingChanges(state) {
+  const tombstones = state.tombstones ?? {};
+
+  return (
+    TABLES.some((table) => (tombstones[table] ?? []).length > 0) ||
+    TABLES.some((table) => dirty(state[table]).length > 0)
+  );
+}
+
+/**
+ * Rows the device has written and the server has not acknowledged.
+ *
+ * `updatedAt` is required as well as `dirty`: it is the version the push is
+ * acknowledged by, and a row without one could never be marked clean, so it
+ * would be re-sent on every sync for the life of the install. The store
+ * guarantees one on every write and on migration; this is the belt to that
+ * bracer.
+ */
+function dirty(rows) {
+  return (rows ?? []).filter((row) => row.dirty && row.updatedAt);
 }
 
 /** A tombstone, in the shape every table's rows take. */
@@ -44,7 +71,7 @@ const toUnit = (unit) => ({
   code: unit.code,
   title: unit.title,
   lecturer: unit.lecturer ?? "",
-  updated_at: unit.updatedAt ?? unit.createdAt,
+  updated_at: unit.updatedAt,
 });
 
 const toSession = (entry) => ({
@@ -66,7 +93,7 @@ const toMaterial = (material) => ({
   title: material.title,
   body: material.body ?? "",
   archived: Boolean(material.archived),
-  updated_at: material.updatedAt ?? material.addedAt,
+  updated_at: material.updatedAt,
 });
 
 const toEvent = (event) => ({
@@ -77,14 +104,14 @@ const toEvent = (event) => ({
   label: event.label ?? "",
   due_at: event.at ?? null,
   done: Boolean(event.done),
-  updated_at: event.updatedAt ?? event.createdAt,
+  updated_at: event.updatedAt,
 });
 
 const toChat = (chat) => ({
   id: chat.id,
   unit_id: chat.unitId ?? null,
   title: chat.title ?? "New chat",
-  updated_at: chat.updatedAt ?? chat.createdAt,
+  updated_at: chat.updatedAt,
   messages: (chat.messages ?? []).map((message) => ({
     id: message.id,
     role: message.role,
@@ -214,6 +241,7 @@ export async function sync({ force = false } = {}) {
   const state = useStudyStore.getState();
 
   if (!state.isAuthenticated) return { error: null };
+
   // One at a time. Two overlapping syncs would push the same rows twice and
   // race each other's cursor, which is how a cursor ends up ahead of the data.
   if (state.syncing && !force) return { error: null };
@@ -222,9 +250,6 @@ export async function sync({ force = false } = {}) {
   store.setSyncing(true);
 
   try {
-    // Taken before the request, not after: an edit made while the push is in
-    // flight has to stay dirty and go next time.
-    const startedAt = new Date().toISOString();
     const push = await pushChanges(state);
 
     if (push.error) {
@@ -232,11 +257,11 @@ export async function sync({ force = false } = {}) {
       return { error: push.error };
     }
 
-    // Only the push clock moves here. The pull cursor deliberately stays where
-    // it was: the cursor a push returns is the server's "now", and pulling from
-    // it would skip everything another device wrote between the last pull and
-    // this moment.
-    store.markPushed(startedAt);
+    // Cleared by id, so an edit made while the request was in flight survives
+    // and goes next time. The pull cursor deliberately does not move here: the
+    // cursor a push returns is the server's "now", and pulling from it would
+    // skip everything another device wrote since the last pull.
+    if (push.sent) store.markPushed(push.sent);
 
     const pull = await pullChanges(useStudyStore.getState().syncCursor);
 
@@ -253,23 +278,15 @@ export async function sync({ force = false } = {}) {
 }
 
 async function pushChanges(state) {
-  const { pushedAt, tombstones } = state;
-
-  // A tombstone for a row filed under a unit needs that unit's id. The server
-  // validates a burial against the same schema as a live row and writes every
-  // field it is given, so one that arrived without it would either be refused
-  // or point the row at a unit that does not exist. Anything missing it was
-  // never on the server to begin with — a row created and deleted between two
-  // syncs — so dropping it loses nothing.
-  const filed = (entries) => entries.filter((entry) => entry.unitId);
+  const { tombstones } = state;
 
   const payload = {
     units: [
-      ...dirty(state.units, pushedAt).map(toUnit),
+      ...dirty(state.units).map(toUnit),
       ...tombstones.units.map((entry) => grave({ code: "", title: "" }, entry)),
     ],
     class_sessions: [
-      ...dirty(state.sessions, pushedAt).map(toSession),
+      ...dirty(state.sessions).map(toSession),
       ...filed(tombstones.sessions).map((entry) =>
         grave(
           {
@@ -283,13 +300,13 @@ async function pushChanges(state) {
       ),
     ],
     materials: [
-      ...dirty(state.materials, pushedAt).map(toMaterial),
+      ...dirty(state.materials).map(toMaterial),
       ...filed(tombstones.materials).map((entry) =>
         grave({ unit_id: entry.unitId, title: "" }, entry),
       ),
     ],
     events: [
-      ...dirty(state.events, pushedAt).map(toEvent),
+      ...dirty(state.events).map(toEvent),
       // An event needs no unit — not everything a student has to turn up for
       // belongs to one — so its tombstone is never dropped.
       ...tombstones.events.map((entry) =>
@@ -297,17 +314,57 @@ async function pushChanges(state) {
       ),
     ],
     chats: [
-      ...dirty(state.chats, pushedAt).map(toChat),
+      ...dirty(state.chats).map(toChat),
       ...tombstones.chats.map((entry) => grave({}, entry)),
     ],
   };
 
   const nothingToSay = Object.values(payload).every((rows) => rows.length === 0);
-  if (nothingToSay) return { error: null };
+  if (nothingToSay) return { error: null, sent: null };
 
   const { error } = await authed((token) => coursework.push(payload, token));
-  return { error };
+  if (error) return { error, sent: null };
+
+  // Exactly what went, so the store clears exactly that and nothing written
+  // since. The version matters as much as the id: a note edited while the
+  // request was in flight is a *different* row from the one that was sent, and
+  // clearing it by id alone would drop that edit on the floor — the note would
+  // appear to save and then quietly un-save itself.
+  const versions = (rows) => new Map(rows.map((row) => [row.id, row.updated_at]));
+  const ids = (rows) => new Set(rows.map((row) => row.id));
+
+  return {
+    error: null,
+    sent: {
+      units: versions(payload.units),
+      sessions: versions(payload.class_sessions),
+      materials: versions(payload.materials),
+      events: versions(payload.events),
+      chats: versions(payload.chats),
+      // Every tombstone clears, including the ones `filed` held back. Those
+      // can never be sent — the server never had the row — so keeping them
+      // would leave the outbox permanently non-empty and every screen that
+      // asks "is anything waiting" permanently wrong.
+      graves: {
+        units: ids(tombstones.units),
+        sessions: ids(tombstones.sessions),
+        materials: ids(tombstones.materials),
+        events: ids(tombstones.events),
+        chats: ids(tombstones.chats),
+      },
+    },
+  };
 }
+
+/**
+ * Tombstones the push could actually carry.
+ *
+ * One for a row filed under a unit needs that unit's id — the server validates
+ * a burial against the same schema as a live row. Anything missing it was
+ * created and deleted between two syncs, so the server never had it and there
+ * is nothing to bury.
+ */
+const filed = (entries) => entries.filter((entry) => entry.unitId);
 
 async function pullChanges(since) {
   let cursor = since;
