@@ -43,6 +43,11 @@ const UNAVAILABLE = {
  *
  * `useIdTokenAuthRequest` rather than the plain auth request: the server wants
  * an ID token, not an access token, and this is what makes Google issue one.
+ *
+ * All three client ids go in and the library picks by platform. The one it
+ * picks becomes the token's audience, which is what the server checks against
+ * its own allow-list — so on Android that is the *Android* client id, not the
+ * web one, and the server has to know about it.
  */
 export function useGoogleSignIn({ onSignedIn } = {}) {
   // Conditional, and safe: `Google` is decided once when this module is first

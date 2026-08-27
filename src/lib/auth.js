@@ -1,3 +1,6 @@
+import { Platform } from "react-native";
+import Constants, { ExecutionEnvironment } from "expo-constants";
+
 import { account } from "@/api/endpoints";
 import { useStudyStore } from "@/store/useStudyStore";
 import { DEVICE, deviceId } from "@/lib/session";
@@ -19,20 +22,47 @@ const CODE_LENGTH = 6;
 /**
  * Google's OAuth client ids, from the build's environment.
  *
- * Absent means the button is not shown at all — see `googleConfigured`. A
- * consent screen that cannot complete is worse than an option that was never
- * offered, and it is also what the server does: with no `GOOGLE_CLIENT_IDS`
- * configured, `/auth/google` refuses every token it is handed.
+ * Three of them, and which one is used is decided by the platform, not by us:
+ * a native build authenticates with its own client, and the ID token it gets
+ * back carries *that* client id as its audience. This matters on the server
+ * side — `GOOGLE_CLIENT_IDS` there is an allow-list of audiences, and it has
+ * to contain whichever client this build actually used or every sign-in comes
+ * back "issued for another app".
  */
 export const GOOGLE_CLIENT_IDS = {
-  // The web client id is the audience the server checks, so it is required
-  // even on a phone: the native clients are issued tokens *for* it.
   webClientId: process.env.EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID || undefined,
   iosClientId: process.env.EXPO_PUBLIC_GOOGLE_IOS_CLIENT_ID || undefined,
   androidClientId: process.env.EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID || undefined,
 };
 
-export const googleConfigured = Boolean(GOOGLE_CLIENT_IDS.webClientId);
+/** The one this platform will actually authenticate with. */
+const platformClientId =
+  Platform.select({
+    android: GOOGLE_CLIENT_IDS.androidClientId,
+    ios: GOOGLE_CLIENT_IDS.iosClientId,
+    default: GOOGLE_CLIENT_IDS.webClientId,
+  }) ?? GOOGLE_CLIENT_IDS.webClientId;
+
+/**
+ * Expo Go cannot complete a Google sign-in, whatever is configured.
+ *
+ * Its redirect is an `exp://` URL on a development host, and Google accepts
+ * neither that nor anything but a registered package-and-fingerprint pair for
+ * a native client. The hosted proxy that used to bridge the two was removed
+ * after SDK 48. So the button is hidden there rather than offered and broken —
+ * it appears in a development build, an APK and an AAB, which is where it can
+ * actually work.
+ */
+const inExpoGo =
+  Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
+
+/**
+ * Absent means the button is not shown at all. A consent screen that cannot
+ * complete is worse than an option that was never offered, and it is also what
+ * the server does: with no `GOOGLE_CLIENT_IDS` configured, `/auth/google`
+ * refuses every token it is handed.
+ */
+export const googleConfigured = Boolean(platformClientId) && !inExpoGo;
 
 /** Texts a code. `phone` is full E.164, e.g. +254712345678. */
 export async function sendPhoneOtp(phone) {
