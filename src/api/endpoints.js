@@ -17,7 +17,7 @@ const v1 = (path) => `${API_V1}${path}`;
 // --- Account ---------------------------------------------------------------
 
 export const account = {
-  /** Sends a real OTP. Replaces the local stub in `src/lib/auth.js`. */
+  /** Texts a six-digit code. The response never says whether an account exists. */
   requestOtp: (phone) => api.post(v1("/auth/otp"), { phone }),
 
   /**
@@ -122,7 +122,7 @@ export const materials = {
 
 export const billing = {
   /**
-   * The plans, from the server.
+   * The plans, from the server. Public — no token, nothing to authorise.
    *
    * `src/theme/plans.js` ships its own copy so the app can refuse before
    * making a request; this is what lets a price change reach a phone without
@@ -182,27 +182,33 @@ export const billing = {
 // --- The tutor -------------------------------------------------------------
 
 /**
- * Not served yet.
+ * Retrieval happens on the server, not here.
  *
- * Kept because it is the contract the backend is being built against, but
- * nothing here will answer until the extraction pipeline exists — an answer
- * that cites a page needs the page to have been read first. Calling these
- * today returns a 404 through the normal `{ data, error }` shape.
+ * That is the point: deciding "your notes do not cover this" is only
+ * trustworthy if the side holding all the material did the looking. The device
+ * sends a question and a unit; the server ranks the student's own passages,
+ * generates against them, and says which sources it used.
+ *
+ * `ask` is missing from this list on purpose — it streams server-sent events
+ * rather than returning JSON, so it lives in `src/lib/tutor.js` where the
+ * stream can be read frame by frame.
  */
 export const tutor = {
-  /**
-   * Asks a model, grounded in the student's own material.
-   *
-   * `passages` is what `src/lib/tutor.js` already produces — the retrieval
-   * half is done on the device, so the server only has to generate. Sending
-   * the ranked passages rather than the whole corpus is also what keeps a
-   * request small enough to answer on a phone connection.
-   */
-  ask: ({ question, passages, unitCode }, token) =>
-    api.post(v1("/tutor/ask"), { question, passages, unit_code: unitCode }, { token }),
+  /** The model line-up, including the ones not switched on yet. */
+  models: (token) => api.get(v1("/tutor/models"), { token }),
 
-  quiz: ({ passages, count }, token) =>
-    api.post(v1("/tutor/quiz"), { passages, count }, { token }),
+  /**
+   * A multiple-choice quiz over one unit or one topic.
+   *
+   * Not streamed, unlike an answer: a quiz renders as cards and there is
+   * nothing to show until the last question has been parsed and validated.
+   */
+  quiz: ({ topic, unitCode, count, model }, token) =>
+    api.post(
+      v1("/tutor/quiz"),
+      { topic, unit_code: unitCode, count, model },
+      { token },
+    ),
 };
 
 export { isBackendConfigured };

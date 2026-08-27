@@ -26,6 +26,7 @@ import EventComposer from "@/components/EventComposer";
 import SessionComposer from "@/components/SessionComposer";
 import { activeTier } from "@/lib/quota";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
+import { fileMaterial, openMaterial } from "@/lib/knowledge";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
 import { COLORS } from "@/theme/colors";
@@ -48,7 +49,7 @@ export default function UnitScreen() {
   const events = useStudyStore((state) => state.events);
   const sessions = useStudyStore((state) => state.sessions);
 
-  const addMaterial = useStudyStore((state) => state.addMaterial);
+
   const archiveMaterial = useStudyStore((state) => state.archiveMaterial);
   const addEvent = useStudyStore((state) => state.addEvent);
   const toggleEvent = useStudyStore((state) => state.toggleEvent);
@@ -240,11 +241,10 @@ export default function UnitScreen() {
                     </Text>
                   ) : null}
 
-                  {material.uri && material.kind === "pdf" ? (
-                    <Text className="font-jk text-muted text-[12px] mt-2">
-                      PDF attached — its text can't be searched until extraction
-                      is wired up.
-                    </Text>
+                  {/* Where the file has got to. Silent once it is readable —
+                      a line saying "ready" on every item is furniture. */}
+                  {material.uri || material.uploadStatus ? (
+                    <UploadNote material={material} />
                   ) : null}
                 </View>
               ))}
@@ -314,7 +314,7 @@ export default function UnitScreen() {
         onBlocked={setBlocked}
         lockedUnitId={unitId}
         onClose={() => setComposer(null)}
-        onSave={addMaterial}
+        onSave={(payload) => fileMaterial({ ...payload, unitId })}
       />
       <EventComposer
         visible={composer === "events"}
@@ -345,5 +345,39 @@ export default function UnitScreen() {
         }}
       />
     </>
+  );
+}
+
+/**
+ * One line on an attached file, and only when there is something to say.
+ *
+ * A PDF is useful to the tutor only once the server has read the text out of
+ * it, and that takes a moment after the bytes land. Saying so is the honest
+ * version of a silent gap in which the tutor cannot find anything in a file
+ * the student can plainly see they added.
+ */
+function UploadNote({ material }) {
+  const status = material.uploadStatus;
+
+  if (!status || status === "ready") return null;
+
+  const line =
+    status === "failed"
+      ? "This file did not upload. It will be retried next time you are online."
+      : status === "uploading"
+        ? "Uploading…"
+        : status === "queued"
+          ? "Waiting to upload."
+          : "Uploaded. Its text becomes searchable once we have read it.";
+
+  return (
+    <Pressable
+      onPress={() => status === "pending" && openMaterial(material.id)}
+      accessibilityRole={status === "pending" ? "button" : "text"}
+      accessibilityLabel={line}
+      className="mt-2 active:opacity-60"
+    >
+      <Text className="font-jk text-muted text-[12px]">{line}</Text>
+    </Pressable>
   );
 }

@@ -5,10 +5,17 @@ import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import LinkRow from "@/components/LinkRow";
 import { useStudyStore } from "@/store/useStudyStore";
+import { saveSettings } from "@/lib/account";
 
+/**
+ * Reminders are sent by the server, so the switch has to reach it.
+ *
+ * `saveSettings` writes the preference locally first and then to the account,
+ * which is what makes the toggle move under a thumb rather than after a round
+ * trip — and what makes the reminder actually stop arriving.
+ */
 export default function NotificationSettingsScreen() {
   const settings = useStudyStore((state) => state.settings);
-  const updateSettings = useStudyStore((state) => state.updateSettings);
 
   return (
     <Screen bare>
@@ -21,7 +28,7 @@ export default function NotificationSettingsScreen() {
           hint="The evening before something is due"
           toggle
           toggleValue={settings.deadlineReminders}
-          onToggle={(deadlineReminders) => updateSettings({ deadlineReminders })}
+          onToggle={(deadlineReminders) => saveSettings({ deadlineReminders })}
         />
         <LinkRow
           Icon={BellRing}
@@ -29,7 +36,7 @@ export default function NotificationSettingsScreen() {
           hint="Fifteen minutes before a session starts"
           toggle
           toggleValue={settings.sessionReminders}
-          onToggle={(sessionReminders) => updateSettings({ sessionReminders })}
+          onToggle={(sessionReminders) => saveSettings({ sessionReminders })}
           last
         />
       </View>

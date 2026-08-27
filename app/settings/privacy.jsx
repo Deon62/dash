@@ -6,20 +6,24 @@ import ScreenHeader from "@/components/ScreenHeader";
 /** Plain statements of what is true today, not a policy template. */
 const POINTS = [
   {
-    title: "Everything is on this phone",
-    body: "Your units, timetable, notes, deadlines and chats are written to this device's storage.",
+    title: "Your coursework is on your account",
+    body: "Units, timetable, notes, deadlines and chats are stored against your account so they follow you to any phone you sign in on. A copy is kept on this device too, which is what lets the app work with no signal.",
   },
   {
-    title: "Nothing leaves for a model",
-    body: "The tutor searches your notes on the device and quotes them back.",
+    title: "The tutor reads your material to answer",
+    body: "A question is sent to our server, which finds the relevant passages in what you have filed and asks a language model to answer using them. The model is given those passages and your question, and nothing else from your account.",
   },
   {
-    title: "Files stay where you put them",
-    body: "A PDF or photo you add is copied into the app's own storage so the link keeps working. Deleting the app deletes those copies.",
+    title: "Files are stored privately",
+    body: "A PDF or photo you add is uploaded to private storage. It is reached through links that are created when you open it and expire shortly after, so a link that leaks stops working.",
   },
   {
-    title: "Sign-in is offline",
-    body: "Your phone number identifies your account and is stored on this device.",
+    title: "Signing in identifies the account",
+    body: "Your phone number, or your Google address, is what your account is filed under. Signing in on a new phone signs the old one out — one account, one device at a time.",
+  },
+  {
+    title: "Deleting is deleting",
+    body: "Delete account, in Settings, removes your profile, units, timetable, knowledge and chats from our servers as well as from this phone.",
   },
 ];
 

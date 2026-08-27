@@ -22,6 +22,8 @@ import TextField from "@/components/TextField";
 import Button from "@/components/Button";
 import Dropdown from "@/components/Dropdown";
 import { useStudyStore } from "@/store/useStudyStore";
+import { saveProfile } from "@/lib/account";
+import { sync } from "@/lib/sync";
 import { SEMESTERS, YEARS } from "@/theme/units";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
@@ -82,15 +84,24 @@ export default function OnboardingScreen() {
   const finish = () => {
     impact("medium");
     notify("success");
-    completeOnboarding({
+
+    const details = {
       name: name.trim(),
       institution: institution.trim(),
       program: program.trim(),
       yearOfStudy: year,
       semester,
-    });
-    // No navigation — the session guard moves us into the tabs once
-    // `onboarded` flips.
+    };
+
+    completeOnboarding(details);
+
+    // Sent rather than only stored: this is what makes signing in on another
+    // phone skip intake, and what files the units under the account rather
+    // than under this handset. Neither is awaited — the guard moves into the
+    // tabs the moment `onboarded` flips, and holding a finished form open for
+    // a round trip is time a student spends looking at a spinner.
+    saveProfile(details);
+    sync();
   };
 
   return (

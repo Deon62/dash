@@ -1,6 +1,5 @@
 import { dayKey } from "@/lib/dates";
 import {
-  PLAN_CONFIGS,
   SubscriptionTier,
   UNLIMITED,
   limitsFor,
@@ -17,10 +16,11 @@ import {
  * take the subscription and the usage counters and return a verdict, so the
  * screens only have to decide what to say about it.
  *
- * None of this is security. It runs on the student's device, on data the
- * student owns, and anyone determined to get past it can. It is here to make
- * the product's shape honest and to be the exact logic a server enforces for
- * real once there is one.
+ * None of this is enforcement. The server meters the same allowances from the
+ * same config and refuses for real; this is the copy that lets a screen say
+ * "you have used today's questions" before spending a round trip finding out,
+ * and that keeps working with no connection at all. When the two disagree, the
+ * server wins.
  */
 
 const ALLOWED = { ok: true };
@@ -40,6 +40,12 @@ function denied(reason, detail) {
  */
 export function activeTier(subscription, now = Date.now()) {
   if (!subscription?.tier) return SubscriptionTier.TRIAL;
+
+  // `expired` is a tier the server reports, not one the app sells. It means
+  // the paid period ran out, and the limits that apply from then on are the
+  // trial's — an unpaid account keeps working in a reduced way rather than
+  // locking a student out of their own notes.
+  if (subscription.tier === EXPIRED) return SubscriptionTier.TRIAL;
   if (!subscription.expiresAt) return subscription.tier;
 
   return new Date(subscription.expiresAt).getTime() > now
@@ -47,13 +53,31 @@ export function activeTier(subscription, now = Date.now()) {
     : SubscriptionTier.TRIAL;
 }
 
+/** What it was sold as, even once it has run out. Used to name what ended. */
+export function nominalTier(subscription) {
+  return subscription?.nominalTier ?? subscription?.tier ?? SubscriptionTier.TRIAL;
+}
+
 export function isExpired(subscription, now = Date.now()) {
-  if (!subscription?.expiresAt) return false;
+  if (!subscription) return false;
+  // The server's own verdict first: it knows about a plan cancelled or a
+  // payment reversed, neither of which shows up in an expiry date.
+  if (subscription.isExpired !== undefined) return Boolean(subscription.isExpired);
+  if (subscription.tier === EXPIRED) return true;
+  if (!subscription.expiresAt) return false;
+
   return new Date(subscription.expiresAt).getTime() <= now;
 }
 
+/** The server's word for a plan that has run out. Never sold, only reported. */
+const EXPIRED = "expired";
+
 /** Whole days left, floored, never negative. */
 export function daysRemaining(subscription, now = Date.now()) {
+  // The server counts them too, and its clock is the one the plan ends on.
+  if (typeof subscription?.daysRemaining === "number") {
+    return Math.max(0, subscription.daysRemaining);
+  }
   if (!subscription?.expiresAt) return null;
   const ms = new Date(subscription.expiresAt).getTime() - now;
   return Math.max(0, Math.floor(ms / 86400000));
@@ -116,12 +140,6 @@ export function canAskAi(tier, usage) {
   return denied("ai", `You have used today's ${limit} AI questions.`);
 }
 
-export function aiQueriesLeft(tier, usage) {
-  const limit = limitsFor(tier).dailyAiQueries;
-  if (limit === UNLIMITED) return null;
-  return Math.max(0, limit - rollUsage(usage).aiQueriesToday);
-}
-
 export function canStartQuiz(tier, usage) {
   const { count, interval } = limitsFor(tier).quizzesPerInterval;
   if (count === UNLIMITED || interval === "unlimited") return ALLOWED;
@@ -179,38 +197,4 @@ export function canUseOcr(tier, usage) {
 /** Timetable alerts are off on the trial, which only supports manual entry. */
 export function canUseAlerts(tier) {
   return limitsFor(tier).timetableMode !== "manual";
-}
-
-/**
- * How many passages an answer may quote.
- *
- * The three citation modes are the honest part of the spec the tutor can
- * actually deliver today: how much of the student's own material an answer is
- * allowed to bring back. Page-exact citation needs the PDF parser that does
- * not exist yet.
- */
-export function citationDepth(tier) {
-  const mode = limitsFor(tier).sourceCitations;
-  if (mode === "deep_summary") return 6;
-  if (mode === "exact_page") return 4;
-  return 2;
-}
-
-/** A fresh subscription of the given tier, starting now. */
-export function newSubscription(tier, now = new Date()) {
-  const plan = PLAN_CONFIGS[tier] ?? PLAN_CONFIGS[SubscriptionTier.TRIAL];
-  const expires = new Date(now);
-  expires.setDate(expires.getDate() + plan.durationDays);
-
-  return {
-    tier: plan.id,
-    startedAt: new Date(now).toISOString(),
-    expiresAt: expires.toISOString(),
-    /**
-     * False until a server has seen the payment. Nothing on the device can
-     * confirm a Kora charge, so this records what the app was told rather
-     * than what it knows.
-     */
-    verified: plan.priceKsh === 0,
-  };
 }

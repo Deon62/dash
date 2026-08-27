@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Linking, Pressable, Share, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -22,7 +22,7 @@ import Disc from "@/components/Disc";
 import { useStudyStore } from "@/store/useStudyStore";
 import { activeTier } from "@/lib/quota";
 import { confirmCheckout, startCheckout } from "@/lib/checkout";
-import { newInviteCode } from "@/lib/inviteCode";
+import { createGroup, loadGroup, removeMember } from "@/lib/billing";
 import {
   SubscriptionTier,
   planFor,
@@ -87,13 +87,6 @@ export default function FriendsScreen() {
 
   const subscription = useStudyStore((state) => state.subscription);
   const group = useStudyStore((state) => state.group);
-  const setGroup = useStudyStore((state) => state.setGroup);
-  const removeGroupMember = useStudyStore((state) => state.removeGroupMember);
-  const addGroupMember = useStudyStore((state) => state.addGroupMember);
-  const activatePlan = useStudyStore((state) => state.activatePlan);
-  const profile = useStudyStore((state) => state.profile);
-
-  const authToken = useStudyStore((state) => state.authToken);
 
   const [confirming, setConfirming] = useState(false);
   /** The reference the server minted, so the sheet can verify rather than ask. */
@@ -112,11 +105,19 @@ export default function FriendsScreen() {
 
   const members = group?.members ?? [];
   const onPlan = activeTier(subscription) === FRIENDS && Boolean(group?.inviteCode);
-  const owns = onPlan && (members.find((member) => member.id === "me")?.isOwner ?? true);
+  const owns = onPlan && (members.find((member) => member.isMe)?.isOwner ?? true);
 
-  const left = Math.max(0, seats - members.length);
+  // The server counts the taken seats; the member list is only what it sent.
+  const left = Math.max(0, seats - (group?.seatsTaken ?? members.length));
   const invite = group?.inviteCode ?? "";
   const payer = members.find((member) => member.isOwner);
+
+  // The code and the seat list are the server's. Re-read on open so a friend
+  // who joined an hour ago is on the list rather than appearing at the next
+  // cold start.
+  useEffect(() => {
+    loadGroup();
+  }, []);
 
   const pay = async () => {
     impact("medium");
@@ -124,7 +125,7 @@ export default function FriendsScreen() {
 
     // Minted by the server for this student — see `src/lib/checkout.js`. The
     // fixed payment link this replaced produced a charge that named nobody.
-    const { reference, error } = await startCheckout(FRIENDS, authToken);
+    const { reference, error } = await startCheckout(FRIENDS);
 
     if (error) {
       setNotice(error);
@@ -136,32 +137,38 @@ export default function FriendsScreen() {
     setConfirming(true);
   };
 
+  /**
+   * Confirms the payment, then asks the server for the group.
+   *
+   * The invite code comes from the server, not from this device. A code minted
+   * here would be one nobody else could redeem — the seats it claims to give
+   * away live on the account, and only the server can hand them out.
+   */
   const startGroup = async () => {
-    // Ask the server first when there is a reference and a token. A verified
-    // group is a fact; the local path below is only the student's word, which
-    // is exactly what `verified: false` on the subscription records.
-    if (paymentReference && authToken) {
-      setBusy(true);
-      const { error, pending } = await confirmCheckout(paymentReference, authToken);
-      setBusy(false);
+    setBusy(true);
+    const { error, pending } = await confirmCheckout(paymentReference);
 
-      if (error) {
-        setNotice(
-          pending
-            ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
-            : error
-        );
-        return;
-      }
+    if (error) {
+      setBusy(false);
+      setNotice(
+        pending
+          ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
+          : error
+      );
+      return;
+    }
+
+    // Creating the group is separate from paying for it: the payment grants
+    // the seats, this is what produces the code that gives them out.
+    const created = await createGroup();
+    setBusy(false);
+
+    if (created.error) {
+      setNotice(created.error);
+      return;
     }
 
     setPaymentReference(null);
-    activatePlan(FRIENDS);
-    setGroup({
-      inviteCode: newInviteCode(),
-      seats,
-      members: [{ id: "me", name: profile.name || "You", isOwner: true }],
-    });
     notify("success");
     setConfirming(false);
   };
@@ -204,14 +211,10 @@ export default function FriendsScreen() {
 
     try {
       await Linking.openURL(url);
-      // Only once the composer is actually open. Marking the seat taken and
-      // then failing to open would be a lie about an invite nobody received.
-      addGroupMember({
-        id: address,
-        name: address,
-        isOwner: false,
-        pending: true,
-      });
+      // The seat list is not touched. An invite that has been sent is not a
+      // seat that has been taken — the friend still has to enter the code, and
+      // showing them on the plan before they have would be a count that
+      // disagrees with the one the server enforces.
       notify("success");
       setInviting(false);
       setEmail("");
@@ -377,10 +380,6 @@ export default function FriendsScreen() {
                     <Text className="font-jk text-muted text-[12px] mt-0.5">
                       Pays for this plan
                     </Text>
-                  ) : member.pending ? (
-                    <Text className="font-jk text-muted text-[12px] mt-0.5">
-                      Invited — has not joined yet
-                    </Text>
                   ) : null}
                 </View>
 
@@ -459,14 +458,16 @@ export default function FriendsScreen() {
         visible={confirming}
         onClose={() => setConfirming(false)}
         title="Did the payment go through?"
-        subtitle={
-          paymentReference
-            ? `Tap below and we'll check with our records. If Kora took KES ${plan.priceKsh}, the group unlocks for real.`
-            : `We can't confirm it from here. If Kora charged you KES ${plan.priceKsh}, unlock the group now and it will be reconciled once your account is connected.`
-        }
+        subtitle={`Tap below and we will check it against our records. If Kora took KES ${plan.priceKsh}, the group and its code are yours.`}
       >
         <View className="gap-y-3">
-          <Button label="Yes, give me the code" onPress={startGroup} />
+          <Button
+            label="Yes, give me the code"
+            busyLabel="Checking…"
+            busy={busy}
+            disabled={busy}
+            onPress={startGroup}
+          />
           <Pressable
             onPress={() => {
               impact("light");
@@ -519,9 +520,14 @@ export default function FriendsScreen() {
         confirmLabel="Remove"
         destructive
         onCancel={() => setRemoving(null)}
-        onConfirm={() => {
-          removeGroupMember(removing.id);
+        onConfirm={async () => {
+          const target = removing;
           setRemoving(null);
+
+          // The seat is the server's to free — it is what the next person's
+          // join request is checked against.
+          const { error } = await removeMember(target.id);
+          if (error) setNotice(error);
         }}
       />
     </>

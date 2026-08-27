@@ -5,7 +5,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Check,
   ChevronDown,
-  Eye,
   MessageSquare,
   PanelLeft,
   RotateCcw,
@@ -20,18 +19,12 @@ import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
-import { answer, buildFlashcards, buildQuiz } from "@/lib/tutor";
+import { askTutor, buildFlashcards, buildQuiz } from "@/lib/tutor";
+import { recordStudyDay } from "@/lib/account";
 import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
-import {
-  activeTier,
-  aiQueriesLeft,
-  canAskAi,
-  canStartQuiz,
-  citationDepth,
-  quizSize,
-} from "@/lib/quota";
+import { activeTier, canAskAi, canStartQuiz, quizSize } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import { useDictation } from "@/lib/useDictation";
 import { MicGlyph, SendGlyph } from "@/components/Glyph";
@@ -67,7 +60,6 @@ export default function StudyScreen() {
   const setChatUnit = useStudyStore((state) => state.setChatUnit);
   const appendMessage = useStudyStore((state) => state.appendMessage);
   const deleteChat = useStudyStore((state) => state.deleteChat);
-  const recordStudy = useStudyStore((state) => state.recordStudy);
   const subscription = useStudyStore((state) => state.subscription);
   const usage = useStudyStore((state) => state.usage);
   const recordAiQuery = useStudyStore((state) => state.recordAiQuery);
@@ -80,6 +72,16 @@ export default function StudyScreen() {
   const [scopeOpen, setScopeOpen] = useState(false);
   /** A `{ reason, detail }` verdict from the quota layer, or null. */
   const [blocked, setBlocked] = useState(null);
+  /** Anything that went wrong that is not a limit. Shown, then dismissed. */
+  const [failure, setFailure] = useState(null);
+  /**
+   * The answer as it arrives.
+   *
+   * Held here rather than written into the chat token by token: the store is
+   * persisted, and putting a stream through it would write the conversation to
+   * disk on every few characters. The finished answer is appended once.
+   */
+  const [streaming, setStreaming] = useState(null);
 
   const scrollRef = useRef(null);
 
@@ -110,19 +112,26 @@ export default function StudyScreen() {
 
   const messages = chat?.messages ?? [];
 
-  // What the current plan allows. Read before `ask` is defined, because `ask`
-  // closes over all three.
+  // What the current plan allows, read before `ask` is defined because `ask`
+  // closes over it. The server meters the same allowance and is what actually
+  // refuses; this is so a student out of questions is told before the request.
   const tier = activeTier(subscription);
-  const depth = citationDepth(tier);
-  const left = aiQueriesLeft(tier, usage);
 
-  const ask = (question) => {
+  /**
+   * Asks the tutor, and renders the answer as it comes.
+   *
+   * Retrieval happens on the server, over everything filed — including the
+   * text pulled out of PDFs, which this device never sees. The answer arrives
+   * as a stream, so the first words appear in about a second rather than the
+   * whole thing landing after six.
+   */
+  const ask = async (question) => {
     const text = question.trim();
     if (!text || thinking) return;
 
-    // The daily allowance is checked before the question is posted, not after:
-    // showing a student's own words in the thread and then refusing to answer
-    // them reads as a failure rather than a limit.
+    // Checked before the question is posted, not after: showing a student's
+    // own words in the thread and then refusing to answer them reads as a
+    // failure rather than as a limit.
     const allowance = canAskAi(tier, usage);
     if (!allowance.ok) {
       setBlocked(allowance);
@@ -135,21 +144,48 @@ export default function StudyScreen() {
     appendMessage(target.id, { role: "student", text });
     setDraft("");
     setThinking(true);
-    recordStudy();
-    recordAiQuery();
+    setStreaming({ text: "", sources: [] });
 
-    // Retrieval is synchronous and instant. The pause is deliberate: a reply
-    // that lands before the student's own message has finished animating in
-    // reads as a canned response rather than an answer.
-    setTimeout(() => {
-      const reply = answer(text, { materials: scoped, unit, limit: depth });
-      appendMessage(target.id, {
-        role: "tutor",
-        text: reply.text,
-        sources: reply.sources.map((source) => source.title),
-      });
-      setThinking(false);
-    }, 400);
+    // The device's own counters, so a limit can still be refused with no
+    // connection. The server keeps the numbers that decide.
+    recordAiQuery();
+    recordStudyDay();
+
+    const result = await askTutor({
+      question: text,
+      chatId: target.id,
+      unitCode: unit?.code ?? null,
+      onMeta: (meta) =>
+        setStreaming((current) => ({
+          ...(current ?? { text: "" }),
+          sources: meta.sources ?? [],
+        })),
+      onToken: (_piece, whole) =>
+        setStreaming((current) => ({ ...(current ?? { sources: [] }), text: whole })),
+    });
+
+    setStreaming(null);
+    setThinking(false);
+
+    if (result.error && !result.text) {
+      // 402 is a plan limit — not included in what you pay for — and belongs in
+      // the sheet that explains limits and offers a way out. Everything else is
+      // a failure, and telling someone with no signal to upgrade their plan is
+      // the wrong answer to the wrong question.
+      if (result.status === 402) setBlocked({ reason: "ai", detail: result.error });
+      else setFailure(result.error);
+      return;
+    }
+
+    appendMessage(target.id, {
+      role: "tutor",
+      text: result.error ? `${result.text}\n\n${result.error}` : result.text,
+      sources: (result.sources ?? []).map((source) =>
+        source.page_number
+          ? `${source.title} · p.${source.page_number}`
+          : source.title,
+      ),
+    });
   };
 
   const scopeLabel = `${unit ? unit.code : "All units"} · ${
@@ -225,17 +261,26 @@ export default function StudyScreen() {
             messages.map((message) => <Bubble key={message.id} message={message} />)
           )}
 
-          {thinking ? (
+          {/* The answer while it is still arriving. Rendered as an ordinary
+              bubble so nothing shifts when the finished one replaces it. */}
+          {streaming?.text ? (
+            <Bubble
+              message={{
+                role: "tutor",
+                text: streaming.text,
+                sources: (streaming.sources ?? []).map((source) => source.title),
+              }}
+            />
+          ) : thinking ? (
             <View className="self-start rounded-2xl bg-surface px-4 py-3">
               <Text className="font-jk text-muted text-[13.5px]">
-                Reading your notes…
+                Reading your material…
               </Text>
             </View>
           ) : null}
         </ScrollView>
       ) : mode === "quiz" ? (
         <QuizPane
-          materials={scoped}
           unit={unit}
           tier={tier}
           usage={usage}
@@ -525,6 +570,15 @@ export default function StudyScreen() {
       <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
 
       <ConfirmDialog
+        visible={Boolean(failure)}
+        title="That did not go through"
+        message={failure}
+        confirmLabel="OK"
+        onConfirm={() => setFailure(null)}
+        onDismiss={() => setFailure(null)}
+      />
+
+      <ConfirmDialog
         visible={Boolean(dictation.error)}
         title="Can't hear you"
         message={dictation.error}
@@ -568,52 +622,96 @@ function Bubble({ message }) {
 
 // --- Quiz ------------------------------------------------------------------
 
-function QuizPane({ materials, unit, tier, usage, onStart, onBlocked }) {
-  const [seed, setSeed] = useState(0);
+/**
+ * A quiz, built by the server from the student's own material.
+ *
+ * Multiple choice rather than the fill-in-the-blank the device used to cut out
+ * of a sentence: a blanked word can only test recall of the exact phrasing a
+ * note happened to use, and it marks a right answer wrong for being worded
+ * differently. Four options with an explanation is a question a person can
+ * actually learn from being wrong about.
+ */
+function QuizPane({ unit, tier, usage, onStart, onBlocked }) {
+  const [questions, setQuestions] = useState([]);
+  const [note, setNote] = useState("");
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const [index, setIndex] = useState(0);
-  const [revealed, setRevealed] = useState(false);
+  const [picked, setPicked] = useState(null);
 
   const size = quizSize(tier);
-
-  // Rebuilt whenever the scope or the seed changes; `seed` is what "new set"
-  // increments, since the question picker shuffles.
-  const questions = useMemo(
-    () => buildQuiz(materials, { count: size }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [materials, seed, size]
-  );
 
   /**
    * A "set" is what the quota counts, not a question.
    *
-   * Checked when a new set is asked for rather than on every reveal — a
-   * student stepping through the questions they already have is still inside
-   * the one quiz they were allowed.
+   * Stepping through questions already built is still inside the one quiz the
+   * student was allowed; only asking for a new set spends another.
    */
-  const newSet = () => {
+  const newSet = async () => {
     const allowance = canStartQuiz(tier, usage);
     if (!allowance.ok) {
       onBlocked(allowance);
       return;
     }
+
+    setLoading(true);
+    setError("");
+
+    const result = await buildQuiz({ unitCode: unit?.code ?? null, count: size });
+
+    setLoading(false);
+
+    if (result.error) {
+      // A plan limit goes to the sheet that explains limits; anything else is
+      // said in place, where the student is already looking.
+      if (result.status === 402) onBlocked({ reason: "quiz", detail: result.error });
+      else setError(result.error);
+      return;
+    }
+
+    if (result.questions.length === 0) {
+      setError(
+        `There is not enough filed${unit ? ` under ${unit.code}` : ""} to build a quiz yet. Add a note or a set of slides in Knowledge and try again.`,
+      );
+      return;
+    }
+
     onStart();
-    setSeed((value) => value + 1);
+    setQuestions(result.questions);
+    setNote(result.note);
+    setIndex(0);
+    setPicked(null);
   };
 
-  useEffect(() => {
-    setIndex(0);
-    setRevealed(false);
-  }, [questions]);
-
+  // Nothing is fetched on mount: a quiz costs a request and counts against a
+  // weekly allowance, so it starts when the student asks for one.
   if (questions.length === 0) {
     return (
       <View className="flex-1 justify-center px-5">
         <EmptyState
           Icon={MessageSquare}
-          title="Not enough to quiz on"
-          message={`Questions are built out of full sentences in your notes. Add a longer one${
-            unit ? ` under ${unit.code}` : ""
-          } and a set appears here.`}
+          title={loading ? "Building your quiz…" : "Ready when you are"}
+          message={
+            error ||
+            `Questions are written from what you have filed${unit ? ` under ${unit.code}` : ""}. Start a set and they appear here.`
+          }
+          action={
+            loading ? null : (
+              <Pressable
+                onPress={() => {
+                  impact("medium");
+                  newSet();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Start a quiz"
+                className="rounded-full bg-primary px-5 py-3 active:opacity-85"
+              >
+                <Text className="font-jk-med text-canvas text-[13.5px]">
+                  Start a quiz
+                </Text>
+              </Pressable>
+            )
+          }
         />
       </View>
     );
@@ -621,6 +719,7 @@ function QuizPane({ materials, unit, tier, usage, onStart, onBlocked }) {
 
   const question = questions[Math.min(index, questions.length - 1)];
   const last = index >= questions.length - 1;
+  const answered = picked !== null;
 
   return (
     <ScrollView
@@ -629,36 +728,75 @@ function QuizPane({ materials, unit, tier, usage, onStart, onBlocked }) {
     >
       <Text className="font-jk text-muted text-[12px]">
         Question {index + 1} of {questions.length}
+        {note ? ` · ${note}` : ""}
       </Text>
 
       <Text className="font-jk text-ink text-[19px] leading-[28px]">
         {question.prompt}
       </Text>
 
-      <View className="border-t border-line pt-4">
-        {revealed ? (
-          <Text className="font-jk-semi text-primary text-[18px]">
-            {question.answer}
-          </Text>
-        ) : (
-          <Pressable
-            onPress={() => {
-              impact("light");
-              setRevealed(true);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Reveal answer"
-            className="flex-row items-center gap-x-2 active:opacity-60"
-          >
-            <Eye size={15} color="#71717A" strokeWidth={1.8} />
-            <Text className="font-jk text-muted text-[13.5px]">Tap to reveal</Text>
-          </Pressable>
-        )}
+      <View className="gap-y-2.5">
+        {question.options.map((option, optionIndex) => {
+          const correct = optionIndex === question.answer;
+          const chosen = optionIndex === picked;
 
-        <Text className="font-jk text-muted text-[11.5px] mt-3">
-          From “{question.source}”
-        </Text>
+          // Colour only after an answer: highlighting before would give the
+          // question away, and greying options out reads as "not allowed"
+          // rather than "not chosen".
+          const tone = !answered
+            ? { borderColor: COLORS.line, backgroundColor: COLORS.canvas }
+            : correct
+              ? { borderColor: COLORS.primary, backgroundColor: COLORS.surface }
+              : chosen
+                ? { borderColor: COLORS.danger, backgroundColor: COLORS.canvas }
+                : { borderColor: COLORS.line, backgroundColor: COLORS.canvas };
+
+          return (
+            <Pressable
+              key={option}
+              onPress={() => {
+                if (answered) return;
+                impact("light");
+                if (optionIndex === question.answer) notify("success");
+                setPicked(optionIndex);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={option}
+              accessibilityState={{ selected: chosen, disabled: answered }}
+              style={{ ...tone, borderWidth: 1, borderRadius: 16, padding: 14 }}
+              className="active:opacity-70"
+            >
+              <Text className="font-jk text-ink text-[14.5px] leading-[21px]">
+                {option}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
+
+      {answered ? (
+        <View className="border-t border-line pt-4">
+          <Text className="font-jk-med text-ink text-[14px]">
+            {picked === question.answer ? "Right." : "Not quite."}
+          </Text>
+          {question.explanation ? (
+            <Text className="font-jk text-muted text-[13.5px] leading-[20px] mt-1.5">
+              {question.explanation}
+            </Text>
+          ) : null}
+          {question.source ? (
+            <Text className="font-jk text-muted text-[11.5px] mt-3">
+              From “{question.source}”
+            </Text>
+          ) : null}
+        </View>
+      ) : null}
+
+      {error ? (
+        <Text className="font-jk text-[12px] leading-[17px]" style={{ color: COLORS.danger }}>
+          {error}
+        </Text>
+      ) : null}
 
       <View className="flex-row gap-x-2.5">
         <Pressable
@@ -666,29 +804,39 @@ function QuizPane({ materials, unit, tier, usage, onStart, onBlocked }) {
             impact("light");
             newSet();
           }}
+          disabled={loading}
           accessibilityRole="button"
           accessibilityLabel="New set of questions"
           className="rounded-full border border-line px-4 py-3 active:bg-surface"
         >
-          <Text className="font-jk-med text-muted text-[13.5px]">New set</Text>
+          <Text className="font-jk-med text-muted text-[13.5px]">
+            {loading ? "Building…" : "New set"}
+          </Text>
         </Pressable>
 
         <Pressable
           onPress={() => {
             impact("medium");
             if (last) {
-              notify("success");
               newSet();
               return;
             }
             setIndex((value) => value + 1);
-            setRevealed(false);
+            setPicked(null);
           }}
+          disabled={!answered || loading}
           accessibilityRole="button"
+          accessibilityState={{ disabled: !answered }}
           accessibilityLabel={last ? "Finish and start a new set" : "Next question"}
-          className="flex-1 items-center justify-center rounded-full bg-primary py-3 active:opacity-85"
+          className={`flex-1 items-center justify-center rounded-full py-3 ${
+            answered ? "bg-primary active:opacity-85" : "bg-surface"
+          }`}
         >
-          <Text className="font-jk-med text-canvas text-[13.5px]">
+          <Text
+            className={`font-jk-med text-[13.5px] ${
+              answered ? "text-canvas" : "text-muted"
+            }`}
+          >
             {last ? "Finish" : "Next"}
           </Text>
         </Pressable>

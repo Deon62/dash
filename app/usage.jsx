@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Receipt } from "lucide-react-native";
@@ -8,7 +8,8 @@ import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
 import UsageMeter from "@/components/UsageMeter";
 import { useStudyStore } from "@/store/useStudyStore";
-import { limitsFor, planName, unitCap } from "@/theme/plans";
+import { loadUsage } from "@/lib/account";
+import { UNLIMITED, limitsFor, planName, unitCap } from "@/theme/plans";
 import { activeTier, daysRemaining, rollUsage } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 
@@ -35,9 +36,13 @@ function Figure({ label, value, last = false }) {
 /**
  * What the plan allows, and how much of it is gone.
  *
- * Built to fit one screen. The old version was four labelled lists you had to
- * scroll through and mentally diff against the plan; this is four bars you can
- * read in a glance, because "how much is left" is the only question anyone
+ * The meters are the server's. They have to be: the server is what refuses a
+ * question at the limit, and a bar drawn from a device's own tally would say
+ * three left on the very screen a student opens to find out why they were
+ * turned down. The device's counters are the fallback, for the first render
+ * and for no connection.
+ *
+ * Built to fit one screen — "how much is left" is the only question anyone
  * opens this page with.
  */
 export default function UsageScreen() {
@@ -50,11 +55,19 @@ export default function UsageScreen() {
   const study = useStudyStore((state) => state.study);
   const subscription = useStudyStore((state) => state.subscription);
   const rawUsage = useStudyStore((state) => state.usage);
+  const serverUsage = useStudyStore((state) => state.serverUsage);
 
   const tier = activeTier(subscription);
   const limits = limitsFor(tier);
   const usage = rollUsage(rawUsage);
   const left = daysRemaining(subscription);
+
+  // Re-read on open rather than trusting whatever the last sync left behind: a
+  // student lands here straight after being refused, and a stale bar is the
+  // one thing this screen must not show.
+  useEffect(() => {
+    loadUsage();
+  }, []);
 
   const live = materials.filter((material) => !material.archived);
 
@@ -73,7 +86,22 @@ export default function UsageScreen() {
   );
 
   const quiz = limits.quizzesPerInterval;
-  const weekly = quiz.interval === "weekly";
+  const weekly = (serverUsage?.quizInterval ?? quiz.interval) === "weekly";
+
+  /** A meter the server sent, or the device's own count of the same thing. */
+  const meter = (name, used, limit) => {
+    const remote = serverUsage?.[name];
+    if (!remote) return { used, limit };
+    return { used: remote.used, limit: remote.unlimited ? UNLIMITED : remote.limit };
+  };
+
+  const ai = meter("aiQueriesToday", usage.aiQueriesToday, limits.dailyAiQueries);
+  const quizzes = meter(
+    "quizzes",
+    weekly ? usage.quizzesThisWeek : usage.quizzesEver,
+    quiz.count,
+  );
+  const courseUnits = meter("courseUnits", units.length, unitCap(tier));
 
   return (
     <Screen bare>
@@ -94,7 +122,9 @@ export default function UsageScreen() {
         <View
           style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: COLORS.primary }}
         />
-        <Text className="font-jk-med text-ink text-[13px]">{planName(tier)}</Text>
+        <Text className="font-jk-med text-ink text-[13px]">
+          {serverUsage?.planName ?? planName(tier)}
+        </Text>
         {left !== null ? (
           <Text className="font-jk text-muted text-[13px]">
             · {left} {left === 1 ? "day" : "days"} left
@@ -107,17 +137,18 @@ export default function UsageScreen() {
           ALLOWANCE
         </Text>
 
-        <UsageMeter
-          label="AI questions today"
-          used={usage.aiQueriesToday}
-          limit={limits.dailyAiQueries}
-        />
+        <UsageMeter label="AI questions today" used={ai.used} limit={ai.limit} />
         <UsageMeter
           label={weekly ? "Quizzes this week" : "Quizzes taken"}
-          used={weekly ? usage.quizzesThisWeek : usage.quizzesEver}
-          limit={quiz.count}
+          used={quizzes.used}
+          limit={quizzes.limit}
         />
-        <UsageMeter label="Course units" used={units.length} limit={unitCap(tier)} last />
+        <UsageMeter
+          label="Course units"
+          used={courseUnits.used}
+          limit={courseUnits.limit}
+          last
+        />
       </View>
 
       <View>

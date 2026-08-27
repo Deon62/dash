@@ -83,7 +83,7 @@ export default function DaySheet({
       ) : null}
 
       {dayEvents.length > 0 ? (
-        <View className={dayClasses.length > 0 ? "mt-5" : ""}>
+        <View className={daySessions.length > 0 ? "mt-5" : ""}>
           <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
             DUE
           </Text>

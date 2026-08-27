@@ -116,7 +116,19 @@ export default function AddKnowledge({
     if (result.canceled || !result.assets?.length) return null;
 
     const asset = result.assets[0];
-    return { kind: "image", title: asset.fileName ?? "Photo", uri: asset.uri, body: "" };
+
+    // `mimeType`, `filename` and `size` are what the upload asks the server to
+    // sign for. Without them the request is refused on type or measured
+    // wrongly on size, which is a plan limit enforced against a guess.
+    return {
+      kind: "image",
+      title: asset.fileName ?? "Photo",
+      filename: asset.fileName ?? "photo.jpg",
+      mimeType: asset.mimeType ?? "image/jpeg",
+      size: asset.fileSize ?? 0,
+      uri: asset.uri,
+      body: "",
+    };
   };
 
   const pickPdf = async () => {
@@ -139,7 +151,15 @@ export default function AddKnowledge({
       return null;
     }
 
-    return { kind: "pdf", title: asset.name ?? "Document", uri: asset.uri, body: "" };
+    return {
+      kind: "pdf",
+      title: asset.name ?? "Document",
+      filename: asset.name ?? "document.pdf",
+      mimeType: asset.mimeType ?? "application/pdf",
+      size: asset.size ?? 0,
+      uri: asset.uri,
+      body: "",
+    };
   };
 
   const chooseFormat = async (key) => {

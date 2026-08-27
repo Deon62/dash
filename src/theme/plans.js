@@ -1,10 +1,15 @@
 /**
  * Subscription tiers and what each one allows.
  *
- * This file is the single source of truth for every limit in the app. Nothing
- * else hard-codes a number: the screens read from here, `src/lib/quota.js`
- * decides against it, and when a real backend arrives it should serve exactly
- * this shape so the two cannot drift.
+ * The copy the app reads. Nothing else hard-codes a number: the screens read
+ * from here and `src/lib/quota.js` decides against it, so a limit can be shown
+ * and refused with no connection at all.
+ *
+ * It is not the authority. The server enforces the same limits from its own
+ * copy in `app/services/plans.py`, and serves the prices at
+ * `/api/v1/billing/plans` so a change reaches a phone without an app store
+ * release. Where the two disagree, the server is right — and a number changed
+ * here has to be changed there too.
  *
  * Three of the four tiers are sold. `TRIAL` is not a product — it is the state
  * a new account starts in, for fourteen days, whichever plan they eventually

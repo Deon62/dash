@@ -8,10 +8,12 @@ import IconButton from "@/components/IconButton";
 import Fab from "@/components/Fab";
 import { PillButton } from "@/components/Button";
 import AddKnowledge from "@/components/AddKnowledge";
+import ConfirmDialog from "@/components/ConfirmDialog";
 import LimitSheet from "@/components/LimitSheet";
 import EmptyState from "@/components/EmptyState";
 import { activeTier } from "@/lib/quota";
 import { useStudyStore } from "@/store/useStudyStore";
+import { fileMaterial } from "@/lib/knowledge";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -68,10 +70,10 @@ export default function KnowledgeScreen() {
   const materials = useStudyStore((state) => state.materials);
   const subscription = useStudyStore((state) => state.subscription);
   const events = useStudyStore((state) => state.events);
-  const addMaterial = useStudyStore((state) => state.addMaterial);
 
   const [adding, setAdding] = useState(false);
   const [blocked, setBlocked] = useState(null);
+  const [notice, setNotice] = useState(null);
 
   const tier = activeTier(subscription);
 
@@ -166,7 +168,18 @@ export default function KnowledgeScreen() {
         tier={tier}
         onBlocked={setBlocked}
         onClose={() => setAdding(false)}
-        onSave={addMaterial}
+        onSave={(payload) => fileMaterial(payload).then(({ error }) => setNotice(error))}
+      />
+
+      {/* An upload that failed is worth interrupting for: the item is filed
+          either way, but until the file lands the tutor cannot read it. */}
+      <ConfirmDialog
+        visible={Boolean(notice)}
+        title="That file did not upload"
+        message={notice}
+        confirmLabel="OK"
+        onConfirm={() => setNotice(null)}
+        onDismiss={() => setNotice(null)}
       />
     </>
   );

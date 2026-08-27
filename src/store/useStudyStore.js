@@ -4,18 +4,24 @@ import { createJSONStorage, persist } from "zustand/middleware";
 
 import { newId } from "@/lib/ids";
 import { dayKey } from "@/lib/dates";
-import { rollUsage, newSubscription } from "@/lib/quota";
+import { rollUsage } from "@/lib/quota";
 import { ALWAYS_SHOW_INTRO } from "@/lib/devFlags";
-import { SubscriptionTier } from "@/theme/plans";
 
 /**
- * The whole app's state, on the device.
+ * The app's state, backed by the account.
  *
- * There is no server yet, so this *is* the source of truth: units, timetable,
- * knowledge, events and chats all live here and are written straight through to
- * AsyncStorage. Everything time-shaped is stored as an ISO string rather than a
- * Date, because a Date does not survive the JSON round-trip persistence does.
+ * The server at `EXPO_PUBLIC_API_URL` is the source of truth. What is written
+ * here is a cache of it, so a student on a train still sees their notes, plus
+ * an outbox: every row carries `updatedAt`, every deletion leaves a tombstone,
+ * and `src/lib/sync.js` pushes whatever is newer than the last successful push
+ * before pulling back what the server has.
+ *
+ * Everything time-shaped is an ISO string rather than a Date, because a Date
+ * does not survive the JSON round-trip persistence does.
  */
+
+/** Stamped on every row the device writes. The whole sync story is this field. */
+const stamp = () => new Date().toISOString();
 
 const EMPTY_PROFILE = {
   name: "",
@@ -58,6 +64,28 @@ const EMPTY_USAGE = {
   quizzesEver: 0,
 };
 
+/**
+ * Empty tombstones, one list per synced table.
+ *
+ * A deleted row cannot simply vanish: the server would still hold it, and the
+ * next pull would put it straight back. The id and the moment it was deleted
+ * are kept until a push has carried them across.
+ */
+/**
+ * A tombstone keeps the parent unit alongside the id.
+ *
+ * Not decoration: the server validates a deleted row against the same schema
+ * as a live one and writes every field it is given, so a burial that arrived
+ * with no `unit_id` would either be refused or point the row at nothing.
+ */
+const EMPTY_TOMBSTONES = {
+  units: [],
+  sessions: [],
+  materials: [],
+  events: [],
+  chats: [],
+};
+
 /** How much streak history is worth keeping: a week to draw, a month of slack. */
 const STREAK_HISTORY_DAYS = 60;
 
@@ -73,6 +101,7 @@ function initialsFrom(name) {
 }
 
 const BLANK = {
+  /** The server's id for this account, from the token response. */
   userId: null,
   isAuthenticated: false,
   profile: { ...EMPTY_PROFILE },
@@ -82,9 +111,9 @@ const BLANK = {
   /**
    * The Friends plan, once there is one.
    *
-   * `{ inviteCode, seats, members: [{ id, name, isOwner }] }`. Held locally so
-   * the invite screen renders offline; the server is the authority on who
-   * actually holds a seat, and a pull overwrites this wholesale.
+   * `{ id, inviteCode, seats, seatsTaken, members: [{ id, name, isOwner, isMe }] }`.
+   * Cached so the invite screen renders with no connection; the server is the
+   * authority on who holds a seat, and `loadGroup` replaces this wholesale.
    */
   group: null,
   usage: { ...EMPTY_USAGE },
@@ -112,12 +141,60 @@ const BLANK = {
      */
     days: [],
   },
+
+  // --- Session ------------------------------------------------------------
+
+  /**
+   * The server's access token, or null.
+   *
+   * Kept out of `profile` because it is a credential, not a preference: it is
+   * the thing to clear on sign-out and the thing never to log.
+   */
+  authToken: null,
+  /** Swapped for a new pair when the access token expires. Rotated each time. */
+  refreshToken: null,
+  /** Epoch milliseconds. Refreshed a little before this, never after. */
+  tokenExpiresAt: null,
+
+  // --- Sync ---------------------------------------------------------------
+
+  /**
+   * The server's cursor from the last successful pull, handed back as `since`
+   * on the next one so a pull carries changes rather than the whole account.
+   */
+  syncCursor: null,
+  /** Device time of the last successful push. Rows newer than this are dirty. */
+  pushedAt: null,
+  tombstones: { ...EMPTY_TOMBSTONES },
+  /** Whether a sync is in flight, so two cannot overlap and duplicate a push. */
+  syncing: false,
+  /** The last sync failure, in words for a student, or null. */
+  syncError: null,
+
+  /**
+   * The meters, as the server counts them.
+   *
+   * `usage` above is the device's own tally and exists so a limit can be
+   * refused before a request is made. This is the authority, and the Usage
+   * screen draws from it whenever it is present.
+   */
+  serverUsage: null,
 };
 
 export const useStudyStore = create(
   persist(
     (set, get) => ({
       ...BLANK,
+
+      /**
+       * This installation, minted once and kept for good.
+       *
+       * Deliberately outside `BLANK` so signing out does not mint a new one:
+       * the server allows one live session per account and identifies the
+       * handset by this id, so a device that changes identity on every sign-in
+       * grows a row per launch and can never be signed out remotely.
+       */
+      deviceId: null,
 
       /**
        * False until AsyncStorage has been read back. The route guard waits on
@@ -128,61 +205,129 @@ export const useStudyStore = create(
 
       // --- Session ----------------------------------------------------------
 
+      /** Minted on first use and never again. See `deviceId` above. */
+      ensureDeviceId: () => {
+        const existing = get().deviceId;
+        if (existing) return existing;
+        const deviceId = newId();
+        set({ deviceId });
+        return deviceId;
+      },
+
       /**
-       * Signs the student in locally. Called once the code passes.
+       * Records a real session: the account the server issued tokens for.
        *
-       * Still local: `src/lib/auth.js` validates the code on the device and
-       * mints no token, so `authToken` below stays null and anything that
-       * needs the server — paying, sync — reports that rather than failing
-       * oddly. Wiring `account.requestOtp` / `account.verifyOtp` from
-       * `src/api/endpoints.js` is what fills it in.
+       * `userId` comes from the server rather than being minted here, because
+       * every row this device pushes is filed against it — an id invented on
+       * the phone would file a semester of notes under an account that does
+       * not exist.
        */
-      signIn: (phone) =>
-        set((state) => ({
-          userId: state.userId ?? newId(),
+      setSession: ({ userId, accessToken, refreshToken, expiresIn }) =>
+        set({
+          userId: userId ?? get().userId,
           isAuthenticated: true,
-          profile: { ...state.profile, phone: phone ?? state.profile.phone },
-        })),
+          authToken: accessToken,
+          refreshToken: refreshToken ?? get().refreshToken,
+          // A minute of slack, so a token that expires mid-flight is refreshed
+          // before the request rather than after it comes back 401.
+          tokenExpiresAt: expiresIn ? Date.now() + (expiresIn - 60) * 1000 : null,
+        }),
 
-      /**
-       * The server's access token, or null.
-       *
-       * Kept out of `profile` because it is a credential, not a preference: it
-       * is the thing to clear on sign-out and the thing never to log. Null is
-       * a supported state and the app is built for it — every screen reads
-       * from the store and works with no server at all.
-       */
-      authToken: null,
-
-      setAuthToken: (authToken) => set({ authToken }),
-
-      /** Google, also local for now. Carries an email instead of a number. */
-      signInWithEmail: (email) =>
-        set((state) => ({
-          userId: state.userId ?? newId(),
-          isAuthenticated: true,
-          profile: { ...state.profile, email: email ?? state.profile.email },
-        })),
-
-      /**
-       * Signs out but keeps the coursework.
-       *
-       * Everything is local, so wiping it here would destroy a semester of
-       * notes on what a student thinks of as "log out". `resetEverything` is
-       * the deliberate version of that.
-       */
-      signOut: () => set({ isAuthenticated: false, authToken: null }),
+      /** Called by the refresh path in `src/lib/session.js`, nowhere else. */
+      setTokens: ({ accessToken, refreshToken, expiresIn }) =>
+        set({
+          authToken: accessToken,
+          refreshToken: refreshToken ?? get().refreshToken,
+          tokenExpiresAt: expiresIn ? Date.now() + (expiresIn - 60) * 1000 : null,
+        }),
 
       /** Dismisses the explainer. Never shown again, even after a sign-out. */
       completeIntro: () => set({ introSeen: true }),
 
+      /**
+       * Signs out and clears the cache with it.
+       *
+       * The coursework is on the account, not on the handset, so there is
+       * nothing here to lose — and leaving one student's notes on a phone the
+       * next student signs into would be the wrong way round. Signing back in
+       * pulls it all down again.
+       */
+      signOut: () =>
+        set({
+          ...BLANK,
+          hydrated: true,
+          // The explainer has been seen; showing it again after a sign-out
+          // would be a stranger's welcome for a returning student.
+          introSeen: get().introSeen,
+        }),
+
+      /** After the server has deleted the account. Same wipe, different cause. */
       resetEverything: () => set({ ...BLANK, hydrated: true }),
+
+      // --- Sync bookkeeping ---------------------------------------------------
+
+      setSyncing: (syncing) => set({ syncing }),
+      setSyncError: (syncError) => set({ syncError }),
+
+      /**
+       * Marks everything pushed up to this moment.
+       *
+       * The timestamp is taken *before* the request rather than after, so an
+       * edit made while it was in flight stays dirty and goes next time.
+       */
+      markPushed: (pushedAt, cursor) =>
+        set({
+          pushedAt,
+          syncCursor: cursor ?? get().syncCursor,
+          tombstones: { ...EMPTY_TOMBSTONES },
+        }),
+
+      setCursor: (syncCursor) => set({ syncCursor }),
+
+      /** Replaces the cached tables with what a pull resolved to. */
+      applyPull: (tables) => set(tables),
+
+      /**
+       * Whether intake has been done.
+       *
+       * Set from the server's profile rather than remembered here, because it
+       * is a property of the account: a student signing in on a new phone has
+       * already told us their programme, and asking again would look like the
+       * first one had lost it.
+       */
+      setOnboarded: (onboarded) => set({ onboarded }),
+
+      /** The profile as the server has it. Local edits are pushed, not merged. */
+      applyServerProfile: (patch) =>
+        set((state) => {
+          const profile = { ...state.profile, ...patch };
+          profile.initials = initialsFrom(profile.name);
+          return { profile };
+        }),
+
+      applyServerSettings: (patch) =>
+        set((state) => ({ settings: { ...state.settings, ...patch } })),
+
+      applyServerSubscription: (subscription) => set({ subscription }),
+
+      applyServerUsage: (serverUsage) => set({ serverUsage }),
+
+      applyServerStreak: ({ current, longest, lastDay, days }) =>
+        set((state) => ({
+          study: {
+            ...state.study,
+            streakDays: current ?? state.study.streakDays,
+            longestStreak: longest ?? state.study.longestStreak,
+            lastStudyDay: lastDay ?? state.study.lastStudyDay,
+            days: days ?? state.study.days,
+          },
+        })),
 
       // --- Profile ----------------------------------------------------------
 
       updateProfile: (patch) =>
         set((state) => {
-          const profile = { ...state.profile, ...patch };
+          const profile = { ...state.profile, ...patch, updatedAt: stamp() };
           if (patch.name !== undefined) profile.initials = initialsFrom(profile.name);
           return { profile };
         }),
@@ -191,63 +336,30 @@ export const useStudyStore = create(
         set((state) => ({ profile: { ...state.profile, avatarUri } })),
 
       updateSettings: (patch) =>
-        set((state) => ({ settings: { ...state.settings, ...patch } })),
+        set((state) => ({
+          settings: { ...state.settings, ...patch, updatedAt: stamp() },
+        })),
 
       // --- Subscription -----------------------------------------------------
 
-      /** Starts the seven days. Never restarts one that has already run. */
-      startTrial: () =>
-        set((state) =>
-          state.subscription
-            ? {}
-            : { subscription: newSubscription(SubscriptionTier.TRIAL) }
-        ),
-
       /**
-       * Switches the account onto a paid tier.
+       * The plan, exactly as `/billing/subscription` reported it.
        *
-       * Called after the student returns from checkout saying they paid. The
-       * subscription it writes is marked unverified, because nothing on this
-       * device saw the money — only the server, receiving Kora's webhook or
-       * verifying the reference, can set that straight. Until then it is a
-       * claim, not a fact, and `/billing/verify` is what settles it.
+       * Nothing on this device grants a plan any more. A payment is a fact the
+       * server establishes — from Kora's webhook or from verifying the
+       * reference — and the app's job is to read it, not to claim it.
        */
-      activatePlan: (tier) => set({ subscription: newSubscription(tier) }),
+      setSubscription: (subscription) => set({ subscription }),
 
-      /** Replaces the local copy of the group with whatever the server said. */
+      /** The Friends group, as `/billing/group` reported it. */
       setGroup: (group) => set({ group }),
 
-      /**
-       * Adds someone optimistically, so the list moves the moment you invite.
-       *
-       * Reconciled on the next sync — a seat the server refused disappears
-       * again, which is the right way round: showing a friend as joined and
-       * being wrong is recoverable, refusing to show them until a round trip
-       * completes is just a slow app.
-       */
-      addGroupMember: (member) =>
-        set((state) => {
-          if (!state.group) return {};
-          const members = state.group.members ?? [];
-          if (members.some((existing) => existing.id === member.id)) return {};
-          return { group: { ...state.group, members: [...members, member] } };
-        }),
-
-      removeGroupMember: (memberId) =>
-        set((state) =>
-          state.group
-            ? {
-                group: {
-                  ...state.group,
-                  members: (state.group.members ?? []).filter(
-                    (member) => member.id !== memberId
-                  ),
-                },
-              }
-            : {}
-        ),
-
       // --- Usage ------------------------------------------------------------
+      //
+      // These count on the device so a limit can be refused before a request is
+      // made — a student on a dead connection should still be told they are out
+      // of questions rather than watching one fail. The server meters the same
+      // things and wins whenever `serverUsage` is present.
 
       /** Rolls any counter whose period has passed. Safe to call on render. */
       refreshUsage: () => set((state) => ({ usage: rollUsage(state.usage) })),
@@ -278,18 +390,22 @@ export const useStudyStore = create(
           };
         }),
 
-      /** Marks the intake flow done; the guard stops redirecting after this. */
+      /**
+       * Marks the intake flow done; the guard stops redirecting after this.
+       *
+       * No trial is minted here. The server grants the fortnight once per
+       * person when the account is created, and it does not restart because
+       * someone reinstalled — which is exactly what a device-side clock would
+       * let them do.
+       */
       completeOnboarding: (patch = {}) =>
         set((state) => ({
           onboarded: true,
-          // The clock starts when the account is actually usable, not on
-          // install — otherwise a student who abandons intake loses days of a
-          // trial they never began.
-          subscription: state.subscription ?? newSubscription(SubscriptionTier.TRIAL),
           profile: {
             ...state.profile,
             ...patch,
             initials: initialsFrom(patch.name ?? state.profile.name),
+            updatedAt: stamp(),
           },
         })),
 
@@ -301,7 +417,8 @@ export const useStudyStore = create(
           code: code.trim().toUpperCase(),
           title: title.trim(),
           lecturer: lecturer.trim(),
-          createdAt: new Date().toISOString(),
+          createdAt: stamp(),
+          updatedAt: stamp(),
         };
 
         set((state) => ({ units: [...state.units, unit] }));
@@ -311,29 +428,64 @@ export const useStudyStore = create(
       updateUnit: (id, patch) =>
         set((state) => ({
           units: state.units.map((unit) =>
-            unit.id === id ? { ...unit, ...patch } : unit
+            unit.id === id ? { ...unit, ...patch, updatedAt: stamp() } : unit
           ),
         })),
 
-      /** Drops the unit and everything filed under it — nothing is left orphaned. */
+      /**
+       * Drops the unit and everything filed under it — nothing is left
+       * orphaned, on the device or on the account. Each cascade leaves its own
+       * tombstone, because the server deletes what it is told to delete rather
+       * than inferring a cascade from a parent row it may not have seen yet.
+       */
       removeUnit: (id) =>
-        set((state) => ({
-          units: state.units.filter((unit) => unit.id !== id),
-          sessions: state.sessions.filter((entry) => entry.unitId !== id),
-          materials: state.materials.filter((entry) => entry.unitId !== id),
-          events: state.events.filter((entry) => entry.unitId !== id),
-        })),
+        set((state) => {
+          const at = stamp();
+          const buried = (rows) =>
+            rows.map((row) => ({ id: row.id, unitId: row.unitId, deletedAt: at }));
+
+          const sessions = state.sessions.filter((entry) => entry.unitId === id);
+          const materials = state.materials.filter((entry) => entry.unitId === id);
+          const events = state.events.filter((entry) => entry.unitId === id);
+
+          return {
+            units: state.units.filter((unit) => unit.id !== id),
+            sessions: state.sessions.filter((entry) => entry.unitId !== id),
+            materials: state.materials.filter((entry) => entry.unitId !== id),
+            events: state.events.filter((entry) => entry.unitId !== id),
+            tombstones: {
+              ...state.tombstones,
+              units: [...state.tombstones.units, { id, deletedAt: at }],
+              sessions: [...state.tombstones.sessions, ...buried(sessions)],
+              materials: [...state.tombstones.materials, ...buried(materials)],
+              events: [...state.tombstones.events, ...buried(events)],
+            },
+          };
+        }),
 
       // --- Timetable --------------------------------------------------------
 
       /** `{ unitId, day: 0-6, start: "08:00", end: "10:00", room }` */
       addSession: (entry) =>
         set((state) => ({
-          sessions: [...state.sessions, { id: newId(), ...entry }],
+          sessions: [...state.sessions, { id: newId(), ...entry, updatedAt: stamp() }],
         })),
 
       removeSession: (id) =>
-        set((state) => ({ sessions: state.sessions.filter((c) => c.id !== id) })),
+        set((state) => {
+          const gone = state.sessions.find((entry) => entry.id === id);
+
+          return {
+            sessions: state.sessions.filter((entry) => entry.id !== id),
+            tombstones: {
+              ...state.tombstones,
+              sessions: [
+                ...state.tombstones.sessions,
+                { id, unitId: gone?.unitId ?? null, deletedAt: stamp() },
+              ],
+            },
+          };
+        }),
 
       // --- Knowledge --------------------------------------------------------
 
@@ -350,7 +502,16 @@ export const useStudyStore = create(
           kind,
           uri,
           archived: false,
-          addedAt: new Date().toISOString(),
+          addedAt: stamp(),
+          updatedAt: stamp(),
+          /**
+           * Where an attached file has got to: `queued` before the bytes have
+           * been sent, `uploading` while they are going, `pending` once they
+           * are in the bucket and the server has yet to read them, `ready`
+           * when its text is searchable, `failed` if the upload did not land.
+           * A typed note is `ready` immediately — there is nothing to carry.
+           */
+          uploadStatus: uri ? "queued" : "ready",
         };
 
         set((state) => ({ materials: [material, ...state.materials] }));
@@ -365,14 +526,37 @@ export const useStudyStore = create(
       archiveMaterial: (id, archived = true) =>
         set((state) => ({
           materials: state.materials.map((material) =>
-            material.id === id ? { ...material, archived } : material
+            material.id === id
+              ? { ...material, archived, updatedAt: stamp() }
+              : material
+          ),
+        })),
+
+      /** Patches one item in place. The upload flow uses it to move a file on. */
+      updateMaterial: (id, patch) =>
+        set((state) => ({
+          materials: state.materials.map((material) =>
+            material.id === id
+              ? { ...material, ...patch, updatedAt: stamp() }
+              : material
           ),
         })),
 
       removeMaterial: (id) =>
-        set((state) => ({
-          materials: state.materials.filter((m) => m.id !== id),
-        })),
+        set((state) => {
+          const gone = state.materials.find((material) => material.id === id);
+
+          return {
+            materials: state.materials.filter((material) => material.id !== id),
+            tombstones: {
+              ...state.tombstones,
+              materials: [
+                ...state.tombstones.materials,
+                { id, unitId: gone?.unitId ?? null, deletedAt: stamp() },
+              ],
+            },
+          };
+        }),
 
       // --- Events -----------------------------------------------------------
 
@@ -392,7 +576,8 @@ export const useStudyStore = create(
           // fixed list does not have a name for.
           label: kind === "other" ? label.trim() : "",
           done: false,
-          createdAt: new Date().toISOString(),
+          createdAt: stamp(),
+          updatedAt: stamp(),
         };
 
         set((state) => ({ events: [...state.events, event] }));
@@ -402,12 +587,27 @@ export const useStudyStore = create(
       toggleEvent: (id) =>
         set((state) => ({
           events: state.events.map((event) =>
-            event.id === id ? { ...event, done: !event.done } : event
+            event.id === id
+              ? { ...event, done: !event.done, updatedAt: stamp() }
+              : event
           ),
         })),
 
       removeEvent: (id) =>
-        set((state) => ({ events: state.events.filter((e) => e.id !== id) })),
+        set((state) => {
+          const gone = state.events.find((event) => event.id === id);
+
+          return {
+            events: state.events.filter((event) => event.id !== id),
+            tombstones: {
+              ...state.tombstones,
+              events: [
+                ...state.tombstones.events,
+                { id, unitId: gone?.unitId ?? null, deletedAt: stamp() },
+              ],
+            },
+          };
+        }),
 
       // --- Chats ------------------------------------------------------------
 
@@ -424,7 +624,8 @@ export const useStudyStore = create(
           unitId,
           mode: "ask",
           messages: [],
-          createdAt: new Date().toISOString(),
+          createdAt: stamp(),
+          updatedAt: stamp(),
         };
 
         set((state) => ({ chats: [chat, ...state.chats], activeChatId: chat.id }));
@@ -436,7 +637,7 @@ export const useStudyStore = create(
       setChatUnit: (id, unitId) =>
         set((state) => ({
           chats: state.chats.map((chat) =>
-            chat.id === id ? { ...chat, unitId } : chat
+            chat.id === id ? { ...chat, unitId, updatedAt: stamp() } : chat
           ),
         })),
 
@@ -448,12 +649,13 @@ export const useStudyStore = create(
 
             const messages = [
               ...chat.messages,
-              { id: newId(), at: new Date().toISOString(), ...message },
+              { id: newId(), at: stamp(), ...message },
             ];
 
             return {
               ...chat,
               messages,
+              updatedAt: stamp(),
               // The first thing asked names the conversation. A student
               // scanning the drawer recognises their own question long before
               // they recognise a date.
@@ -472,6 +674,10 @@ export const useStudyStore = create(
             chats,
             activeChatId:
               state.activeChatId === id ? (chats[0]?.id ?? null) : state.activeChatId,
+            tombstones: {
+              ...state.tombstones,
+              chats: [...state.tombstones.chats, { id, deletedAt: stamp() }],
+            },
           };
         }),
 
@@ -513,39 +719,82 @@ export const useStudyStore = create(
     {
       name: "study-brain-v1",
       storage: createJSONStorage(() => AsyncStorage),
-      version: 2,
+      version: 3,
       /**
-       * Renames carried forward, so nobody loses a timetable to vocabulary.
+       * Renames and reshapes carried forward, so nobody loses a timetable to
+       * vocabulary or a semester of notes to a schema change.
        *
        * v2 renamed `classes` to `sessions` — the app is for postgraduates as
        * well as undergraduates, and what they attend is as often a seminar, a
        * lab or a supervision as a class. Without this, an existing install
        * rehydrates a state with no `sessions` key and the timetable comes back
        * empty, which reads as data loss rather than a rename.
+       *
+       * v3 is the move onto the account. An install from before it has rows
+       * with no `updatedAt` and a session with no tokens, so: every row is
+       * stamped now, which marks the lot dirty and pushes a device's whole
+       * history up on the first sync, and the session is cleared so the
+       * student signs in for real once. Signing in is the only way to get a
+       * token, and without one there is nothing to push to.
        */
       migrate: (persisted, version) => {
-        if (!persisted || version >= 2) return persisted;
+        if (!persisted) return persisted;
 
-        const { classes, settings, ...rest } = persisted;
+        let state = persisted;
 
-        return {
-          ...rest,
-          sessions: classes ?? rest.sessions ?? [],
-          settings: settings
-            ? (({ classReminders, ...keep }) => ({
-                ...keep,
-                sessionReminders: classReminders ?? keep.sessionReminders ?? true,
-              }))(settings)
-            : settings,
-        };
+        if (version < 2) {
+          const { classes, settings, ...rest } = state;
+
+          state = {
+            ...rest,
+            sessions: classes ?? rest.sessions ?? [],
+            settings: settings
+              ? (({ classReminders, ...keep }) => ({
+                  ...keep,
+                  sessionReminders: classReminders ?? keep.sessionReminders ?? true,
+                }))(settings)
+              : settings,
+          };
+        }
+
+        if (version < 3) {
+          const at = stamp();
+          const stampAll = (rows) =>
+            (rows ?? []).map((row) => ({ ...row, updatedAt: row.updatedAt ?? at }));
+
+          state = {
+            ...state,
+            units: stampAll(state.units),
+            sessions: stampAll(state.sessions),
+            materials: stampAll(state.materials),
+            events: stampAll(state.events),
+            chats: stampAll(state.chats),
+            tombstones: { ...EMPTY_TOMBSTONES },
+            syncCursor: null,
+            pushedAt: null,
+            // No token existed before this version, so there is no session to
+            // restore — only a local sign-in flag that would now let someone
+            // past the wall with nothing behind it.
+            userId: null,
+            isAuthenticated: false,
+            authToken: null,
+            refreshToken: null,
+            tokenExpiresAt: null,
+            subscription: null,
+            serverUsage: null,
+          };
+        }
+
+        return state;
       },
       // `hydrated` is about this launch, not about the student — persisting it
-      // would restore `true` before the read had actually happened.
+      // would restore `true` before the read had actually happened. `syncing`
+      // and `syncError` are the same: they describe a request, and a request
+      // does not survive the process that made it.
       //
-      // While the intro is being designed, `introSeen` is left out too, so it
-      // comes back false on every cold start and the screens show again. The
-      // flag still works normally within a session; it just is not remembered.
-      partialize: ({ hydrated, introSeen, ...rest }) =>
+      // `introSeen` is left out only while ALWAYS_SHOW_INTRO is on, so the
+      // explainer comes back on every cold start while it is being designed.
+      partialize: ({ hydrated, syncing, syncError, introSeen, ...rest }) =>
         ALWAYS_SHOW_INTRO ? rest : { ...rest, introSeen },
       // Flip the flag through the store rather than the callback's `state`
       // argument: on a read error that argument is undefined, and the guard

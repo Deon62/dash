@@ -17,6 +17,7 @@ import AvatarPicker from "@/components/AvatarPicker";
 import LinkRow from "@/components/LinkRow";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useStudyStore } from "@/store/useStudyStore";
+import { endSession } from "@/lib/session";
 import { activeTier } from "@/lib/quota";
 import { planName } from "@/theme/plans";
 
@@ -29,7 +30,8 @@ export default function ProfileScreen() {
   const units = useStudyStore((state) => state.units);
   const sessions = useStudyStore((state) => state.sessions);
   const subscription = useStudyStore((state) => state.subscription);
-  const signOut = useStudyStore((state) => state.signOut);
+  const syncing = useStudyStore((state) => state.syncing);
+  const syncError = useStudyStore((state) => state.syncError);
 
   const enrolment = [profile.program, profile.institution].filter(Boolean).join(" · ");
   const term = [
@@ -105,23 +107,29 @@ export default function ProfileScreen() {
         />
       </View>
 
-      {/* Everything is on the phone, so this really is the whole account —
-          worth saying plainly rather than implying a server holds a copy. */}
+      {/* Whether the account is level with this phone. Silent when it is —
+          "saved" on every screen is noise, and the only state worth a line is
+          the one a student might act on. */}
       <Text className="font-jk text-muted text-[11.5px] leading-[17px] -mt-4">
-        Your coursework is stored on this device only. Logging out keeps it.
+        {syncing
+          ? "Saving to your account…"
+          : syncError
+            ? `${syncError} Your work is safe here and will go up when you are back online.`
+            : "Your coursework is saved to your account and follows you to any phone you sign in on."}
       </Text>
 
-      {/* Signing out is cheap here — the coursework stays — but it still ends
-          a session, and a mis-tap on the last row of a list should not do it. */}
+      {/* Logging out clears this handset — the coursework is on the account,
+          not here — so it is worth confirming rather than doing on a mis-tap
+          against the last row of a list. */}
       <ConfirmDialog
         visible={confirmingLogout}
         title="Log out?"
-        message="Your units, notes and deadlines stay on this device. You can sign back in any time."
+        message="Your units, notes and deadlines stay on your account. Signing back in brings them down again."
         confirmLabel="Log out"
         onCancel={() => setConfirmingLogout(false)}
         onConfirm={() => {
           setConfirmingLogout(false);
-          signOut();
+          endSession();
         }}
       />
     </Screen>

@@ -17,8 +17,8 @@ import {
 } from "@/theme/countries";
 import { COLORS } from "@/theme/colors";
 import { detectCountry } from "@/lib/geo";
-import { sendPhoneOtp, signInWithGoogle } from "@/lib/auth";
-import { useStudyStore } from "@/store/useStudyStore";
+import { sendPhoneOtp } from "@/lib/auth";
+import { useGoogleSignIn } from "@/lib/useGoogleSignIn";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
 
@@ -61,7 +61,9 @@ export default function LoginScreen() {
   const insets = useSafeAreaInsets();
   const keyboard = useKeyboard();
 
-  const signInWithEmail = useStudyStore((state) => state.signInWithEmail);
+  // Google is only offered where the build has OAuth client ids. A consent
+  // screen that cannot complete is worse than an option that was never shown.
+  const google = useGoogleSignIn();
 
   const scrollRef = useRef(null);
   const [country, setCountry] = useState(DEFAULT_COUNTRY);
@@ -114,23 +116,13 @@ export default function LoginScreen() {
     });
   };
 
+  // No navigation on success — the session guard reacts to the new session and
+  // sends a new student to onboarding, a returning one to the tabs.
   const continueWithGoogle = async () => {
-    if (busy) return;
+    if (busy || google.busy) return;
     impact("medium");
-    setBusy("google");
     setError("");
-
-    const result = await signInWithGoogle();
-    setBusy(null);
-
-    if (result.error) {
-      setError(result.error);
-      return;
-    }
-
-    // No navigation here — the session guard reacts to the new session and
-    // sends a new student to onboarding, a returning one to the tabs.
-    signInWithEmail(result.email);
+    await google.start();
   };
 
   // Scroll the number into view once the keyboard is up. The padding below
@@ -181,27 +173,34 @@ export default function LoginScreen() {
             under the heading — the page reads as a heading at the top, the
             thing you came to do in the middle, and small print at the foot. */}
         <View className="flex-1 justify-center py-10">
-          <Pressable
-            onPress={continueWithGoogle}
-            disabled={Boolean(busy)}
-            accessibilityRole="button"
-            accessibilityLabel="Continue with Google"
-            accessibilityState={{ disabled: Boolean(busy), busy: busy === "google" }}
-            className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 ${
-              busy ? "opacity-50" : "active:bg-surface"
-            }`}
-          >
-            <GoogleMark size={18} />
-            <Text className="font-jk-med text-ink text-[15px]">
-              {busy === "google" ? "Signing in…" : "Continue with Google"}
-            </Text>
-          </Pressable>
+          {google.available ? (
+            <>
+              <Pressable
+                onPress={continueWithGoogle}
+                disabled={Boolean(busy) || google.busy}
+                accessibilityRole="button"
+                accessibilityLabel="Continue with Google"
+                accessibilityState={{
+                  disabled: Boolean(busy) || google.busy,
+                  busy: google.busy,
+                }}
+                className={`flex-row items-center justify-center gap-x-3 rounded-2xl border border-line py-4 ${
+                  busy || google.busy ? "opacity-50" : "active:bg-surface"
+                }`}
+              >
+                <GoogleMark size={18} />
+                <Text className="font-jk-med text-ink text-[15px]">
+                  {google.busy ? "Signing in…" : "Continue with Google"}
+                </Text>
+              </Pressable>
 
-          <View className="flex-row items-center gap-x-3 my-7">
-            <View className="flex-1 h-px bg-line" />
-            <Text className="font-jk text-muted text-[11px]">or</Text>
-            <View className="flex-1 h-px bg-line" />
-          </View>
+              <View className="flex-row items-center gap-x-3 my-7">
+                <View className="flex-1 h-px bg-line" />
+                <Text className="font-jk text-muted text-[11px]">or</Text>
+                <View className="flex-1 h-px bg-line" />
+              </View>
+            </>
+          ) : null}
 
           {/* A rule, like every other input in the app. The Google control
               above keeps its outline because it is a button, not a field. */}
@@ -234,9 +233,9 @@ export default function LoginScreen() {
               : `We'll text a code to ${selected.dial} ${digits || "…"}`}
           </Text>
 
-          {error ? (
+          {error || google.error ? (
             <Text className="font-jk text-danger text-[12px] leading-[17px] mt-2">
-              {error}
+              {error || google.error}
             </Text>
           ) : null}
 

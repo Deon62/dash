@@ -12,16 +12,27 @@ npx eas-cli whoami         # should print ardenaprod
 
 ## What this build is
 
-The app has **no backend**. `src/api/` exists but nothing imports it, and
-`src/lib/auth.js` is an offline stand-in that accepts any six digits. Everything
-on screen comes from the on-device store (`src/store/useStudyStore.js`), which
-persists to AsyncStorage.
+The app runs against the live API at `https://als.ardena.xyz`. Sign-in texts a
+real code, coursework is stored against the account and synced to the device,
+the tutor answers from material the server has read, and payments are verified
+server-side.
 
-That is deliberate for internal testing: a tester can sign in with any number,
-walk the whole app, add units, notes, timetable entries and events, and see
-every screen. Nothing leaves the phone. Payments open real Paystack pages in the
-browser, so **do not complete one** on a test build — the app cannot see the
-charge and simply asks whether it went through.
+`src/store/useStudyStore.js` still persists to AsyncStorage, but as a cache and
+an outbox rather than as the source of truth: every row carries `updatedAt`,
+every deletion leaves a tombstone, and `src/lib/sync.js` pushes what changed
+before pulling what the server has. That is what keeps the app usable on a bad
+connection without making the phone the authority on anything.
+
+Two things a tester should know:
+
+- **Payments are real.** Checkout opens a Kora page for an actual charge. Use a
+  test account and a small amount, or do not complete one.
+- **Signing in takes the account over.** The server allows one live session per
+  account, so signing in on a second handset signs the first one out.
+
+Point a build at another server with `EXPO_PUBLIC_API_URL` — see `.env.example`
+for that and for the Google sign-in client ids, which the sign-in screen hides
+the Google button without.
 
 ---
 

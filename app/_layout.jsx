@@ -17,6 +17,7 @@ import {
 
 import { useStudyStore } from "@/store/useStudyStore";
 import { useSessionGuard } from "@/lib/useSessionGuard";
+import { useAccountSync } from "@/lib/bootstrap";
 
 /**
  * Guards the routes. A component rather than a hook call in RootLayout so it
@@ -25,6 +26,16 @@ import { useSessionGuard } from "@/lib/useSessionGuard";
  */
 function SessionGuard() {
   useSessionGuard();
+  return null;
+}
+
+/**
+ * Keeps the device level with the account: on sign-in, on cold start, and on
+ * coming back from the background. A component for the same reason as the
+ * guard — it belongs below the navigator, not in the layout's own body.
+ */
+function AccountSync() {
+  useAccountSync();
   return null;
 }
 
@@ -84,6 +95,7 @@ export default function RootLayout() {
           <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
         </Stack>
         <SessionGuard />
+        <AccountSync />
       </SafeAreaProvider>
     </GestureHandlerRootView>
   );

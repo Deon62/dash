@@ -10,6 +10,7 @@ import TextField from "@/components/TextField";
 import Dropdown from "@/components/Dropdown";
 import AvatarPicker from "@/components/AvatarPicker";
 import { useStudyStore } from "@/store/useStudyStore";
+import { saveProfile } from "@/lib/account";
 import { SEMESTERS, YEARS } from "@/theme/units";
 import { impact, notify } from "@/lib/haptics";
 
@@ -26,7 +27,6 @@ export const SEMESTER_OPTIONS = SEMESTERS.map((semester) => ({
 export default function AccountScreen() {
   const router = useRouter();
   const profile = useStudyStore((state) => state.profile);
-  const updateProfile = useStudyStore((state) => state.updateProfile);
 
   const [name, setName] = useState(profile.name);
   const [email, setEmail] = useState(profile.email);
@@ -43,10 +43,19 @@ export default function AccountScreen() {
     year !== profile.yearOfStudy ||
     semester !== profile.semester;
 
+  /**
+   * Saves and leaves, without waiting on the round trip.
+   *
+   * `saveProfile` writes the change locally before it sends it, so going back
+   * immediately shows the new details rather than the old ones for the length
+   * of a request. A failure is picked up by the next sync rather than trapping
+   * someone on a form they have finished with.
+   */
   const save = () => {
     if (!dirty) return;
     impact("medium");
-    updateProfile({
+
+    saveProfile({
       name: name.trim(),
       email: email.trim(),
       program: program.trim(),
@@ -54,6 +63,7 @@ export default function AccountScreen() {
       yearOfStudy: year,
       semester,
     });
+
     notify("success");
     router.back();
   };

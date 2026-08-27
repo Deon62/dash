@@ -1,6 +1,9 @@
 import * as WebBrowser from "expo-web-browser";
 
-import { billing, isBackendConfigured } from "@/api/endpoints";
+import { billing } from "@/api/endpoints";
+import { authed } from "@/lib/session";
+import { loadGroup, loadSubscription } from "@/lib/billing";
+import { useStudyStore } from "@/store/useStudyStore";
 
 /**
  * Paying for a plan.
@@ -16,16 +19,10 @@ import { billing, isBackendConfigured } from "@/api/endpoints";
  * mints a Kora checkout with the payer's id in the metadata, so the payment
  * arrives already tied to a student.
  *
- * Everything here resolves to `{ ... , error }` and never throws, matching the
+ * Everything here resolves to `{ ..., error }` and never throws, matching the
  * rest of `src/api` — a rejection inside a button handler takes the screen
  * down with it.
  */
-
-/** Why a checkout could not be started, in words meant for a student. */
-const NO_SERVER =
-  "Paying needs a connection to our server, and this build has none configured.";
-const NOT_SIGNED_IN =
-  "Sign in first — a payment has to be attached to your account, or there is no way to give you the plan.";
 
 /**
  * Opens a payment page for one plan and returns the reference to verify.
@@ -35,11 +32,8 @@ const NOT_SIGNED_IN =
  * WebView also hides whether the page is the provider's or ours, which is
  * exactly the thing not to teach people to ignore.
  */
-export async function startCheckout(tier, token) {
-  if (!isBackendConfigured) return { reference: null, error: NO_SERVER };
-  if (!token) return { reference: null, error: NOT_SIGNED_IN };
-
-  const { data, error } = await billing.checkout(tier, token);
+export async function startCheckout(tier) {
+  const { data, error } = await authed((token) => billing.checkout(tier, token));
   if (error) return { reference: null, error };
 
   // `checkout_url` is the field; `authorization_url` is the same value under
@@ -59,7 +53,7 @@ export async function startCheckout(tier, token) {
 }
 
 /**
- * Asks the server what happened to a reference.
+ * Asks the server what happened to a reference, and takes its answer.
  *
  * Safe to call more than once: the reference is unique, so a second call
  * returns the same subscription rather than extending it again.
@@ -68,18 +62,39 @@ export async function startCheckout(tier, token) {
  * minute, and Kora's webhook will credit the plan when it lands — so a student
  * who checks a moment too early should be told to wait, not told it failed.
  */
-export async function confirmCheckout(reference, token) {
-  if (!reference || !token) return { subscription: null, error: NOT_SIGNED_IN };
-
-  const { data, error, status } = await billing.verifyPayment(reference, token);
-
-  if (error) {
-    return {
-      subscription: null,
-      pending: status === 402,
-      error,
-    };
+export async function confirmCheckout(reference) {
+  if (!reference) {
+    return { pending: false, error: "There is no payment to check." };
   }
 
-  return { subscription: data, pending: false, error: null };
+  const { data, error, status } = await authed((token) =>
+    billing.verifyPayment(reference, token),
+  );
+
+  if (error) {
+    return { pending: status === 402, error };
+  }
+
+  useStudyStore.getState().setSubscription({
+    tier: data.tier,
+    nominalTier: data.nominal_tier ?? data.tier,
+    planName: data.name,
+    expiresAt: data.expires_at,
+    daysRemaining: data.days_remaining,
+    verified: Boolean(data.verified),
+    seats: data.seats ?? 1,
+    isExpired: Boolean(data.is_expired),
+  });
+
+  // A Friends payment buys four other seats and a code to hand them out with.
+  // Reading the group straight away is what puts that code on the screen the
+  // student is about to land on.
+  if (data.seats > 1) await loadGroup();
+
+  return { pending: false, error: null };
+}
+
+/** Re-reads the plan. Used when a screen needs the truth rather than a cache. */
+export async function refreshPlan() {
+  return loadSubscription();
 }

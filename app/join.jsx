@@ -5,8 +5,7 @@ import { useRouter } from "expo-router";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import Button from "@/components/Button";
-import { useStudyStore } from "@/store/useStudyStore";
-import { SubscriptionTier, seatsFor } from "@/theme/plans";
+import { joinGroup } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
 import { notify } from "@/lib/haptics";
 
@@ -26,30 +25,36 @@ const CODE_LENGTH = 8;
 export default function JoinScreen() {
   const router = useRouter();
 
-  const setGroup = useStudyStore((state) => state.setGroup);
-  const activatePlan = useStudyStore((state) => state.activatePlan);
-  const profile = useStudyStore((state) => state.profile);
-
   const [code, setCode] = useState("");
   const [focused, setFocused] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
 
-  const ready = code.length === CODE_LENGTH;
+  const ready = code.length === CODE_LENGTH && !busy;
 
-  const join = () => {
+  /**
+   * The seat is the server's to give.
+   *
+   * Nothing is written here on the way in: whether the code is real, whether
+   * the plan is still paid for, and whether there is a seat left are all
+   * questions only the server can answer, and showing someone a plan they do
+   * not have would be worse than the wait.
+   */
+  const join = async () => {
+    if (!ready) return;
+
+    setBusy(true);
+    setError("");
+
+    const result = await joinGroup(code);
+    setBusy(false);
+
+    if (result.error) {
+      setError(result.error);
+      return;
+    }
+
     notify("success");
-
-    // Local until the join endpoint is wired: the seat is real when the server
-    // says so, and a pull replaces this wholesale.
-    activatePlan(SubscriptionTier.FRIENDS);
-    setGroup({
-      inviteCode: code,
-      seats: seatsFor(SubscriptionTier.FRIENDS),
-      members: [
-        { id: "owner", name: "Whoever invited you", isOwner: true },
-        { id: "me", name: profile.name || "You", isOwner: false },
-      ],
-    });
-
     // Replace, not push: going "back" to a join form you have already used is
     // a dead end.
     router.replace("/friends");
@@ -101,7 +106,22 @@ export default function JoinScreen() {
         }}
       />
 
-      <Button label="Join" disabled={!ready} onPress={join} />
+      {error ? (
+        <Text
+          className="font-jk text-[12px] leading-[17px]"
+          style={{ color: COLORS.danger }}
+        >
+          {error}
+        </Text>
+      ) : null}
+
+      <Button
+        label="Join"
+        busyLabel="Checking the code…"
+        busy={busy}
+        disabled={!ready}
+        onPress={join}
+      />
     </Screen>
   );
 }

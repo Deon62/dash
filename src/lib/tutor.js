@@ -1,222 +1,301 @@
+import { fetch as streamingFetch } from "expo/fetch";
+
+import { API_BASE_URL, API_V1, OFFLINE } from "@/api/client";
+import { tutor as tutorApi } from "@/api/endpoints";
+import { accessToken, authed, refreshSession, NOT_SIGNED_IN } from "@/lib/session";
+
 /**
- * The study tutor, running entirely on the device.
+ * The tutor.
  *
- * This is the retrieval half of the eventual RAG loop and none of the
- * generation half: it scores the student's own notes against the question and
- * hands back the passages that matched, labelled with where they came from.
- * When a model is wired in, `answer()` is the seam — the same ranked passages
- * become its context, and only the prose around them changes.
+ * Retrieval happens on the server, over everything the student has filed —
+ * including the text pulled out of PDFs, which the device never sees. That is
+ * the difference between "nothing in your notes matches that" being a fact and
+ * being a guess made from whatever this handset happened to have cached.
  *
- * Answers therefore never invent anything. A student revising from this sees
- * their own words or an honest "nothing filed on that yet".
+ * An answer arrives as server-sent events rather than as JSON. A grounded
+ * answer takes several seconds to generate and a student watching a spinner
+ * for six of them assumes it has hung; streaming also degrades honestly, since
+ * a connection that drops mid-answer leaves them with the part that arrived.
+ *
+ * `expo/fetch` rather than the global one: React Native's `fetch` has no
+ * readable body, so the global would buffer the whole answer and hand it over
+ * in one lump — the exact thing streaming exists to avoid.
  */
 
-/** Words too common to say anything about which note is relevant. */
-const STOP_WORDS = new Set([
-  "a", "an", "the", "is", "are", "was", "were", "be", "been", "being", "of", "in",
-  "on", "at", "to", "for", "with", "and", "or", "but", "if", "then", "than",
-  "that", "this", "these", "those", "it", "its", "as", "by", "from", "into",
-  "about", "what", "why", "how", "when", "where", "which", "who", "whom", "do",
-  "does", "did", "can", "could", "should", "would", "will", "shall", "may",
-  "might", "me", "my", "i", "you", "your", "we", "our", "us", "explain", "tell",
-  "describe", "define", "give", "show", "help", "please", "again", "quiz",
-]);
+/**
+ * Long, on purpose.
+ *
+ * The budget for a streamed answer is not the budget for a JSON call: the
+ * request is open for as long as the model is talking, and the ordinary
+ * timeout in `src/api/client.js` would cut a good answer off in the middle.
+ */
+const STREAM_TIMEOUT_MS = 120000;
 
-const MIN_TERM_LENGTH = 3;
+/**
+ * Asks a question, grounded in the student's own material.
+ *
+ * `onToken` is called with each piece as it arrives, `onMeta` once before the
+ * first one with the sources the answer is built from — so the citation header
+ * can be drawn while the prose is still coming.
+ *
+ * Resolves to `{ text, sources, chatId, model, error, status }` and never
+ * throws. `status` is 402 when a plan limit refused the question — the caller
+ * has a different screen for that than for a failure.
+ */
+export async function askTutor({
+  question,
+  chatId = null,
+  unitCode = null,
+  model = null,
+  onMeta,
+  onToken,
+  signal,
+} = {}) {
+  const token = await accessToken();
+  if (!token) return { text: "", sources: [], error: NOT_SIGNED_IN, status: 401 };
 
-export function tokenize(text) {
-  return String(text ?? "")
-    .toLowerCase()
-    // ASCII-only classes on purpose: Hermes has shipped without Unicode
-    // property escapes, and a regex that fails to parse takes the bundle down
-    // rather than degrading.
-    .replace(/[^a-z0-9\s]+/g, " ")
-    .split(/\s+/)
-    .filter((word) => word.length >= MIN_TERM_LENGTH && !STOP_WORDS.has(word));
+  const first = await openStream({ question, chatId, unitCode, model, token, signal });
+
+  // A token revoked early — the account signed in on another handset, or the
+  // server restarted — is the one failure worth a second attempt. Anything
+  // else is reported as it came.
+  if (first.status !== 401) return readStream(first, { onMeta, onToken });
+
+  const fresh = await refreshSession();
+  if (!fresh) return { text: "", sources: [], error: NOT_SIGNED_IN, status: 401 };
+
+  const retry = await openStream({
+    question,
+    chatId,
+    unitCode,
+    model,
+    token: fresh,
+    signal,
+  });
+
+  return readStream(retry, { onMeta, onToken });
 }
 
-/** Splits a note into passages a person would recognise as one thought. */
-export function passagesOf(material) {
-  // Blank lines first, then sentence ends inside each block. Two passes rather
+async function openStream({ question, chatId, unitCode, model, token, signal }) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
+  const onExternalAbort = () => controller.abort();
+  signal?.addEventListener?.("abort", onExternalAbort);
+
+  const release = () => {
+    clearTimeout(timer);
+    signal?.removeEventListener?.("abort", onExternalAbort);
+  };
+
+  try {
+    const response = await streamingFetch(`${API_BASE_URL}${API_V1}/tutor/ask`, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "Content-Type": "application/json",
+        Accept: "text/event-stream",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        question,
+        chat_id: chatId,
+        unit_code: unitCode,
+        model,
+      }),
+    });
+
+    if (!response.ok) {
+      // The stream never started, so the failure is an ordinary JSON envelope
+      // and can be read as one.
+      const text = await response.text();
+      let message = `The tutor could not answer (${response.status}).`;
+      try {
+        message = JSON.parse(text)?.message ?? message;
+      } catch {
+        // Not JSON. The status line above is all there is to say.
+      }
+
+      release();
+      return { status: response.status, error: message };
+    }
+
+    return { status: response.status, response, release };
+  } catch (error) {
+    release();
+
+    return {
+      status: 0,
+      error:
+        error?.name === "AbortError"
+          ? "The answer was taking too long, so it was stopped."
+          : OFFLINE,
+    };
+  }
+}
+
+/**
+ * Reads the frames.
+ *
+ * `meta` first, then many `token`s, then `done`. An `error` frame is how a
+ * failure that happened *after* the headers went out reaches the student —
+ * there is no status code left to change by then, so it travels inside the
+ * stream and replaces the rest of the answer.
+ */
+async function readStream(opened, { onMeta, onToken }) {
+  if (opened.error) {
+    return { text: "", sources: [], error: opened.error, status: opened.status };
+  }
+
+  const { response, release } = opened;
+
+  let text = "";
+  let sources = [];
+  let chatId = null;
+  let model = null;
+  let failure = null;
+
+  try {
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Frames are separated by a blank line. Anything after the last one is a
+      // partial frame and stays in the buffer until the rest of it arrives —
+      // parsing it early is how a stream loses a word every few kilobytes.
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() ?? "";
+
+      for (const frame of frames) {
+        const parsed = parseFrame(frame);
+        if (!parsed) continue;
+
+        if (parsed.event === "meta") {
+          chatId = parsed.data.chat_id ?? chatId;
+          model = parsed.data.model ?? model;
+          sources = parsed.data.sources ?? [];
+          onMeta?.(parsed.data);
+        } else if (parsed.event === "token") {
+          text += parsed.data.text ?? "";
+          onToken?.(parsed.data.text ?? "", text);
+        } else if (parsed.event === "done") {
+          if (parsed.data.text) text = parsed.data.text;
+        } else if (parsed.event === "error") {
+          failure = parsed.data.message ?? "Something went wrong on our side.";
+        }
+      }
+    }
+  } catch {
+    // Whatever arrived before the connection went is still worth keeping: a
+    // half-answer a student can read beats an error that throws it away.
+    if (!text) failure = OFFLINE;
+  } finally {
+    release?.();
+  }
+
+  // A failure inside the stream is never a quota refusal — the allowance was
+  // charged before the first frame went out — so the status stays 200.
+  return { text, sources, chatId, model, error: failure, status: 200 };
+}
+
+function parseFrame(frame) {
+  let event = "message";
+  const data = [];
+
+  for (const line of frame.split("\n")) {
+    if (line.startsWith("event:")) event = line.slice(6).trim();
+    else if (line.startsWith("data:")) data.push(line.slice(5).trim());
+  }
+
+  if (data.length === 0) return null;
+
+  try {
+    return { event, data: JSON.parse(data.join("\n")) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * A multiple-choice quiz over a unit or a topic.
+ *
+ * Not streamed: a quiz renders as cards and there is nothing to show until the
+ * last question has been parsed and checked. `count` is a request, not a
+ * promise — the server clamps it to whatever the plan allows.
+ */
+export async function buildQuiz({ unitCode = null, topic = null, count } = {}) {
+  const { data, error, status } = await authed((token) =>
+    tutorApi.quiz({ unitCode, topic, count }, token),
+  );
+
+  // 402 is the plan refusing, not the request failing. The caller shows a
+  // different screen for each.
+  if (error) return { questions: [], error, status };
+
+  return {
+    questions: (data.questions ?? []).map((question, index) => ({
+      id: `${index}-${question.prompt.slice(0, 24)}`,
+      prompt: question.prompt,
+      options: question.options ?? [],
+      answer: question.answer,
+      explanation: question.explanation ?? "",
+      source: question.source ?? "",
+    })),
+    grounded: Boolean(data.grounded),
+    note: data.note ?? "",
+    model: data.model ?? null,
+    error: null,
+    status,
+  };
+}
+
+/** The model line-up, so the picker can show what is and is not switched on. */
+export async function tutorModels() {
+  const { data, error } = await authed((token) => tutorApi.models(token));
+  if (error) return { models: [], default: null, error };
+
+  return { models: data.models ?? [], default: data.default ?? null, error: null };
+}
+
+// --- Cards ------------------------------------------------------------------
+
+/**
+ * Each note as a two-sided card: title on the front, opening lines behind.
+ *
+ * Built on the device rather than asked for, and deliberately so — this is a
+ * different view of material already synced down, not a new answer, and a
+ * round trip to re-cut text the app is already holding would only make it
+ * slower and unavailable underground.
+ */
+export function buildFlashcards(materials, { count = 12 } = {}) {
+  return materials
+    .filter((material) => (material.body ?? "").length > 0)
+    .slice(0, count)
+    .map((material) => ({
+      id: material.id,
+      front: material.title,
+      back: trim(firstPassage(material) ?? material.body, 220),
+      unitId: material.unitId,
+    }));
+}
+
+/** The opening thought of a note — a person would call it the first sentence. */
+function firstPassage(material) {
+  // Blank lines first, then sentence ends inside the block. Two passes rather
   // than one regex because the lookbehind that would do it in one is not safe
   // to rely on in Hermes.
   return String(material.body ?? "")
     .split(/\n{2,}/)
     .flatMap((block) => block.match(/[^.!?\n]+[.!?]*/g) ?? [])
     .map((passage) => passage.trim())
-    .filter((passage) => passage.length > 24);
-}
-
-/**
- * Ranks every passage in scope against the question.
- *
- * Scoring is term overlap weighted by how rare the term is across the corpus —
- * plain TF-IDF, which is enough to beat keyword matching on a few hundred notes
- * and needs no model on the device.
- */
-export function retrieve(question, materials, { limit = 4 } = {}) {
-  const terms = tokenize(question);
-  if (terms.length === 0 || materials.length === 0) return [];
-
-  const chunks = materials.flatMap((material) =>
-    passagesOf(material).map((text) => ({
-      text,
-      material,
-      terms: new Set(tokenize(text)),
-    }))
-  );
-
-  if (chunks.length === 0) return [];
-
-  // How many passages each term appears in — a term in every note tells us
-  // nothing, a term in one note tells us almost everything.
-  const documentFrequency = new Map();
-  for (const chunk of chunks) {
-    for (const term of chunk.terms) {
-      documentFrequency.set(term, (documentFrequency.get(term) ?? 0) + 1);
-    }
-  }
-
-  const scored = chunks.map((chunk) => {
-    let score = 0;
-
-    for (const term of terms) {
-      if (!chunk.terms.has(term)) continue;
-      score += Math.log(1 + chunks.length / (documentFrequency.get(term) ?? 1));
-    }
-
-    // A title match is a strong signal the student filed this deliberately.
-    const titleTerms = new Set(tokenize(chunk.material.title));
-    for (const term of terms) if (titleTerms.has(term)) score += 0.75;
-
-    return { ...chunk, score };
-  });
-
-  return scored
-    .filter((chunk) => chunk.score > 0)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, limit);
+    .find((passage) => passage.length > 24);
 }
 
 function trim(text, max = 320) {
   return text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`;
-}
-
-/**
- * Builds a reply to a question.
- *
- * Returns `{ text, sources }` where `sources` are the materials the answer was
- * drawn from, so the screen can show the student exactly which of their notes
- * is talking.
- */
-export function answer(question, { materials, unit, limit = 4 }) {
-  const scope = unit ? unit.code : "your units";
-
-  if (materials.length === 0) {
-    return {
-      text: `There is nothing filed under ${scope} yet, so I have nothing to revise from. Add a note or a summary of your reading in Knowledge and ask me again.`,
-      sources: [],
-    };
-  }
-
-  // `limit` comes from the plan: how many passages an answer may quote is the
-  // part of the tiered "source citations" promise this can honestly deliver.
-  const hits = retrieve(question, materials, { limit });
-
-  if (hits.length === 0) {
-    const titles = materials
-      .slice(0, 3)
-      .map((material) => `“${material.title}”`)
-      .join(", ");
-
-    return {
-      text: `Nothing in ${scope} matches that. What you do have on file: ${titles}${
-        materials.length > 3 ? `, and ${materials.length - 3} more` : ""
-      }. Try wording it the way your notes do, or file the material it came from.`,
-      sources: [],
-    };
-  }
-
-  const body = hits
-    .map((hit, index) => `${index + 1}. ${trim(hit.text)}\n— ${hit.material.title}`)
-    .join("\n\n");
-
-  const sources = [...new Map(hits.map((hit) => [hit.material.id, hit.material])).values()];
-
-  return {
-    text: `From your ${scope} material:\n\n${body}`,
-    sources,
-  };
-}
-
-/**
- * Turns notes into cloze questions.
- *
- * The blanked word is the rarest one in the sentence, which is close enough to
- * "the term being defined" to be worth answering — a blanked "the" would not be.
- */
-export function buildQuiz(materials, { count = 5 } = {}) {
-  const sentences = materials.flatMap((material) =>
-    passagesOf(material).map((text) => ({ text, material }))
-  );
-
-  const frequency = new Map();
-  for (const sentence of sentences) {
-    for (const term of tokenize(sentence.text)) {
-      frequency.set(term, (frequency.get(term) ?? 0) + 1);
-    }
-  }
-
-  const questions = [];
-
-  for (const sentence of shuffle(sentences)) {
-    const terms = tokenize(sentence.text);
-    // Blanking the word a sentence opens with leaves "______ is constant time
-    // on average", which reads as a broken sentence rather than a question.
-    const opener = terms[0];
-
-    const candidates = terms
-      .filter((term) => term.length > 4 && term !== opener)
-      .sort((a, b) => (frequency.get(a) ?? 0) - (frequency.get(b) ?? 0));
-
-    const target = candidates[0];
-    if (!target) continue;
-
-    const pattern = new RegExp(`\\b${target}\\b`, "i");
-    if (!pattern.test(sentence.text)) continue;
-
-    questions.push({
-      id: `${sentence.material.id}-${questions.length}`,
-      prompt: trim(sentence.text.replace(pattern, "______"), 240),
-      answer: target,
-      source: sentence.material.title,
-      unitId: sentence.material.unitId,
-    });
-
-    if (questions.length >= count) break;
-  }
-
-  return questions;
-}
-
-/** Each note as a two-sided card: title on the front, opening lines behind. */
-export function buildFlashcards(materials, { count = 12 } = {}) {
-  return materials
-    .filter((material) => material.body.length > 0)
-    .slice(0, count)
-    .map((material) => ({
-      id: material.id,
-      front: material.title,
-      back: trim(passagesOf(material)[0] ?? material.body, 220),
-      unitId: material.unitId,
-    }));
-}
-
-function shuffle(items) {
-  const copy = [...items];
-  for (let i = copy.length - 1; i > 0; i -= 1) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
 }

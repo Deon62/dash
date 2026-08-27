@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Check, Minus } from "lucide-react-native";
@@ -18,7 +18,7 @@ import {
 } from "@/theme/plans";
 import { activeTier, daysRemaining, isExpired } from "@/lib/quota";
 import { confirmCheckout, startCheckout } from "@/lib/checkout";
-import { newInviteCode } from "@/lib/inviteCode";
+import { loadPlans, loadSubscription } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
 
@@ -30,34 +30,51 @@ import { impact, notify } from "@/lib/haptics";
  * rather than a column of its own that nobody can buy.
  *
  * Every line on a card is generated from `PLAN_CONFIGS`, so a limit cannot be
- * changed in the config and left advertised wrongly here.
+ * changed in the config and left advertised wrongly here. The *prices* come
+ * from the server on open: the app ships a copy so a card can be drawn with no
+ * connection, but a price change has to be able to reach a phone without an
+ * app store release, and when the two disagree the server is right.
  */
 export default function BillingScreen() {
   const router = useRouter();
 
   const subscription = useStudyStore((state) => state.subscription);
-  const activatePlan = useStudyStore((state) => state.activatePlan);
-  const setGroup = useStudyStore((state) => state.setGroup);
   const group = useStudyStore((state) => state.group);
-  const profile = useStudyStore((state) => state.profile);
-
-  const authToken = useStudyStore((state) => state.authToken);
 
   const [confirming, setConfirming] = useState(null);
   /** The reference the server gave us, so the sheet can verify rather than ask. */
   const [reference, setReference] = useState(null);
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
+  /** Prices as the server has them, keyed by tier. Empty until they land. */
+  const [prices, setPrices] = useState({});
 
   const tier = activeTier(subscription);
   const left = daysRemaining(subscription);
   const expired = isExpired(subscription);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    loadPlans().then(({ plans }) => {
+      if (cancelled || !plans.length) return;
+      setPrices(Object.fromEntries(plans.map((plan) => [plan.tier, plan])));
+    });
+
+    // The plan may have changed since the last sync — a friend's payment, or a
+    // webhook that landed while the app was closed.
+    loadSubscription();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   // Only the person who paid has a code to see. A friend they invited is on
   // the same tier and lands on the same screen, but there is nothing there for
   // them to hand out.
   const paysForGroup =
-    (group?.members ?? []).find((member) => member.id === "me")?.isOwner ?? true;
+    (group?.members ?? []).find((member) => member.isMe)?.isOwner ?? true;
 
   const checkout = async (card) => {
     impact("medium");
@@ -66,7 +83,7 @@ export default function BillingScreen() {
 
     // The link is minted by the server for this student and this plan — see
     // `src/lib/checkout.js`. There is no hardcoded payment page any more.
-    const { reference: opened, error } = await startCheckout(card.tier, authToken);
+    const { reference: opened, error } = await startCheckout(card.tier);
     setBusy(false);
 
     if (error) {
@@ -79,46 +96,38 @@ export default function BillingScreen() {
     setConfirming(card);
   };
 
+  /**
+   * Asks the server what happened, and takes its answer.
+   *
+   * Nothing here grants the plan. The device cannot see a charge, so the only
+   * honest thing it can do is check the reference — and `pending` is a real
+   * outcome, not a failure: mobile money takes a minute and the webhook will
+   * credit the plan when it lands.
+   */
   const unlock = async () => {
     const card = confirming;
 
-    // Ask the server first when it can answer. A verified plan is a fact; the
-    // local fallback below is only a claim, and the difference is the whole
-    // reason `verified` exists on the subscription.
-    if (reference && authToken) {
-      setBusy(true);
-      const { error, pending } = await confirmCheckout(reference, authToken);
-      setBusy(false);
+    setBusy(true);
+    const { error, pending } = await confirmCheckout(reference);
+    setBusy(false);
 
-      if (error) {
-        setNotice(
-          pending
-            ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
-            : error
-        );
-        return;
-      }
-    }
-
-    notify("success");
-    activatePlan(card.tier);
-
-    // Paying for Friends buys four other seats, and a code nobody has been
-    // handed yet is the same as not having bought them. So the group is created
-    // here and the student lands straight on the screen that gives it out.
-    if (card.tier === SubscriptionTier.FRIENDS) {
-      setGroup({
-        inviteCode: newInviteCode(),
-        seats: seatsFor(card.tier),
-        members: [{ id: "me", name: profile.name || "You", isOwner: true }],
-      });
-      setConfirming(null);
-      router.push("/friends");
+    if (error) {
+      setNotice(
+        pending
+          ? "That payment has not landed yet. Mobile money can take a minute — try again shortly."
+          : error
+      );
       return;
     }
 
+    notify("success");
     setConfirming(null);
     setReference(null);
+
+    // Paying for Friends buys four other seats, and a code nobody has been
+    // handed yet is the same as not having bought them — so the payer lands
+    // straight on the screen that gives it out.
+    if (card.tier === SubscriptionTier.FRIENDS) router.push("/friends");
   };
 
   return (
@@ -127,7 +136,9 @@ export default function BillingScreen() {
         <ScreenHeader title="Plans" />
 
         {PLAN_CARDS.map((card) => {
-          const plan = planFor(card.tier);
+          // The server's price where it has arrived, the shipped one until
+          // then, so a card is never blank while a request is in flight.
+          const plan = { ...planFor(card.tier), ...(prices[card.tier] ?? {}) };
           const current = card.tier === tier && !expired;
 
           return (
@@ -182,8 +193,8 @@ export default function BillingScreen() {
                   plan, and it is not something to make anyone divide. */}
               {card.perSeatNote ? (
                 <Text className="font-jk text-muted text-[12.5px] mt-1">
-                  KES {pricePerSeat(card.tier)} each, for {seatsFor(card.tier)} of
-                  you
+                  KES {plan.pricePerSeatKsh ?? pricePerSeat(card.tier)} each, for{" "}
+                  {plan.seats ?? seatsFor(card.tier)} of you
                 </Text>
               ) : null}
 
@@ -267,25 +278,23 @@ export default function BillingScreen() {
         </Text>
       </Screen>
 
-      {/* The device cannot see a charge. With a token we ask the server, which
-          has either had Kora's webhook or can verify the reference itself.
-          Without one, activation is the student's word — recorded as
-          unverified so it can be reconciled rather than silently trusted. */}
+      {/* The device cannot see a charge, so it asks the server — which has
+          either had Kora's webhook or can verify the reference itself. */}
       <Sheet
         visible={Boolean(confirming)}
         onClose={() => setConfirming(null)}
         title="Did the payment go through?"
         subtitle={
           confirming
-            ? reference
-              ? `Checking with our records confirms it properly. If Kora charged you for ${confirming.name}, tap below and the plan unlocks for real.`
-              : `We can't confirm it from here. If Kora charged you for ${confirming.name}, unlock it now and it will be reconciled once your account is connected.`
+            ? `If Kora charged you for ${confirming.name}, tap below and we will check it against our records.`
             : undefined
         }
       >
         <View className="gap-y-3">
           <Button
-            label={confirming ? `Yes, unlock ${confirming.name}` : "Yes"}
+            label={confirming ? `Check my ${confirming.name} payment` : "Check"}
+            busyLabel="Checking…"
+            busy={busy}
             onPress={unlock}
             disabled={busy}
           />

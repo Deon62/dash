@@ -13,7 +13,6 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { ArrowLeft } from "lucide-react-native";
 
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
-import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
 
@@ -36,8 +35,6 @@ export default function VerifyScreen() {
   // `phone` is E.164 and must match what the code was sent to; `display` is the
   // prettier version for the heading.
   const { phone, display } = useLocalSearchParams();
-
-  const signIn = useStudyStore((state) => state.signIn);
 
   const inputRef = useRef(null);
   const [code, setCode] = useState("");
@@ -72,9 +69,9 @@ export default function VerifyScreen() {
     }
 
     notify("success");
-    // No navigation here — the session guard sends a new student to onboarding
-    // and a returning one straight to the tabs.
-    signIn(String(phone ?? ""));
+    // No navigation here, and nothing to record: `verifyPhoneOtp` has already
+    // written the server's tokens into the store, and the session guard reacts
+    // to that — a new student to onboarding, a returning one to the tabs.
   };
 
   /**

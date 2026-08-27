@@ -14,15 +14,15 @@ import LinkRow from "@/components/LinkRow";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import { useStudyStore } from "@/store/useStudyStore";
 import { authenticate, describe, isAvailable } from "@/lib/biometrics";
+import { deleteAccount, saveSettings } from "@/lib/account";
 
 export default function SettingsScreen() {
   const router = useRouter();
 
   const settings = useStudyStore((state) => state.settings);
-  const updateSettings = useStudyStore((state) => state.updateSettings);
-  const resetEverything = useStudyStore((state) => state.resetEverything);
 
   const [confirming, setConfirming] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [notice, setNotice] = useState(null);
   const [biometry, setBiometry] = useState({ available: false, name: "Biometrics" });
 
@@ -43,7 +43,7 @@ export default function SettingsScreen() {
    */
   const setLock = async (next) => {
     if (!next) {
-      updateSettings({ biometricLock: false });
+      saveSettings({ biometricLock: false });
       return;
     }
 
@@ -53,7 +53,23 @@ export default function SettingsScreen() {
     }
 
     const result = await authenticate("Turn on the lock for ALS");
-    if (result.ok) updateSettings({ biometricLock: true });
+    if (result.ok) saveSettings({ biometricLock: true });
+  };
+
+  /**
+   * Deletes on the server first, then clears the handset.
+   *
+   * That order matters: wiping locally first would leave no token to
+   * authenticate the deletion with, and the account would live on with nobody
+   * able to reach it.
+   */
+  const removeAccount = async () => {
+    setDeleting(true);
+    const { error } = await deleteAccount();
+    setDeleting(false);
+    setConfirming(false);
+
+    if (error) setNotice(error);
   };
 
   return (
@@ -92,7 +108,7 @@ export default function SettingsScreen() {
         <LinkRow
           Icon={Trash2}
           label="Delete account"
-          hint="Erases everything on this device"
+          hint="Erases your account and everything on it"
           destructive
           onPress={() => setConfirming(true)}
           last
@@ -111,14 +127,11 @@ export default function SettingsScreen() {
       <ConfirmDialog
         visible={confirming}
         title="Delete your account?"
-        message="This erases your profile, units, timetable, knowledge and chats from this device. It can't be undone."
-        confirmLabel="Delete"
+        message="This erases your profile, units, timetable, knowledge and chats from our servers and from this phone. It can't be undone."
+        confirmLabel={deleting ? "Deleting…" : "Delete"}
         destructive
         onCancel={() => setConfirming(false)}
-        onConfirm={() => {
-          setConfirming(false);
-          resetEverything();
-        }}
+        onConfirm={removeAccount}
       />
     </Screen>
   );
