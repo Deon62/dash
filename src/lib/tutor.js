@@ -50,11 +50,25 @@ export async function askTutor({
   onMeta,
   onToken,
   signal,
+  // The ids the caller has already stored this turn under, so the server
+  // records the same two rows instead of minting its own.
+  studentMessageId = null,
+  answerMessageId = null,
 } = {}) {
   const token = await accessToken();
   if (!token) return { text: "", sources: [], error: NOT_SIGNED_IN, status: 401 };
 
-  const first = await openStream({ question, chatId, unitCode, model, token, signal });
+  const opening = {
+    question,
+    chatId,
+    unitCode,
+    model,
+    signal,
+    studentMessageId,
+    answerMessageId,
+  };
+
+  const first = await openStream({ ...opening, token });
 
   // A token revoked early — the account signed in on another handset, or the
   // server restarted — is the one failure worth a second attempt. Anything
@@ -64,19 +78,21 @@ export async function askTutor({
   const fresh = await refreshSession();
   if (!fresh) return { text: "", sources: [], error: NOT_SIGNED_IN, status: 401 };
 
-  const retry = await openStream({
-    question,
-    chatId,
-    unitCode,
-    model,
-    token: fresh,
-    signal,
-  });
+  const retry = await openStream({ ...opening, token: fresh });
 
   return readStream(retry, { onMeta, onToken });
 }
 
-async function openStream({ question, chatId, unitCode, model, token, signal }) {
+async function openStream({
+  question,
+  chatId,
+  unitCode,
+  model,
+  token,
+  signal,
+  studentMessageId,
+  answerMessageId,
+}) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), STREAM_TIMEOUT_MS);
   const onExternalAbort = () => controller.abort();
@@ -101,6 +117,12 @@ async function openStream({ question, chatId, unitCode, model, token, signal }) 
         chat_id: chatId,
         unit_code: unitCode,
         model,
+        // The ids this device is about to store the turn under. Sending them
+        // means the server writes the same two rows rather than inventing its
+        // own, which the next sync would otherwise pull down as duplicates —
+        // every answer appearing twice, as though it had been asked twice.
+        student_message_id: studentMessageId,
+        answer_message_id: answerMessageId,
       }),
     });
 

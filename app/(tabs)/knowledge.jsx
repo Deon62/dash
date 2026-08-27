@@ -8,7 +8,6 @@ import IconButton from "@/components/IconButton";
 import Fab from "@/components/Fab";
 import { PillButton } from "@/components/Button";
 import AddKnowledge from "@/components/AddKnowledge";
-import ConfirmDialog from "@/components/ConfirmDialog";
 import LimitSheet from "@/components/LimitSheet";
 import EmptyState from "@/components/EmptyState";
 import { activeTier } from "@/lib/quota";
@@ -73,7 +72,6 @@ export default function KnowledgeScreen() {
 
   const [adding, setAdding] = useState(false);
   const [blocked, setBlocked] = useState(null);
-  const [notice, setNotice] = useState(null);
 
   const tier = activeTier(subscription);
 
@@ -168,21 +166,11 @@ export default function KnowledgeScreen() {
         tier={tier}
         onBlocked={setBlocked}
         onClose={() => setAdding(false)}
-        onSave={(payload) => fileMaterial(payload).then(({ error }) => setNotice(error))}
-      />
-
-      {/* An upload that failed is worth interrupting for: the item is filed
-          either way, but until the file lands the tutor cannot read it. */}
-      <ConfirmDialog
-        visible={Boolean(notice)}
-        title="We couldn't upload that file"
-        // The item is filed either way, so the first thing to say is that
-        // nothing was lost. The retry is automatic, which is worth saying too
-        // — otherwise the only obvious move is to add the same file again.
-        message={`${notice} It is still saved under your unit, and we will try again on its own next time you are online.`}
-        confirmLabel="OK"
-        onConfirm={() => setNotice(null)}
-        onDismiss={() => setNotice(null)}
+        // No dialog on a failed upload any more. The item is filed either way,
+        // it carries its own "couldn't upload · retry" line inside the unit,
+        // and the bell picks it up — three ways of noticing, none of which
+        // stops a student who was about to add the next thing.
+        onSave={fileMaterial}
       />
     </>
   );

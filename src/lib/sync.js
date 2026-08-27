@@ -169,8 +169,22 @@ const fromMaterial = (row, existing) => ({
   addedAt: row.updated_at,
   updatedAt: row.updated_at,
   pageCount: row.page_count ?? null,
-  uploadStatus: row.extraction_status === "done" ? "ready" : row.extraction_status,
+  // The server's extraction states, translated so they cannot collide with the
+  // device's own. Both sides have a "failed" and they mean opposite things:
+  // here it is "the bytes never left this phone", there it is "the bytes
+  // arrived and the text could not be read out of them". Only the first can be
+  // retried from a handset, so showing a Retry for the second would be a
+  // button that does nothing.
+  uploadStatus: EXTRACTION[row.extraction_status] ?? "pending",
 });
+
+/** `pending | running | done | failed` on the server. See `fromMaterial`. */
+const EXTRACTION = {
+  pending: "pending",
+  running: "pending",
+  done: "ready",
+  failed: "unreadable",
+};
 
 const fromEvent = (row) => ({
   id: row.id,

@@ -21,6 +21,7 @@ import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { askTutor, buildFlashcards, buildQuiz } from "@/lib/tutor";
+import { newId } from "@/lib/ids";
 import { recordStudyDay } from "@/lib/account";
 import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
@@ -142,7 +143,14 @@ export default function StudyScreen() {
     impact("medium");
     const target = chat ?? newChat(unitId);
 
-    appendMessage(target.id, { role: "student", text });
+    // Both ids are minted here, before either row exists anywhere, and the
+    // same pair goes to the server. Otherwise each side stores the turn under
+    // ids the other has never seen and the next sync pulls the server's copies
+    // down as extra messages — every answer appearing twice.
+    const studentMessageId = newId();
+    const answerMessageId = newId();
+
+    appendMessage(target.id, { id: studentMessageId, role: "student", text });
     setDraft("");
     setThinking(true);
     setStreaming({ text: "", sources: [] });
@@ -163,6 +171,8 @@ export default function StudyScreen() {
         })),
       onToken: (_piece, whole) =>
         setStreaming((current) => ({ ...(current ?? { sources: [] }), text: whole })),
+      studentMessageId,
+      answerMessageId,
     });
 
     setStreaming(null);
@@ -179,6 +189,7 @@ export default function StudyScreen() {
     }
 
     appendMessage(target.id, {
+      id: answerMessageId,
       role: "tutor",
       text: result.error ? `${result.text}\n\n${result.error}` : result.text,
       sources: (result.sources ?? []).map((source) =>

@@ -26,6 +26,7 @@ import EventComposer from "@/components/EventComposer";
 import SessionComposer from "@/components/SessionComposer";
 import { activeTier } from "@/lib/quota";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
+import UploadStatus from "@/components/UploadStatus";
 import { fileMaterial, openMaterial } from "@/lib/knowledge";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
@@ -198,14 +199,32 @@ export default function UnitScreen() {
                   }`}
                 >
                   <View className="flex-row items-start">
-                    <View className="flex-1 pr-2">
+                    {/* Tapping it opens the file, where there is one stored.
+                        That used to hang off the status caption underneath,
+                        which made the way to read your own PDF a line of grey
+                        text that looked like a date. A typed note has nothing
+                        to open, so it is not pressable and does not pretend to
+                        be. */}
+                    <Pressable
+                      onPress={() => {
+                        if (!hasFile(material)) return;
+                        impact("light");
+                        openMaterial(material.id);
+                      }}
+                      disabled={!hasFile(material)}
+                      accessibilityRole={hasFile(material) ? "button" : "text"}
+                      accessibilityLabel={
+                        hasFile(material) ? `Open ${material.title}` : material.title
+                      }
+                      className="flex-1 pr-2 active:opacity-60"
+                    >
                       <Text className="font-jk text-muted text-[11.5px]">
                         {kindLabel(material.kind)} · {formatDateTime(material.addedAt)}
                       </Text>
                       <Text className="font-jk-med text-ink text-[14.5px] leading-[20px] mt-1">
                         {material.title}
                       </Text>
-                    </View>
+                    </Pressable>
 
                     {/* Archive, not delete. A student clearing clutter should
                         not be one tap from losing a semester of notes. */}
@@ -243,9 +262,7 @@ export default function UnitScreen() {
 
                   {/* Where the file has got to. Silent once it is readable —
                       a line saying "ready" on every item is furniture. */}
-                  {material.uri || material.uploadStatus ? (
-                    <UploadNote material={material} />
-                  ) : null}
+                  <UploadStatus material={material} />
                 </View>
               ))}
             </View>
@@ -349,35 +366,18 @@ export default function UnitScreen() {
 }
 
 /**
- * One line on an attached file, and only when there is something to say.
+ * Whether there is something to open.
  *
- * A PDF is useful to the tutor only once the server has read the text out of
- * it, and that takes a moment after the bytes land. Saying so is the honest
- * version of a silent gap in which the tutor cannot find anything in a file
- * the student can plainly see they added.
+ * A file the server has taken, or one still sitting on this phone. Not one
+ * that failed to upload and was never on the handset either — a download URL
+ * for that resolves to nothing, and a tap that opens an empty browser tab is
+ * worse than a tap that does nothing at all.
  */
-function UploadNote({ material }) {
-  const status = material.uploadStatus;
+const STORED = new Set(["ready", "pending", "unreadable"]);
 
-  if (!status || status === "ready") return null;
-
-  const line =
-    status === "failed"
-      ? "This file did not upload. It will be retried next time you are online."
-      : status === "uploading"
-        ? "Uploading…"
-        : status === "queued"
-          ? "Waiting to upload."
-          : "Uploaded. Its text becomes searchable once we have read it.";
-
-  return (
-    <Pressable
-      onPress={() => status === "pending" && openMaterial(material.id)}
-      accessibilityRole={status === "pending" ? "button" : "text"}
-      accessibilityLabel={line}
-      className="mt-2 active:opacity-60"
-    >
-      <Text className="font-jk text-muted text-[12px]">{line}</Text>
-    </Pressable>
-  );
+function hasFile(material) {
+  if (material.kind === "note" || material.kind === "link") return false;
+  // `unreadable` counts: the file is in the bucket and opens fine, it is only
+  // its *text* that could not be extracted.
+  return Boolean(material.uri) || STORED.has(material.uploadStatus);
 }
