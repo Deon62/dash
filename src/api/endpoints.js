@@ -86,7 +86,15 @@ export const account = {
   forgetDevice: (deviceId, token) =>
     api.delete(v1(`/me/devices/${deviceId}`), { token }),
 
-  streak: (token) => api.get(v1("/me/streak"), { token }),
+  /**
+   * `today` is the student's *local* day, and is not optional in practice.
+   *
+   * Without it the server dates the read in UTC while `recordStudyDay` below
+   * stores a local day, so the two endpoints disagree about what day it is for
+   * anyone not on UTC. That read a live streak as zero.
+   */
+  streak: (day, token) =>
+    api.get(v1(`/me/streak?today=${encodeURIComponent(day)}`), { token }),
   recordStudyDay: (day, token) => api.post(v1("/me/streak"), { day }, { token }),
 
   /** What is left of today's allowances, counted server-side. */

@@ -183,7 +183,9 @@ function deviceTimezone() {
 // --- Streak -----------------------------------------------------------------
 
 export async function loadStreak() {
-  const { data, error } = await authed((token) => accountApi.streak(token));
+  const { data, error } = await authed((token) =>
+    accountApi.streak(dayKey(), token),
+  );
   if (error) return { error };
 
   useStudyStore.getState().applyServerStreak({

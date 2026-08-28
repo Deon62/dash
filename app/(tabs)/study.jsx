@@ -887,6 +887,107 @@ function QuizPane({ unit, tier, usage, onStart, onBlocked }) {
 
 // --- Cards -----------------------------------------------------------------
 
+/**
+ * The colours a card can wear, one per unit.
+ *
+ * Not the calendar's `MARK_COLORS`: those already mean something specific
+ * (violet is an assignment, red is an exam) and reusing them here would have a
+ * card looking like a deadline. `flame` and `danger` are left out on purpose —
+ * one belongs to the streak, the other means something has gone wrong.
+ */
+const CARD_TINTS = [
+  COLORS.primary,
+  COLORS.violet,
+  COLORS.teal,
+  COLORS.pink,
+  COLORS.amber,
+];
+
+/**
+ * The same unit gets the same colour every time.
+ *
+ * Hashed from the code rather than assigned by position, so a card keeps its
+ * colour when another unit is added above it — colour that reshuffles is worse
+ * than no colour, because the eye has already started using it to group.
+ */
+function cardTint(code) {
+  if (!code) return COLORS.muted;
+
+  let hash = 0;
+  for (let i = 0; i < code.length; i += 1) {
+    hash = (hash * 31 + code.charCodeAt(i)) % 100000;
+  }
+  return CARD_TINTS[hash % CARD_TINTS.length];
+}
+
+/** `#RRGGBB` plus an alpha byte. Used for the wash behind a flipped card. */
+const wash = (hex, alpha) => `${hex}${alpha}`;
+
+function Flashcard({ card, unitCode, open, onPress }) {
+  const tint = cardTint(unitCode);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ expanded: open }}
+      accessibilityLabel={card.front}
+      accessibilityHint={open ? "Tap to hide the answer" : "Tap to reveal the answer"}
+      style={{
+        borderRadius: 18,
+        borderWidth: 1,
+        // Flipping is the whole interaction, so it changes the card itself
+        // rather than only adding text underneath: the border takes the unit's
+        // colour and a wash of it fills the card. From across the screen you
+        // can see which ones you have already turned over.
+        borderColor: open ? wash(tint, "55") : COLORS.line,
+        backgroundColor: open ? wash(tint, "0D") : COLORS.canvas,
+        padding: 16,
+        marginBottom: 12,
+      }}
+      className="active:opacity-80"
+    >
+      <View className="flex-row items-center justify-between">
+        <View
+          style={{ backgroundColor: wash(tint, "1A") }}
+          className="rounded-full px-2.5 py-1"
+        >
+          <Text style={{ color: tint }} className="font-jk-semi text-[10.5px] tracking-[0.5px]">
+            {unitCode ?? "UNFILED"}
+          </Text>
+        </View>
+
+        <RotateCcw size={14} color={open ? tint : COLORS.faint} strokeWidth={2} />
+      </View>
+
+      <Text className="font-jk-med text-ink text-[16px] leading-[23px] mt-3">
+        {card.front}
+      </Text>
+
+      {open ? (
+        <>
+          <View
+            style={{ backgroundColor: wash(tint, "33") }}
+            className="h-px my-3"
+          />
+          <Text className="font-jk text-ink text-[13.5px] leading-[20px]">
+            {card.back}
+          </Text>
+        </>
+      ) : null}
+
+      {/* Said in words, every time. The old row gave the whole list one "tap
+          to flip" at the top, which is read once and gone by the third card. */}
+      <Text
+        style={{ color: open ? tint : COLORS.faint }}
+        className="font-jk text-[11px] mt-3"
+      >
+        {open ? "Tap to hide" : "Tap to flip"}
+      </Text>
+    </Pressable>
+  );
+}
+
 function CardsPane({ materials, units, unit }) {
   const cards = useMemo(() => buildFlashcards(materials), [materials]);
   const [flipped, setFlipped] = useState(() => new Set());
@@ -905,53 +1006,34 @@ function CardsPane({ materials, units, unit }) {
     );
   }
 
+  const flip = (id) => {
+    impact("light");
+    setFlipped((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
   return (
     <ScrollView
       showsVerticalScrollIndicator={false}
-      contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 16 }}
+      contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
     >
-      <Text className="font-jk text-muted text-[12px] pb-1">
-        {cards.length} {cards.length === 1 ? "card" : "cards"} · tap to flip
+      <Text className="font-jk text-muted text-[12px] pb-2.5">
+        {cards.length} {cards.length === 1 ? "card" : "cards"}
       </Text>
 
-      {cards.map((card, index) => {
-        const open = flipped.has(card.id);
-        const cardUnit = unitById(units, card.unitId);
-
-        return (
-          <Pressable
-            key={card.id}
-            onPress={() => {
-              impact("light");
-              setFlipped((current) => {
-                const next = new Set(current);
-                if (next.has(card.id)) next.delete(card.id);
-                else next.add(card.id);
-                return next;
-              });
-            }}
-            accessibilityRole="button"
-            accessibilityState={{ expanded: open }}
-            accessibilityLabel={card.front}
-            className={`py-4 active:opacity-60 ${
-              index === cards.length - 1 ? "" : "border-b border-line"
-            }`}
-          >
-            <Text className="font-jk text-muted text-[11.5px]">
-              {cardUnit?.code ?? "—"}
-            </Text>
-            <Text className="font-jk-med text-ink text-[15px] leading-[21px] mt-1">
-              {card.front}
-            </Text>
-
-            {open ? (
-              <Text className="font-jk text-muted text-[13px] leading-[19px] mt-2">
-                {card.back}
-              </Text>
-            ) : null}
-          </Pressable>
-        );
-      })}
+      {cards.map((card) => (
+        <Flashcard
+          key={card.id}
+          card={card}
+          unitCode={unitById(units, card.unitId)?.code}
+          open={flipped.has(card.id)}
+          onPress={() => flip(card.id)}
+        />
+      ))}
     </ScrollView>
   );
 }

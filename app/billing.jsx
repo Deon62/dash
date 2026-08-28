@@ -371,8 +371,8 @@ export default function BillingScreen() {
 
         <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
           {lapsed
-            ? "Your plan has ended. You are on the free plan until you renew — "
-            + "nothing you filed has gone anywhere. "
+            ? "Your plan has ended. You are on the free plan until you renew. "
+            + "Nothing you filed has gone anywhere. "
             : ""}
           Payment is handled by Kora, which accepts M-Pesa, Airtel Money and
           cards. Your plan activates once the payment clears.
