@@ -34,28 +34,35 @@ function denied(reason, detail) {
 /**
  * The tier actually in force right now.
  *
- * An expired subscription is not the tier it was sold as. It falls back to the
- * trial's limits rather than to nothing, so an unpaid account keeps working in
- * a reduced way instead of locking a student out of their own notes.
+ * A subscription that has run out is not the tier it was sold as. It falls
+ * back to free — a small allowance rather than nothing, so an unpaid account
+ * keeps working in a reduced way instead of locking a student out of their own
+ * notes.
+ *
+ * It used to fall back to the *trial*, which was two units and fifteen
+ * questions a day. That was more generous than the plan a new account gets
+ * now, and it would have made lapsing an upgrade.
  */
 export function activeTier(subscription, now = Date.now()) {
-  if (!subscription?.tier) return SubscriptionTier.TRIAL;
+  if (!subscription?.tier) return SubscriptionTier.FREE;
 
-  // `expired` is a tier the server reports, not one the app sells. It means
-  // the paid period ran out, and the limits that apply from then on are the
-  // trial's — an unpaid account keeps working in a reduced way rather than
-  // locking a student out of their own notes.
-  if (subscription.tier === EXPIRED) return SubscriptionTier.TRIAL;
+  // `expired` is a tier older servers reported, not one the app sells. It
+  // means the paid period ran out, and what applies from then on is free.
+  if (subscription.tier === EXPIRED) return SubscriptionTier.FREE;
+
+  // Free carries no end date, and neither does a row that was never finished.
+  // Resolving that to the tier itself is right for free and harmless for the
+  // rest: the server decides, and it does not trust a missing date either.
   if (!subscription.expiresAt) return subscription.tier;
 
   return new Date(subscription.expiresAt).getTime() > now
     ? subscription.tier
-    : SubscriptionTier.TRIAL;
+    : SubscriptionTier.FREE;
 }
 
 /** What it was sold as, even once it has run out. Used to name what ended. */
 export function nominalTier(subscription) {
-  return subscription?.nominalTier ?? subscription?.tier ?? SubscriptionTier.TRIAL;
+  return subscription?.nominalTier ?? subscription?.tier ?? SubscriptionTier.FREE;
 }
 
 export function isExpired(subscription, now = Date.now()) {
@@ -70,6 +77,8 @@ export function isExpired(subscription, now = Date.now()) {
 }
 
 /** The server's word for a plan that has run out. Never sold, only reported. */
+// What the server used to call the free floor. Still arrives from rows written
+// before the free plan existed, so it keeps having to mean something.
 const EXPIRED = "expired";
 
 /** Whole days left, floored, never negative. */

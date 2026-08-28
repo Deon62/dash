@@ -11,22 +11,25 @@
  * release. Where the two disagree, the server is right — and a number changed
  * here has to be changed there too.
  *
- * Three of the four tiers are sold. `TRIAL` is not a product — it is the state
- * a new account starts in, for fourteen days, whichever plan they eventually
- * pick.
+ * Three of the four tiers are sold. `FREE` is not a product — it is where an
+ * account starts and where it returns when a plan lapses, and it does not run
+ * out.
  *
- * The server grants that fortnight **once per person, for good**: deleting an
- * account and signing up again does not restart it. This file is the copy the
- * app reads so it can refuse before making a request; the server's copy is the
- * one that decides.
+ * It replaced a fourteen-day trial. A trial is worth stealing, so it needed a
+ * ledger of every phone number that had ever had one and a rule for what a
+ * returning student got; free forever has nothing to steal, and none of that
+ * survives. `TRIAL` is kept only because accounts still inside one have to
+ * finish the fortnight they were promised.
  */
 
 export const SubscriptionTier = {
-  TRIAL: "trial",
+  FREE: "free",
   STANDARD: "standard",
   PRO: "pro",
   /** Synapse, split five ways. Same limits, one bill. */
   FRIENDS: "friends",
+  /** Legacy. Not granted any more; drains to nothing as the last ones expire. */
+  TRIAL: "trial",
 };
 
 /**
@@ -41,6 +44,35 @@ export const UNLIMITED = -1;
 export const UNIT_HARD_CAP = 10;
 
 export const PLAN_CONFIGS = {
+  [SubscriptionTier.FREE]: {
+    id: SubscriptionTier.FREE,
+    name: "Free",
+    priceKsh: 0,
+    /** Never. A countdown here would be a paywall with no date on it. */
+    durationDays: 0,
+    limits: {
+      maxCourseUnits: 1,
+      totalPdfPagesPool: 100,
+      maxSingleFileSizeMb: 10,
+      // The whole pool in one document, so a single 100-page lecture PDF is
+      // uploadable rather than refused for being one file.
+      maxSingleFilePages: 100,
+      dailyAiQueries: 5,
+      /**
+       * The most this plan will ever answer, across every day it is held.
+       *
+       * Only free sets one. A daily limit bounds the rate and not the bill,
+       * and free exists to show someone the product rather than to be it.
+       * `UNLIMITED` on every paid tier, where the month is the bound.
+       */
+      lifetimeAiQueries: 100,
+      quizzesPerInterval: { count: 1, interval: "lifetime", maxQuestions: 5 },
+      timetableMode: "manual",
+      sourceCitations: "basic",
+      allowOcrScans: false,
+      monthlyOcrPageLimit: 0,
+    },
+  },
   [SubscriptionTier.TRIAL]: {
     id: SubscriptionTier.TRIAL,
     name: "14-Day Free Trial",
@@ -52,6 +84,8 @@ export const PLAN_CONFIGS = {
       maxSingleFileSizeMb: 10,
       maxSingleFilePages: 30,
       dailyAiQueries: 15,
+      // The fortnight is the ceiling on a trial. It ends on its own.
+      lifetimeAiQueries: UNLIMITED,
       quizzesPerInterval: { count: 2, interval: "lifetime", maxQuestions: 5 },
       timetableMode: "manual",
       sourceCitations: "basic",
@@ -70,6 +104,7 @@ export const PLAN_CONFIGS = {
       maxSingleFileSizeMb: 25,
       maxSingleFilePages: 100,
       dailyAiQueries: 40,
+      lifetimeAiQueries: UNLIMITED,
       quizzesPerInterval: { count: 5, interval: "weekly", maxQuestions: 10 },
       timetableMode: "alerts",
       sourceCitations: "exact_page",
@@ -105,6 +140,7 @@ export const PLAN_CONFIGS = {
       maxSingleFileSizeMb: 50,
       maxSingleFilePages: 300,
       dailyAiQueries: 120,
+      lifetimeAiQueries: UNLIMITED,
       quizzesPerInterval: { count: UNLIMITED, interval: "unlimited", maxQuestions: 20 },
       timetableMode: "ai_sync",
       sourceCitations: "deep_summary",
@@ -193,7 +229,9 @@ export const PLAN_CARDS = [
 ];
 
 export function planFor(tier) {
-  return PLAN_CONFIGS[tier] ?? PLAN_CONFIGS[SubscriptionTier.TRIAL];
+  // An unknown tier resolves to the floor, never upward. The server does the
+  // same with a tampered or legacy value, including the old "expired".
+  return PLAN_CONFIGS[tier] ?? PLAN_CONFIGS[SubscriptionTier.FREE];
 }
 
 export function limitsFor(tier) {
@@ -249,10 +287,9 @@ export function planFeatures(tier) {
   const seats = seatsFor(tier);
 
   return [
-    // Stated on every card rather than once above them: it is part of what
-    // each plan is, and a student comparing columns should not have to look
-    // somewhere else to learn it applies to the one they are reading.
-    { text: `${PLAN_CONFIGS[SubscriptionTier.TRIAL].durationDays}-day free trial`, available: true },
+    // No trial line any more. There is no fortnight to advertise — the free
+    // plan is always there, and a card promising a trial that does not exist
+    // is the worst kind of stale copy.
     ...(seats > 1
       ? [{ text: `${seats} students on one payment`, available: true }]
       : []),

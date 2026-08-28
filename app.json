@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "ALS",
+    "name": "als",
     "slug": "als",
     "scheme": ["als", "com.ardena.als"],
     "version": "1.0.0",
@@ -14,7 +14,7 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.ardena.als",
       "infoPlist": {
-        "CFBundleDisplayName": "ALS",
+        "CFBundleDisplayName": "als",
         "NSSpeechRecognitionUsageDescription": "ALS uses speech recognition to turn what you say into text in the chat.",
         "NSMicrophoneUsageDescription": "ALS uses the microphone so you can speak your question instead of typing it."
       }
