@@ -42,7 +42,17 @@ const EMPTY_PROFILE = {
   email: "",
   phone: null,
   initials: "",
+  /**
+   * What an `<Image>` can load: a signed URL that expires, or the local file
+   * while an upload is still in flight. Not durable, and not the truth.
+   */
   avatarUri: null,
+  /**
+   * The object in the `avatars` bucket. This is what the server stores and
+   * what survives a sign-out, and `avatarUri` is re-signed from it on load.
+   * Keeping only the URL is what made the photo vanish: a stored link expires.
+   */
+  avatarPath: null,
   /** University or college. */
   institution: "",
   /** Degree programme, e.g. "BSc Computer Science". */
@@ -370,8 +380,15 @@ export const useStudyStore = create(
           return { profile };
         }),
 
-      setAvatar: (avatarUri) =>
-        set((state) => ({ profile: { ...state.profile, avatarUri } })),
+      /**
+       * Both halves of the photo, together.
+       *
+       * It took a bare URI once, which is precisely how the two drifted: the
+       * displayable link was set and the path behind it never was, so nothing
+       * on the account pointed at the file and the picture did not come back.
+       */
+      setAvatar: ({ avatarUri, avatarPath }) =>
+        set((state) => ({ profile: { ...state.profile, avatarUri, avatarPath } })),
 
       updateSettings: (patch) =>
         set((state) => ({

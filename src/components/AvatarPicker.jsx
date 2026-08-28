@@ -7,19 +7,21 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { COLORS } from "@/theme/colors";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
+import { uploadAvatar } from "@/lib/avatar";
 
 const SIZE = 96;
 
 /**
  * Tappable avatar. Falls back to initials until a picture is chosen.
  *
- * The chosen image is a local file URI held in the store. That survives a
- * restart because the store is persisted, but it is still a path into this
- * device's cache — uploading the file belongs to whatever backs accounts later.
+ * The picked image is uploaded to the account, not just shown. It used to be
+ * shown only — a local `file://` URI written into the persisted store and
+ * nothing else — which looked like it had worked and did not survive a
+ * sign-out, because the server had never been told. `src/lib/avatar.js` has
+ * the three steps and the two values it keeps.
  */
 export default function AvatarPicker() {
   const profile = useStudyStore((state) => state.profile);
-  const setAvatar = useStudyStore((state) => state.setAvatar);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState(null);
 
@@ -45,8 +47,14 @@ export default function AvatarPicker() {
         quality: 0.8,
       });
 
-      if (!result.canceled && result.assets?.length) {
-        setAvatar(result.assets[0].uri);
+      if (result.canceled || !result.assets?.length) return;
+
+      // The upload puts the photo up straight away and takes it back down if
+      // it cannot be saved. Saying so matters: a picture that appears and is
+      // quietly not kept is the bug this replaced.
+      const { error } = await uploadAvatar(result.assets[0]);
+      if (error) {
+        setNotice({ title: "Photo not saved", message: error });
       }
     } catch {
       setNotice({
@@ -79,6 +87,10 @@ export default function AvatarPicker() {
           justifyContent: "center",
           overflow: "hidden",
           backgroundColor: COLORS.ink,
+          // The new photo is already showing by this point, so the upload
+          // needs some sign it is still happening — otherwise a failure a few
+          // seconds later arrives out of nowhere.
+          opacity: busy ? 0.55 : 1,
         }}
       >
         {profile.avatarUri ? (

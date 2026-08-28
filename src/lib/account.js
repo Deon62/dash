@@ -1,5 +1,6 @@
 import { account as accountApi } from "@/api/endpoints";
 import { authed } from "@/lib/session";
+import { refreshAvatarUrl } from "@/lib/avatar";
 import { useStudyStore } from "@/store/useStudyStore";
 import { dayKey } from "@/lib/dates";
 
@@ -23,6 +24,7 @@ const fromProfile = (row) => ({
   program: row.program ?? "",
   yearOfStudy: row.year_of_study ?? null,
   semester: row.semester ?? null,
+  avatarPath: row.avatar_path ?? null,
   memberSince: row.created_at ? String(new Date(row.created_at).getFullYear()) : "",
 });
 
@@ -34,7 +36,10 @@ const toProfile = (patch) => {
   if (patch.program !== undefined) body.program = patch.program;
   if (patch.yearOfStudy !== undefined) body.year_of_study = patch.yearOfStudy;
   if (patch.semester !== undefined) body.semester = patch.semester;
-  if (patch.avatarPath !== undefined) body.avatar_path = patch.avatarPath;
+  // `avatar_path` is deliberately absent. It names an object in a private
+  // bucket, and the server refuses to take it here for that reason — a client
+  // free to write it could name somebody else's file and then read it back
+  // through the signed URL. `src/lib/avatar.js` sets it, via POST /me/avatar.
   return body;
 };
 
@@ -50,6 +55,12 @@ export async function loadProfile() {
   // one. Without this a returning student is sent back through it on every new
   // device, which reads as their details having been lost.
   if (data.full_name) store.setOnboarded(true);
+
+  // The photo is stored as a path and displayed as a signed URL that expires,
+  // so the URL is fetched fresh here rather than kept. Not awaited: an image
+  // arriving a moment after the name is fine, and a slow storage call must not
+  // hold up the screen that is waiting on this.
+  refreshAvatarUrl();
 
   if (data.subscription) {
     store.setSubscription({

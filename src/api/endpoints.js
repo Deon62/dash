@@ -56,6 +56,28 @@ export const account = {
   updateProfile: (patch, token) => api.patch(v1("/me"), patch, { token }),
   deleteAccount: (token) => api.delete(v1("/me"), { token }),
 
+  /**
+   * The profile photo, in the same three steps as a material: sign, PUT the
+   * bytes straight at Supabase Storage, confirm.
+   *
+   * `avatar_path` is not settable through `updateProfile`. It names an object
+   * in a private bucket, so the server takes it only here, where it checks the
+   * path belongs to the caller before storing it.
+   */
+  avatarUploadUrl: ({ mimeType, byteSize }, token) =>
+    api.post(
+      v1("/me/avatar/upload-url"),
+      { mime_type: mimeType, byte_size: byteSize },
+      { token },
+    ),
+
+  confirmAvatar: (path, token) => api.post(v1("/me/avatar"), { path }, { token }),
+
+  /** A signed URL that expires. Fetched when the profile loads, never stored. */
+  avatarUrl: (token) => api.get(v1("/me/avatar-url"), { token }),
+
+  removeAvatar: (token) => api.delete(v1("/me/avatar"), { token }),
+
   settings: (token) => api.get(v1("/me/settings"), { token }),
   updateSettings: (patch, token) => api.patch(v1("/me/settings"), patch, { token }),
 
