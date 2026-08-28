@@ -103,6 +103,22 @@ export default function UsageScreen() {
   );
   const courseUnits = meter("courseUnits", units.length, unitCap(tier));
 
+  // Free is the only plan with a ceiling that does not reset, and it is the
+  // number that decides when the app stops answering — so it is drawn, and
+  // drawn above the daily one, which is the less important of the two once it
+  // starts running out.
+  const totalAi = meter(
+    "aiQueriesTotal",
+    // The device's own counter, not the number of questions in the chat list:
+    // a student who clears a conversation has not been given the questions
+    // back, and the server's meter -- which wins here whenever it has arrived
+    // -- knows that.
+    usage.aiQueriesEver,
+    limits.lifetimeAiQueries,
+  );
+  const hasLifetimeCeiling =
+    totalAi.limit !== UNLIMITED && totalAi.limit > 0;
+
   return (
     <Screen bare>
       <ScreenHeader
@@ -137,6 +153,13 @@ export default function UsageScreen() {
           ALLOWANCE
         </Text>
 
+        {hasLifetimeCeiling ? (
+          <UsageMeter
+            label="AI questions on the free plan"
+            used={totalAi.used}
+            limit={totalAi.limit}
+          />
+        ) : null}
         <UsageMeter label="AI questions today" used={ai.used} limit={ai.limit} />
         <UsageMeter
           label={weekly ? "Quizzes this week" : "Quizzes taken"}

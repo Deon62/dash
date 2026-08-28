@@ -17,7 +17,7 @@ import {
   pricePerSeat,
   seatsFor,
 } from "@/theme/plans";
-import { activeTier, daysRemaining, isExpired } from "@/lib/quota";
+import { activeTier, daysRemaining, hasEverPaid, isExpired } from "@/lib/quota";
 import { confirmCheckout, startCheckout } from "@/lib/checkout";
 import { loadPlans, loadSubscription } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
@@ -26,9 +26,14 @@ import { impact, notify } from "@/lib/haptics";
 /**
  * Pricing.
  *
- * Three cards, because three things are for sale. The trial is not a product —
- * it is the fortnight every account already has, so it is a line on the cards
- * rather than a column of its own that nobody can buy.
+ * Three cards, because three things are for sale. Free is not one of them, so
+ * it is not a fourth column with a KES 0 button on it — it is the panel above,
+ * stating what the student already has. A card you cannot buy sitting in a row
+ * of cards you can is a thing people try to press.
+ *
+ * It replaced a fourteen-day trial, which used to be a line on every card.
+ * That line is gone: there is no fortnight to advertise, and copy promising
+ * one would be the worst kind of stale.
  *
  * Every line on a card is generated from `PLAN_CONFIGS`, so a limit cannot be
  * changed in the config and left advertised wrongly here. The *prices* come
@@ -61,6 +66,10 @@ export default function BillingScreen() {
   const tier = activeTier(subscription);
   const left = daysRemaining(subscription);
   const expired = isExpired(subscription);
+  // "Your plan has ended" is wrong on an account that never had one, and there
+  // are now a great many of those.
+  const lapsed = expired && hasEverPaid(subscription);
+  const onFree = tier === SubscriptionTier.FREE;
 
   // A payment that was still clearing usually lands while this screen is open,
   // through the webhook rather than through anything the student did. When it
@@ -188,6 +197,48 @@ export default function BillingScreen() {
             onAction={notice.retry}
             onDismiss={() => setNotice(null)}
           />
+        ) : null}
+
+        {/* What they have right now, before what they could buy. On free this
+            is the only plan on the screen that is actually in force, and a
+            student who does not know what free includes cannot tell whether
+            KES 150 is worth it. */}
+        {onFree ? (
+          <View
+            style={{
+              borderColor: COLORS.line,
+              borderWidth: 1,
+              borderRadius: 24,
+              padding: 20,
+            }}
+          >
+            <View className="flex-row items-start justify-between">
+              <View className="flex-1 pr-3">
+                <Text className="font-jk-bold text-ink text-[20px]">Free</Text>
+                <Text className="font-jk text-muted text-[12.5px] mt-0.5">
+                  {lapsed
+                    ? "Where your plan left you. No time limit."
+                    : "Enough to try it properly. No time limit."}
+                </Text>
+              </View>
+              <View className="items-end mt-1">
+                <Text className="font-jk-med text-primary text-[11px] tracking-[0.8px]">
+                  CURRENT
+                </Text>
+              </View>
+            </View>
+
+            <View className="gap-y-2.5 mt-5">
+              {planFeatures(SubscriptionTier.FREE).map((feature) => (
+                <View key={feature.text} className="flex-row items-start">
+                  <Check size={14} color={COLORS.primary} strokeWidth={2.4} />
+                  <Text className="font-jk text-ink text-[13px] leading-[19px] flex-1 ml-2.5">
+                    {feature.text}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
         ) : null}
 
         {PLAN_CARDS.map((card) => {
@@ -319,8 +370,9 @@ export default function BillingScreen() {
         })}
 
         <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
-          {expired
-            ? "Your plan has ended. The free limits apply until you renew. "
+          {lapsed
+            ? "Your plan has ended. You are on the free plan until you renew — "
+            + "nothing you filed has gone anywhere. "
             : ""}
           Payment is handled by Kora, which accepts M-Pesa, Airtel Money and
           cards. Your plan activates once the payment clears.

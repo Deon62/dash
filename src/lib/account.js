@@ -250,6 +250,9 @@ export async function loadUsage() {
     tier: data.tier,
     planName: data.plan_name,
     aiQueriesToday: meter(data.ai_queries_today),
+    // Only the free plan sets one. It arrives as unlimited on every paid tier,
+    // and `UsageMeter` is not drawn for it there.
+    aiQueriesTotal: meter(data.ai_queries_total),
     quizzes: meter(data.quizzes),
     quizInterval: data.quiz_interval,
     courseUnits: meter(data.course_units),

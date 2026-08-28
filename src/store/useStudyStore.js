@@ -76,11 +76,15 @@ const EMPTY_SETTINGS = {
  *
  * Each carries the period it belongs to, so a stale counter can be recognised
  * and reset rather than silently spending yesterday's allowance. `quizzesEver`
- * has no period on purpose — the trial's quiz limit is a lifetime one.
+ * and `aiQueriesEver` have no period on purpose — the free plan's ceilings on
+ * both are lifetime ones, and a counter that rolled over would be no ceiling
+ * at all.
  */
 const EMPTY_USAGE = {
   day: dayKey(),
   aiQueriesToday: 0,
+  /** No period. The free plan's ceiling is a lifetime one. */
+  aiQueriesEver: 0,
   week: null,
   quizzesThisWeek: 0,
   month: dayKey().slice(0, 7),
@@ -126,7 +130,10 @@ const BLANK = {
   isAuthenticated: false,
   profile: { ...EMPTY_PROFILE },
   settings: { ...EMPTY_SETTINGS },
-  /** `null` until the trial is started, which happens at the end of intake. */
+  /**
+   * `null` until the server has been asked. Absent is not the same as free:
+   * the server always answers with a plan, so nothing here has to guess.
+   */
   subscription: null,
   /**
    * The Friends plan, once there is one.
@@ -422,7 +429,15 @@ export const useStudyStore = create(
       recordAiQuery: () =>
         set((state) => {
           const usage = rollUsage(state.usage);
-          return { usage: { ...usage, aiQueriesToday: usage.aiQueriesToday + 1 } };
+          return {
+            usage: {
+              ...usage,
+              aiQueriesToday: usage.aiQueriesToday + 1,
+              // Both, always. The daily counter alone would let the free
+              // plan's lifetime ceiling be walked past a day at a time.
+              aiQueriesEver: (usage.aiQueriesEver ?? 0) + 1,
+            },
+          };
         }),
 
       recordQuiz: () =>
@@ -448,10 +463,10 @@ export const useStudyStore = create(
       /**
        * Marks the intake flow done; the guard stops redirecting after this.
        *
-       * No trial is minted here. The server grants the fortnight once per
-       * person when the account is created, and it does not restart because
-       * someone reinstalled — which is exactly what a device-side clock would
-       * let them do.
+       * No plan is minted here, and there is no longer a fortnight to mint.
+       * Every account is on free from the moment the server creates it, which
+       * is also why nothing on this device needs a clock: there is no date to
+       * restart by reinstalling.
        */
       completeOnboarding: (patch = {}) =>
         set((state) => ({

@@ -60,6 +60,19 @@ export function activeTier(subscription, now = Date.now()) {
     : SubscriptionTier.FREE;
 }
 
+/**
+ * Whether this account has ever held a paid plan.
+ *
+ * `isExpired` is true for both a lapsed subscription and an account that has
+ * simply never bought anything, because it answers one question: is a paid
+ * plan in force. The pricing screen needs the other one — "your plan has
+ * ended" is wrong, and slightly insulting, on an account that never had one.
+ */
+export function hasEverPaid(subscription) {
+  const nominal = nominalTier(subscription);
+  return nominal !== SubscriptionTier.FREE && nominal !== SubscriptionTier.TRIAL;
+}
+
 /** What it was sold as, even once it has run out. Used to name what ended. */
 export function nominalTier(subscription) {
   return subscription?.nominalTier ?? subscription?.tier ?? SubscriptionTier.FREE;
@@ -124,6 +137,10 @@ export function rollUsage(usage, now = new Date()) {
     ocrPagesThisMonth: usage.month === month ? usage.ocrPagesThisMonth : 0,
     // Lifetime counters never roll — that is what makes them lifetime.
     quizzesEver: usage.quizzesEver ?? 0,
+    // `?? 0` because an install that predates this field has no value for it.
+    // Reading `undefined` here would compare as NaN and quietly allow past the
+    // ceiling, which is the one thing this counter exists to stop.
+    aiQueriesEver: usage.aiQueriesEver ?? 0,
   };
 }
 
@@ -139,12 +156,33 @@ export function canAddUnit(tier, unitCount) {
   );
 }
 
+/**
+ * Two ceilings, and they mean different things to whoever hits them.
+ *
+ * The daily one is a rate: come back tomorrow. The lifetime one is the end of
+ * the free plan, and the message has to say so — sending someone away to wait
+ * for a reset that is never coming is worse than telling them it is over.
+ *
+ * The lifetime one is checked first for that reason. Once it is spent, "you
+ * have used today's five" is technically true and completely misleading.
+ */
 export function canAskAi(tier, usage) {
-  const limit = limitsFor(tier).dailyAiQueries;
+  const limits = limitsFor(tier);
+  const rolled = rollUsage(usage);
+
+  const ceiling = limits.lifetimeAiQueries;
+  if (ceiling !== UNLIMITED && (rolled.aiQueriesEver ?? 0) >= ceiling) {
+    return denied(
+      "ai",
+      `You have used all ${ceiling} questions the free plan includes. ` +
+        "A paid plan carries on from here.",
+    );
+  }
+
+  const limit = limits.dailyAiQueries;
   if (limit === UNLIMITED) return ALLOWED;
 
-  const used = rollUsage(usage).aiQueriesToday;
-  if (used < limit) return ALLOWED;
+  if (rolled.aiQueriesToday < limit) return ALLOWED;
 
   return denied("ai", `You have used today's ${limit} AI questions.`);
 }
@@ -203,7 +241,7 @@ export function canUseOcr(tier, usage) {
   return denied("ocr", `You have scanned this month's ${monthlyOcrPageLimit} pages.`);
 }
 
-/** Timetable alerts are off on the trial, which only supports manual entry. */
+/** Timetable alerts are off on free, which only supports manual entry. */
 export function canUseAlerts(tier) {
   return limitsFor(tier).timetableMode !== "manual";
 }
