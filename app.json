@@ -2,7 +2,7 @@
   "expo": {
     "name": "ALS",
     "slug": "als",
-    "scheme": "als",
+    "scheme": ["als", "com.ardena.als"],
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

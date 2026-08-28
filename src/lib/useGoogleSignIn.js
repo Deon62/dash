@@ -48,6 +48,20 @@ const UNAVAILABLE = {
  * picks becomes the token's audience, which is what the server checks against
  * its own allow-list — so on Android that is the *Android* client id, not the
  * web one, and the server has to know about it.
+ *
+ * Two things outside this file have to be true, and neither fails loudly:
+ *
+ * * **`com.ardena.als` is in `scheme` in app.json.** The library redirects to
+ *   `<applicationId>:/oauthredirect`, which is the only redirect shape Google
+ *   accepts for an Android client. Without an intent filter for that scheme
+ *   Android has nothing to hand the redirect to: the consent screen completes,
+ *   the browser sits on a blank page, and the app never hears that anyone
+ *   signed in. That is a native manifest entry, so it needs a new build — an
+ *   over-the-air update cannot carry it.
+ * * **"Custom URI scheme" is enabled on the Android OAuth client**, under
+ *   Advanced Settings in the Google Cloud console. New clients have it off,
+ *   and with it off Google refuses the request before the consent screen with
+ *   a 400 that reads "Ardena sent an invalid request".
  */
 export function useGoogleSignIn({ onSignedIn } = {}) {
   // Conditional, and safe: `Google` is decided once when this module is first
