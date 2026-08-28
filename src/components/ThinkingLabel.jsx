@@ -74,8 +74,17 @@ export function useThinkingWord(holdMs = HOLD_MS) {
   return order[index % order.length];
 }
 
+/**
+ * Drawn in the streak orange, on whatever is behind it.
+ *
+ * No bubble: a grey panel makes the wait look like a message that has already
+ * arrived, and the reader waits for text to appear inside it. Loose on the
+ * ground it reads as the app talking rather than the tutor answering. Orange
+ * because it is the one warm colour in the palette and nothing else on these
+ * screens uses it, so the eye finds it without it having to be large.
+ */
 export default function ThinkingLabel({
-  className = "font-jk text-muted text-[13.5px]",
+  className = "font-jk-med text-flame text-[13.5px]",
 }) {
   const word = useThinkingWord();
   const opacity = useSharedValue(1);

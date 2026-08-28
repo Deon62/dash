@@ -252,7 +252,7 @@ export default function AddKnowledge({
             label="TITLE"
             value={title}
             onChangeText={setTitle}
-            placeholder={format === "link" ? "What is this?" : "Week 4 — Hashing"}
+            placeholder={format === "link" ? "What is this?" : "Week 4: Hashing"}
             autoFocus
           />
 

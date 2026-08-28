@@ -84,7 +84,7 @@ export default function UploadStatus({ material }) {
             // PDF that is images all the way down. Worth saying plainly: the
             // file is safe and openable, the tutor just cannot revise from it.
             "Saved, but no text could be read from it"
-          : "Reading it now — searchable shortly";
+          : "Reading it now, searchable shortly";
 
   return (
     <View className="flex-row items-center mt-2">

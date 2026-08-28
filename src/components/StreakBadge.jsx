@@ -23,7 +23,7 @@ export default function StreakBadge({ days, onPress }) {
       }}
       accessibilityRole="button"
       accessibilityLabel={
-        lit ? `${days} day streak` : "No streak yet — revise today to start one"
+        lit ? `${days} day streak` : "No streak yet. Revise today to start one"
       }
       hitSlop={6}
       style={{

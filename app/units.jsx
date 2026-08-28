@@ -46,7 +46,10 @@ export default function UnitsScreen() {
             const items = materials.filter(
               (material) => material.unitId === unit.id && !material.archived
             ).length;
-            const sessions = sessions.filter((entry) => entry.unitId === unit.id).length;
+            // Not `sessions`: naming it that shadows the store's list in this
+            // same scope, so the filter reads the half-declared local instead
+            // and the screen dies on `undefined.filter` for every unit.
+            const weekly = sessions.filter((entry) => entry.unitId === unit.id).length;
 
             return (
               <Pressable
@@ -70,7 +73,7 @@ export default function UnitsScreen() {
                   </Text>
                   <Text className="font-jk text-muted text-[12px] mt-1.5">
                     {items} {items === 1 ? "item" : "items"} ·{" "}
-                    {sessions} {sessions === 1 ? "session" : "sessions"} a week
+                    {weekly} {weekly === 1 ? "session" : "sessions"} a week
                     {unit.lecturer ? ` · ${unit.lecturer}` : ""}
                   </Text>
                 </View>

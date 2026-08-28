@@ -88,7 +88,7 @@ export default function StreakScreen() {
     ? "Ask one question today and the streak starts."
     : revisedToday
       ? "Today is on the board. Keep it rolling."
-      : "You haven't revised today — one question keeps it alive.";
+      : "You haven't revised today. One question keeps it alive.";
 
   return (
     <Screen bare contentStyle={{ rowGap: 0 }}>

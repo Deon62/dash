@@ -19,7 +19,7 @@ const POINTS = [
   },
   {
     title: "Signing in identifies the account",
-    body: "Your phone number, or your Google address, is what your account is filed under. Signing in on a new phone signs the old one out — one account, one device at a time.",
+    body: "Your phone number, or your Google address, is what your account is filed under. Signing in on a new phone signs the old one out. One account, one device at a time.",
   },
   {
     title: "Deleting is deleting",

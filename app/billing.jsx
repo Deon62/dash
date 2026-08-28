@@ -142,7 +142,7 @@ export default function BillingScreen() {
               tone: "waiting",
               title: "Your payment is still clearing",
               message:
-                "Mobile money can take a minute or two to confirm. Nothing has gone wrong — check again shortly and your plan unlocks as soon as it lands.",
+                "Mobile money can take a minute or two to confirm. Nothing has gone wrong. Check again shortly and your plan unlocks as soon as it lands.",
               retry: () => unlock(card),
             }
           : {
@@ -320,7 +320,7 @@ export default function BillingScreen() {
 
         <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
           {expired
-            ? "Your plan has ended — the free limits apply until you renew. "
+            ? "Your plan has ended. The free limits apply until you renew. "
             : ""}
           Payment is handled by Kora, which accepts M-Pesa, Airtel Money and
           cards. Your plan activates once the payment clears.

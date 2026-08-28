@@ -27,13 +27,13 @@ const SLIDES = [
     key: "knowledge",
     Art: FiledArt,
     title: "Chuck it all in\none place",
-    body: "Timetable, notes, slides, past papers — filed under the unit they belong to instead of lost in your gallery.",
+    body: "Timetable, notes, slides, past papers, filed under the unit they belong to instead of lost in your gallery.",
   },
   {
     key: "study",
     Art: NotesArt,
     title: "An AI that studies\nwhat you study",
-    body: "It reads your material, not the internet. Ask anything and it answers from your own notes, slides and papers — and tells you which one.",
+    body: "It reads your material, not the internet. Ask anything and it answers from your own notes, slides and papers, then tells you which one.",
   },
   {
     key: "calendar",

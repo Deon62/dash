@@ -167,7 +167,7 @@ export default function FriendsScreen() {
               tone: "waiting",
               title: "Your payment is still clearing",
               message:
-                "Mobile money can take a minute or two to confirm. Nothing has gone wrong — check again shortly and the group is yours as soon as it lands.",
+                "Mobile money can take a minute or two to confirm. Nothing has gone wrong. Check again shortly and the group is yours as soon as it lands.",
               retry: startGroup,
             }
           : {
@@ -190,7 +190,7 @@ export default function FriendsScreen() {
       setNotice({
         tone: toneForError(created.error),
         title: "Your payment went through, but the group didn't open",
-        message: `${created.error} You have not lost anything — try again and your seats will be there.`,
+        message: `${created.error} You have not lost anything. Try again and your seats will be there.`,
         retry: startGroup,
       });
       return;
@@ -223,7 +223,7 @@ export default function FriendsScreen() {
 
     const subject = "A seat on my ALS plan";
     const body = [
-      "Hey — I pay for an ALS Friends plan and there is a seat on it for you.",
+      "Hey, I pay for an ALS Friends plan and there is a seat on it for you.",
       'Open ALS, go to Plans, tap "Join with a code" and enter:',
       invite,
       `That is everything in ${solo.name}, and nothing for you to pay.`,
@@ -255,7 +255,7 @@ export default function FriendsScreen() {
     impact("medium");
     await Share.share({
       message:
-        `Join my ALS plan — we each pay KES ${perSeat} a month instead of ` +
+        `Join my ALS plan. We each pay KES ${perSeat} a month instead of ` +
         `${solo.priceKsh}. Open ALS, go to Plans, tap Join with a code and ` +
         `enter ${invite}.`,
     });
@@ -454,7 +454,7 @@ export default function FriendsScreen() {
               ? [
                   `You pay KES ${plan.priceKsh} a month. The other ${seats - 1} pay nothing.`,
                   `Anyone who enters your code gets everything in ${solo.name}, for as long as the plan runs.`,
-                  "Invite by email or send the code — either way it is the same code, and it works until the seats run out.",
+                  "Invite by email or send the code. Either way it is the same code, and it works until the seats run out.",
                   "Remove someone and their seat frees up straight away for the next person.",
                   "Their notes, chats and grades stay private. You pay for the plan, not for their work.",
                   "If the plan lapses, everyone on it drops to the free limits together.",
@@ -463,11 +463,11 @@ export default function FriendsScreen() {
                 ? [
                     `${payer?.name || "Whoever invited you"} pays. There is nothing for you to pay, now or later.`,
                     `You get everything in ${solo.name} for as long as they keep the plan running.`,
-                    "Your notes, chats and grades are yours alone — nobody else on the plan can see them.",
+                    "Your notes, chats and grades are yours alone. Nobody else on the plan can see them.",
                     "If they stop paying or free your seat, you drop to the free limits. Your work stays.",
                   ]
                 : [
-                    `One payment of KES ${plan.priceKsh} covers ${seats} students — KES ${perSeat} each.`,
+                    `One payment of KES ${plan.priceKsh} covers ${seats} students, at KES ${perSeat} each.`,
                     "Whoever pays gets a code and hands it to the other four.",
                     `Everyone on it gets ${solo.name} in full. Nobody's notes are shared.`,
                     "The payer can free a seat at any time and give it to someone else.",
@@ -562,7 +562,7 @@ export default function FriendsScreen() {
             setNotice({
               tone: toneForError(error),
               title: "That seat could not be freed",
-              message: `${error} They are still on the plan — try again in a moment.`,
+              message: `${error} They are still on the plan. Try again in a moment.`,
               retry: () => setRemoving(target),
             });
           }

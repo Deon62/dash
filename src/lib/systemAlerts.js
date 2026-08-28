@@ -75,7 +75,7 @@ export function systemAlerts(state) {
       id: "system-payment",
       Icon: Clock,
       title: "Your payment is still being confirmed",
-      body: "Mobile money can take a minute. Your plan unlocks as soon as it clears — nothing more to do.",
+      body: "Mobile money can take a minute. Your plan unlocks as soon as it clears. Nothing more to do.",
       urgent: false,
       sort: -0.7,
     });

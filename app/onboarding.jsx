@@ -10,7 +10,6 @@ import {
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   ArrowLeft,
-  ArrowRight,
   Building2,
   GraduationCap,
   Plus,
@@ -85,13 +84,22 @@ export default function OnboardingScreen() {
     impact("medium");
     notify("success");
 
-    const details = {
-      name: name.trim(),
-      institution: institution.trim(),
-      program: program.trim(),
-      yearOfStudy: year,
-      semester,
-    };
+    // Only what was actually typed. A skipped field must not be sent: the
+    // server treats a present key as an instruction, so a blank `name` would
+    // wipe the one Google sign-in already put on the account, and a student
+    // who skipped intake here would be sent back through it on their next
+    // device because `loadProfile` reads a missing name as "never onboarded".
+    const details = {};
+    if (name.trim()) details.name = name.trim();
+    if (institution.trim()) details.institution = institution.trim();
+    if (program.trim()) details.program = program.trim();
+
+    // Year and semester always hold a value because the dropdowns default to
+    // one, so they are only meaningful alongside a filled-in programme.
+    if (program.trim()) {
+      details.yearOfStudy = year;
+      details.semester = semester;
+    }
 
     completeOnboarding(details);
 
@@ -100,7 +108,7 @@ export default function OnboardingScreen() {
     // than under this handset. Neither is awaited — the guard moves into the
     // tabs the moment `onboarded` flips, and holding a finished form open for
     // a round trip is time a student spends looking at a spinner.
-    saveProfile(details);
+    if (Object.keys(details).length > 0) saveProfile(details);
     sync();
   };
 
@@ -211,8 +219,27 @@ export default function OnboardingScreen() {
                 label="Continue"
                 disabled={!canContinue}
                 onPress={() => setStep(1)}
-                Icon={ArrowRight}
               />
+
+              {/* Skipping moves on to units rather than ending intake: the
+                  units step is the one that makes the tutor useful, and it
+                  carries its own skip for anyone who wants neither. Anything
+                  already typed is kept, since discarding a half-filled form
+                  is a worse surprise than saving it. */}
+              <Pressable
+                onPress={() => {
+                  impact("light");
+                  setStep(1);
+                }}
+                accessibilityRole="button"
+                accessibilityLabel="Skip for now"
+                hitSlop={8}
+                className="items-center py-4 mt-1 active:opacity-60"
+              >
+                <Text className="font-jk-med text-muted text-[13.5px]">
+                  Skip for now
+                </Text>
+              </Pressable>
             </View>
           </>
         ) : (

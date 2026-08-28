@@ -285,7 +285,7 @@ export default function StudyScreen() {
               }}
             />
           ) : thinking ? (
-            <View className="self-start rounded-2xl bg-surface px-4 py-3">
+            <View className="self-start px-1 py-2">
               <ThinkingLabel />
             </View>
           ) : null}
@@ -585,7 +585,7 @@ export default function StudyScreen() {
         title="We couldn't answer that one"
         // Their question is still in the thread above, so "ask again" means
         // tapping send on what is already typed rather than retyping it.
-        message={`${failure} Your question is still here — try sending it again in a moment.`}
+        message={`${failure} Your question is still here. Try sending it again in a moment.`}
         confirmLabel="OK"
         onConfirm={() => setFailure(null)}
         onDismiss={() => setFailure(null)}

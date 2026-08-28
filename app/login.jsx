@@ -2,7 +2,6 @@ import { useEffect, useRef, useState } from "react";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { ArrowRight } from "lucide-react-native";
 import Svg, { Circle, Defs, RadialGradient, Stop } from "react-native-svg";
 
 import GoogleMark from "@/components/GoogleMark";
@@ -166,7 +165,7 @@ export default function LoginScreen() {
         </Text>
         <Text className="font-jk text-muted text-[14.5px] leading-[22px] text-center mt-3.5">
           Feed it your notes, slides and past papers. It learns your units and
-          revises with you — quoting the exact source it got the answer from.
+          revises with you, quoting the exact source it got the answer from.
         </Text>
 
         {/* The sign-in controls sit in the vertical middle rather than packed
@@ -249,7 +248,6 @@ export default function LoginScreen() {
               busy={busy === "phone"}
               disabled={!canContinue || Boolean(busy)}
               onPress={continueWithPhone}
-              Icon={ArrowRight}
             />
           </View>
         </View>

@@ -34,7 +34,14 @@ export const COLORS = {
   violet: "#7C3AED",
   teal: "#0D9488",
   amber: "#F59E0B",
-  /** The streak flame, and nothing else. */
+  /**
+   * The streak flame, and the tutor's thinking label.
+   *
+   * Both are the app speaking rather than reporting: one says a habit is
+   * alive, the other that work is happening. It is the only warm colour in a
+   * palette that is otherwise blue and grey, so it carries either without
+   * needing size or a fill behind it. Nothing else should take it.
+   */
   flame: "#F97316",
   danger: "#DC2626",
 };

@@ -187,7 +187,7 @@ export default function UnitScreen() {
             <EmptyState
               Icon={FileText}
               title="Nothing filed yet"
-              message="Notes, slides, readings — anything with text in it is what the tutor revises with you."
+              message="Notes, slides, readings. Anything with text in it is what the tutor revises with you."
             />
           ) : (
             <View>
