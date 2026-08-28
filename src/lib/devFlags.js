@@ -15,3 +15,14 @@
  * next cold start. Off: new users see it once and never again.
  */
 export const ALWAYS_SHOW_INTRO = false;
+
+/**
+ * Show the Diagnostics row in Settings, and with it the on-device failure log.
+ *
+ * Defaults to `__DEV__`, so it is there in Expo Go and in a dev client and
+ * gone from anything a student installs. Set it to `true` by hand to carry it
+ * into a preview build when you are chasing something that only happens on a
+ * real install — but put it back before a production build, because the log
+ * records raw response bodies and those are not for a student to read.
+ */
+export const SHOW_DIAGNOSTICS = __DEV__;

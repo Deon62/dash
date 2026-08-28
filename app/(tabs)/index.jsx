@@ -13,6 +13,7 @@ import SessionRow from "@/components/SessionRow";
 import EventComposer from "@/components/EventComposer";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
+import { liveStreak } from "@/lib/streak";
 import { hasSystemAlerts } from "@/lib/systemAlerts";
 import { dayKey, greeting, minutesOf } from "@/lib/dates";
 
@@ -85,7 +86,7 @@ export default function HomeScreen() {
               demand, and the reward should not be the thing you reach past. */}
           <View className="flex-row items-center gap-x-2">
             <StreakBadge
-              days={study.streakDays}
+              days={liveStreak(study)}
               onPress={() => router.push("/streak")}
             />
             <IconButton

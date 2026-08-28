@@ -1,6 +1,7 @@
 import { fetch as streamingFetch } from "expo/fetch";
 
 import { API_BASE_URL, API_V1, OFFLINE } from "@/api/client";
+import { recordFailure } from "@/lib/diagnostics";
 import { tutor as tutorApi } from "@/api/endpoints";
 import { accessToken, authed, refreshSession, NOT_SIGNED_IN } from "@/lib/session";
 
@@ -137,6 +138,15 @@ async function openStream({
         // Not JSON. The status line above is all there is to say.
       }
 
+      recordFailure({
+        source: "tutor",
+        method: "POST",
+        path: `${API_V1}/tutor/ask`,
+        status: response.status,
+        message,
+        detail: text,
+      });
+
       release();
       return { status: response.status, error: message };
     }
@@ -145,13 +155,21 @@ async function openStream({
   } catch (error) {
     release();
 
-    return {
+    const aborted = error?.name === "AbortError";
+    const message = aborted
+      ? "The answer was taking too long, so it was stopped."
+      : OFFLINE;
+
+    recordFailure({
+      source: "tutor",
+      method: "POST",
+      path: `${API_V1}/tutor/ask`,
       status: 0,
-      error:
-        error?.name === "AbortError"
-          ? "The answer was taking too long, so it was stopped."
-          : OFFLINE,
-    };
+      message,
+      detail: aborted ? "Aborted" : `${error?.name ?? "Error"}: ${error?.message ?? error}`,
+    });
+
+    return { status: 0, error: message };
   }
 }
 

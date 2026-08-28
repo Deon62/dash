@@ -3,6 +3,7 @@ import { View } from "react-native";
 import { useRouter } from "expo-router";
 import {
   BellRing,
+  Bug,
   FingerprintPattern,
   ShieldCheck,
   Trash2,
@@ -15,11 +16,14 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { useStudyStore } from "@/store/useStudyStore";
 import { authenticate, describe, isAvailable } from "@/lib/biometrics";
 import { deleteAccount, saveSettings } from "@/lib/account";
+import { SHOW_DIAGNOSTICS } from "@/lib/devFlags";
+import { useFailureCount } from "@/lib/diagnostics";
 
 export default function SettingsScreen() {
   const router = useRouter();
 
   const settings = useStudyStore((state) => state.settings);
+  const failures = useFailureCount();
 
   const [confirming, setConfirming] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -103,6 +107,24 @@ export default function SettingsScreen() {
           last
         />
       </View>
+
+      {/* Development only. The count is on the row because the whole point is
+          to notice a failure without having gone looking for one. */}
+      {SHOW_DIAGNOSTICS ? (
+        <View>
+          <LinkRow
+            Icon={Bug}
+            label="Diagnostics"
+            hint={
+              failures === 0
+                ? "Nothing has failed this session"
+                : `${failures} failed ${failures === 1 ? "request" : "requests"} this session`
+            }
+            onPress={() => router.push("/settings/diagnostics")}
+            last
+          />
+        </View>
+      ) : null}
 
       <View>
         <LinkRow

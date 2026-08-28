@@ -7,6 +7,7 @@ import ScreenHeader from "@/components/ScreenHeader";
 import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS } from "@/theme/colors";
 import { dayKey } from "@/lib/dates";
+import { liveStreak, streakLine } from "@/lib/streak";
 
 /** Monday-first, matching the calendar and every printed timetable. */
 const LETTERS = ["M", "T", "W", "T", "F", "S", "S"];
@@ -80,15 +81,18 @@ export default function StreakScreen() {
   const week = useMemo(() => weekDays(), []);
   const earned = useMemo(() => new Set(days), [days]);
 
-  const current = study.streakDays ?? 0;
+  // Derived, not read straight off the store: `streakDays` is only written
+  // when a question is asked, so a run that ended days ago is still sitting
+  // there at its last value until the server happens to correct it.
+  const current = liveStreak(study);
   const longest = Math.max(study.longestStreak ?? 0, current);
   const revisedToday = earned.has(todayKey);
 
-  const message = !current
-    ? "Ask one question today and the streak starts."
-    : revisedToday
-      ? "Today is on the board. Keep it rolling."
-      : "You haven't revised today. One question keeps it alive.";
+  const message = streakLine({ current, revisedToday, today: todayKey });
+
+  // A broken run leaves ticks on the week row with nothing above them to
+  // explain the zero, which reads as the page contradicting itself.
+  const brokenRun = current === 0 && !revisedToday && earned.size > 0;
 
   return (
     <Screen bare contentStyle={{ rowGap: 0 }}>
@@ -124,6 +128,12 @@ export default function StreakScreen() {
         <Text className="font-jk text-muted text-[13.5px] leading-[20px] text-center mt-3 px-6">
           {message}
         </Text>
+
+        {brokenRun ? (
+          <Text className="font-jk text-faint text-[12px] leading-[18px] text-center mt-2 px-8">
+            The days below are still yours. The run just needs starting again.
+          </Text>
+        ) : null}
 
         <View className="flex-row justify-center gap-x-2 mt-10">
           {week.map((day, index) => (
