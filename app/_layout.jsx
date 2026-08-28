@@ -8,6 +8,7 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
+import { PostHogProvider } from "posthog-react-native";
 import {
   useFonts,
   PlusJakartaSans_400Regular,
@@ -20,6 +21,14 @@ import { useStudyStore } from "@/store/useStudyStore";
 import { useSessionGuard } from "@/lib/useSessionGuard";
 import { useAccountSync } from "@/lib/bootstrap";
 import AppLock from "@/components/AppLock";
+import {
+  analyticsEnabled,
+  IdentitySync,
+  POSTHOG_AUTOCAPTURE,
+  POSTHOG_KEY,
+  POSTHOG_OPTIONS,
+  ScreenTracker,
+} from "@/lib/analytics";
 import { COLORS } from "@/theme/colors";
 
 /**
@@ -40,6 +49,29 @@ function SessionGuard() {
 function AccountSync() {
   useAccountSync();
   return null;
+}
+
+/**
+ * Wraps the app in PostHog when a project key is configured, and gets out of
+ * the way when one is not — Expo Go, a fresh clone, or anyone who would rather
+ * not send events while developing.
+ *
+ * It sits above the navigator because the touch autocapture works by catching
+ * `onTouchEndCapture` on a wrapper View: anything rendered outside it is
+ * invisible to analytics.
+ */
+function Analytics({ children }) {
+  if (!analyticsEnabled) return children;
+
+  return (
+    <PostHogProvider
+      apiKey={POSTHOG_KEY}
+      options={POSTHOG_OPTIONS}
+      autocapture={POSTHOG_AUTOCAPTURE}
+    >
+      {children}
+    </PostHogProvider>
+  );
 }
 
 /**
@@ -110,29 +142,40 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <StatusBar style="dark" backgroundColor="#FFFFFF" />
-        <Stack
-          screenOptions={{
-            headerShown: false,
-            contentStyle: { backgroundColor: "#FFFFFF" },
-          }}
-        >
-          {/* Only screens that need non-default options are declared. Expo
-              Router registers the rest from the file tree, so adding a page
-              does not mean remembering to list it here. */}
-          <Stack.Screen name="intro" options={{ animation: "fade" }} />
-          <Stack.Screen name="login" options={{ animation: "fade" }} />
-          <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-        </Stack>
-        <SessionGuard />
-        <AccountSync />
+      <Analytics>
+        <SafeAreaProvider>
+          <StatusBar style="dark" backgroundColor="#FFFFFF" />
+          <Stack
+            screenOptions={{
+              headerShown: false,
+              contentStyle: { backgroundColor: "#FFFFFF" },
+            }}
+          >
+            {/* Only screens that need non-default options are declared. Expo
+                Router registers the rest from the file tree, so adding a page
+                does not mean remembering to list it here. */}
+            <Stack.Screen name="intro" options={{ animation: "fade" }} />
+            <Stack.Screen name="login" options={{ animation: "fade" }} />
+            <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+          </Stack>
+          <SessionGuard />
+          <AccountSync />
 
-        {/* Over the navigator, not instead of it: unmounting the routes to
-            show a lock would throw away every screen's state and drop the
-            student back at the tabs when they unlock. */}
-        <AppLock />
-      </SafeAreaProvider>
+          {/* Below the navigator: the screen tracker reads the current route
+              segments, and there are none until one exists. */}
+          {analyticsEnabled && (
+            <>
+              <ScreenTracker />
+              <IdentitySync />
+            </>
+          )}
+
+          {/* Over the navigator, not instead of it: unmounting the routes to
+              show a lock would throw away every screen's state and drop the
+              student back at the tabs when they unlock. */}
+          <AppLock />
+        </SafeAreaProvider>
+      </Analytics>
     </GestureHandlerRootView>
   );
 }

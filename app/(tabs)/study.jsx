@@ -19,6 +19,7 @@ import Notice, { toneForError } from "@/components/Notice";
 import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
+import ThinkingLabel from "@/components/ThinkingLabel";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { askTutor, buildFlashcards, buildQuiz } from "@/lib/tutor";
 import { newId } from "@/lib/ids";
@@ -285,9 +286,7 @@ export default function StudyScreen() {
             />
           ) : thinking ? (
             <View className="self-start rounded-2xl bg-surface px-4 py-3">
-              <Text className="font-jk text-muted text-[13.5px]">
-                Reading your material…
-              </Text>
+              <ThinkingLabel />
             </View>
           ) : null}
         </ScrollView>
@@ -718,12 +717,22 @@ function QuizPane({ unit, tier, usage, onStart, onBlocked }) {
 
     return (
       <View className="flex-1 justify-center px-5">
+        {/* The heading stays literal while a set is being written — this is a
+            wait a student can be blocked on, so the rotating word goes
+            underneath it rather than in place of it. The invitation to start
+            has to go too: it is wrong once a set is already on its way. */}
         <EmptyState
           Icon={MessageSquare}
           title={loading ? "Building your quiz…" : "Ready when you are"}
-          message={`Questions are written from what you have filed${unit ? ` under ${unit.code}` : ""}. Start a set and they appear here.`}
+          message={
+            loading
+              ? `Reading what you have filed${unit ? ` under ${unit.code}` : ""} and writing questions from it.`
+              : `Questions are written from what you have filed${unit ? ` under ${unit.code}` : ""}. Start a set and they appear here.`
+          }
           action={
-            loading ? null : (
+            loading ? (
+              <ThinkingLabel />
+            ) : (
               <Pressable
                 onPress={() => {
                   impact("medium");

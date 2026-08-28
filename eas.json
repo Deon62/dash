@@ -25,7 +25,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://als.ardena.xyz",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "924322385892-2l45qoq7jmcl4uuphmmhorev0b0rogfs.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "924322385892-ed7qld3t6s67uvqu6vksgt7b48pund14.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "924322385892-ed7qld3t6s67uvqu6vksgt7b48pund14.apps.googleusercontent.com",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_vqw6A9CRCgWzNLrDtgDbpwatsPz8tWkZXarA2ZL6yGQG",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com"
       }
     },
     "production": {
@@ -37,7 +39,9 @@
       "env": {
         "EXPO_PUBLIC_API_URL": "https://als.ardena.xyz",
         "EXPO_PUBLIC_GOOGLE_ANDROID_CLIENT_ID": "924322385892-2l45qoq7jmcl4uuphmmhorev0b0rogfs.apps.googleusercontent.com",
-        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "924322385892-ed7qld3t6s67uvqu6vksgt7b48pund14.apps.googleusercontent.com"
+        "EXPO_PUBLIC_GOOGLE_WEB_CLIENT_ID": "924322385892-ed7qld3t6s67uvqu6vksgt7b48pund14.apps.googleusercontent.com",
+        "EXPO_PUBLIC_POSTHOG_KEY": "phc_vqw6A9CRCgWzNLrDtgDbpwatsPz8tWkZXarA2ZL6yGQG",
+        "EXPO_PUBLIC_POSTHOG_HOST": "https://us.i.posthog.com"
       }
     }
   },
