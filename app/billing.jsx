@@ -22,6 +22,7 @@ import { confirmCheckout, pendingCheckout, startCheckout } from "@/lib/checkout"
 import { loadPlans, loadSubscription } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
+import { pullSync } from "@/lib/sync";
 
 /**
  * Pricing.
@@ -113,6 +114,17 @@ export default function BillingScreen() {
       cancelled = true;
     };
   }, []);
+
+  /**
+   * Pull to refresh.
+   *
+   * The most likely reason anyone pulls this page down is a payment that has
+   * not shown up yet — Kora's webhook lands seconds to minutes after the
+   * charge, and until it does the plan on screen is the old one. So this asks
+   * the server for the subscription rather than only syncing coursework, which
+   * would refresh everything except the thing being waited for.
+   */
+  const refresh = () => Promise.all([pullSync(), loadSubscription()]);
 
   // Only the person who paid has a code to see. A friend they invited is on
   // the same tier and lands on the same screen, but there is nothing there for
@@ -206,7 +218,7 @@ export default function BillingScreen() {
 
   return (
     <>
-      <Screen bare>
+      <Screen bare onRefresh={refresh}>
         <ScreenHeader title="Plans" />
 
         {/* Directly under the heading, not at the foot of three tall cards.

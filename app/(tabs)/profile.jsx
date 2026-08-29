@@ -20,6 +20,7 @@ import { useStudyStore } from "@/store/useStudyStore";
 import { endSession } from "@/lib/session";
 import { activeTier } from "@/lib/quota";
 import { planName } from "@/theme/plans";
+import { pullSync } from "@/lib/sync";
 
 export default function ProfileScreen() {
   const router = useRouter();
@@ -39,8 +40,18 @@ export default function ProfileScreen() {
     .filter(Boolean)
     .join(" · ");
 
+  /**
+   * Pull to refresh.
+   *
+   * The profile, the plan and the streak on this page all come down with an
+   * ordinary sync, so there is nothing extra to ask for — but the gesture
+   * still has to exist. This is the page a student lands on when they think
+   * something has not updated, and a page that ignores a pull reads as frozen.
+   */
+  const refresh = pullSync;
+
   return (
-    <Screen>
+    <Screen onRefresh={refresh}>
       <View className="flex-row justify-end">
         <IconButton
           Icon={Settings}

@@ -21,8 +21,10 @@ import { useStudyStore } from "@/store/useStudyStore";
 import { useSessionGuard } from "@/lib/useSessionGuard";
 import { useAccountSync } from "@/lib/bootstrap";
 import AppLock from "@/components/AppLock";
+import ErrorBoundary from "@/components/ErrorBoundary";
 import {
   analyticsEnabled,
+  AnalyticsBridge,
   IdentitySync,
   POSTHOG_AUTOCAPTURE,
   POSTHOG_KEY,
@@ -61,7 +63,10 @@ function AccountSync() {
  * invisible to analytics.
  */
 function Analytics({ children }) {
-  if (!analyticsEnabled) return children;
+  // Wrapped rather than returned bare: `children` is several elements now, and
+  // returning that array directly is what makes React ask for keys on static
+  // JSX that has no business having any.
+  if (!analyticsEnabled) return <>{children}</>;
 
   return (
     <PostHogProvider
@@ -143,38 +148,52 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <Analytics>
-        <SafeAreaProvider>
-          <StatusBar style="dark" backgroundColor="#FFFFFF" />
-          <Stack
-            screenOptions={{
-              headerShown: false,
-              contentStyle: { backgroundColor: "#FFFFFF" },
-            }}
-          >
-            {/* Only screens that need non-default options are declared. Expo
-                Router registers the rest from the file tree, so adding a page
-                does not mean remembering to list it here. */}
-            <Stack.Screen name="intro" options={{ animation: "fade" }} />
-            <Stack.Screen name="login" options={{ animation: "fade" }} />
-            <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
-          </Stack>
-          <SessionGuard />
-          <AccountSync />
+        {/* Outside the boundary, deliberately. React unmounts a boundary's
+            children before `componentDidCatch` runs, so a bridge among them
+            would have let go of the client at the exact moment the crash
+            needed reporting. */}
+        <AnalyticsBridge />
 
-          {/* Below the navigator: the screen tracker reads the current route
-              segments, and there are none until one exists. */}
-          {analyticsEnabled && (
-            <>
-              <ScreenTracker />
-              <IdentitySync />
-            </>
-          )}
+        {/* Inside `Analytics`, so a crash is reported through the client that
+            is already configured, and outside everything else, so there is no
+            screen it cannot catch. A React error unmounts the whole tree —
+            without this the student is left on white with no way back but
+            force-quitting, and if the fault is reached while the store
+            rehydrates, force-quitting lands them on white again. */}
+        <ErrorBoundary>
+          <SafeAreaProvider>
+            <StatusBar style="dark" backgroundColor="#FFFFFF" />
+            <Stack
+              screenOptions={{
+                headerShown: false,
+                contentStyle: { backgroundColor: "#FFFFFF" },
+              }}
+            >
+              {/* Only screens that need non-default options are declared. Expo
+                  Router registers the rest from the file tree, so adding a page
+                  does not mean remembering to list it here. */}
+              <Stack.Screen name="intro" options={{ animation: "fade" }} />
+              <Stack.Screen name="login" options={{ animation: "fade" }} />
+              <Stack.Screen name="onboarding" options={{ animation: "fade" }} />
+            </Stack>
+            <SessionGuard />
+            <AccountSync />
 
-          {/* Over the navigator, not instead of it: unmounting the routes to
-              show a lock would throw away every screen's state and drop the
-              student back at the tabs when they unlock. */}
-          <AppLock />
-        </SafeAreaProvider>
+            {/* Below the navigator: the screen tracker reads the current route
+                segments, and there are none until one exists. */}
+            {analyticsEnabled && (
+              <>
+                <ScreenTracker />
+                <IdentitySync />
+              </>
+            )}
+
+            {/* Over the navigator, not instead of it: unmounting the routes to
+                show a lock would throw away every screen's state and drop the
+                student back at the tabs when they unlock. */}
+            <AppLock />
+          </SafeAreaProvider>
+        </ErrorBoundary>
       </Analytics>
     </GestureHandlerRootView>
   );

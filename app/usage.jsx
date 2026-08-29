@@ -12,6 +12,7 @@ import { loadUsage } from "@/lib/account";
 import { UNLIMITED, limitsFor, planName, unitCap } from "@/theme/plans";
 import { activeTier, daysRemaining, rollUsage } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
+import { pullSync } from "@/lib/sync";
 
 /**
  * One line: what it counts on the left, the number on the right.
@@ -69,6 +70,15 @@ export default function UsageScreen() {
     loadUsage();
   }, []);
 
+  /**
+   * Pull to refresh, and it does more than sync.
+   *
+   * The meters on this page come from the server, not from the local tally —
+   * so a plain `pullSync` would push and pull coursework and leave the one
+   * thing the student pulled down to check exactly as stale as it was.
+   */
+  const refresh = () => Promise.all([pullSync(), loadUsage()]);
+
   const live = materials.filter((material) => !material.archived);
 
   const words = useMemo(
@@ -120,7 +130,7 @@ export default function UsageScreen() {
     totalAi.limit !== UNLIMITED && totalAi.limit > 0;
 
   return (
-    <Screen bare>
+    <Screen bare onRefresh={refresh}>
       <ScreenHeader
         title="Usage"
         right={

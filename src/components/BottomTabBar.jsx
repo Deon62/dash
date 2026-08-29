@@ -12,6 +12,7 @@ import { CircleDot } from "lucide-react-native";
 import { TAB_BAR_HEIGHT } from "@/theme/layout";
 import { useKeyboardVisible } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
+import { FIXED_SCALE } from "@/theme/type";
 
 const SPRING = { damping: 16, stiffness: 240, mass: 0.6 };
 
@@ -60,6 +61,10 @@ function TabItem({ label, Icon, focused, onPress, onLongPress }) {
       </Animated.View>
 
       <Text
+        /* The bar's height is a constant the rest of the layout reserves
+           space against, so a label that grows pushes the icon out of the bar
+           rather than making the bar taller. */
+        maxFontSizeMultiplier={FIXED_SCALE}
         numberOfLines={1}
         style={{ textAlign: "center" }}
         className={`mt-1.5 w-full text-[11px] ${

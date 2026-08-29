@@ -2,6 +2,7 @@ import { Pressable, Text, View } from "react-native";
 
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
+import { CHROME_SCALE } from "@/theme/type";
 
 /**
  * The app's primary action.
@@ -64,6 +65,7 @@ export default function Button({
       className="flex-row items-center justify-center gap-x-2 active:opacity-80"
     >
       <Text
+        maxFontSizeMultiplier={CHROME_SCALE}
         style={{ color: dark ? COLORS.ink : COLORS.canvas }}
         className="font-jk-med text-[15px]"
       >
@@ -91,7 +93,11 @@ export function PillButton({ label, onPress, Icon }) {
       className="flex-row items-center gap-x-2 self-center rounded-full px-5 py-3 active:opacity-85"
     >
       {Icon ? <Icon size={16} color={COLORS.canvas} strokeWidth={1.8} /> : null}
-      <Text style={{ color: COLORS.canvas }} className="font-jk-med text-[14px]">
+      <Text
+        maxFontSizeMultiplier={CHROME_SCALE}
+        style={{ color: COLORS.canvas }}
+        className="font-jk-med text-[14px]"
+      >
         {label}
       </Text>
     </Pressable>

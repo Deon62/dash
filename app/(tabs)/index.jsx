@@ -16,6 +16,7 @@ import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { liveStreak } from "@/lib/streak";
 import { hasSystemAlerts } from "@/lib/systemAlerts";
 import { dayKey, greeting, minutesOf } from "@/lib/dates";
+import { pullSync } from "@/lib/sync";
 
 /**
  * The dashboard: the month, and the day you are in.
@@ -71,7 +72,7 @@ export default function HomeScreen() {
 
   return (
     <>
-      <Screen fab>
+      <Screen fab onRefresh={pullSync}>
         <View className="flex-row items-start justify-between">
           <View className="flex-1 pr-3">
             <Text className="font-jk-semi text-ink text-[23px] leading-[29px]">

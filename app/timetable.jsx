@@ -12,6 +12,7 @@ import EmptyState from "@/components/EmptyState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { DAYS } from "@/theme/units";
 import { minutesOf } from "@/lib/dates";
+import { pullSync } from "@/lib/sync";
 
 /**
  * The whole week, day by day.
@@ -44,7 +45,7 @@ export default function TimetableScreen() {
 
   return (
     <>
-      <Screen bare>
+      <Screen bare onRefresh={pullSync}>
         <ScreenHeader
           title="Timetable"
           right={

@@ -12,6 +12,7 @@ import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { systemAlerts } from "@/lib/systemAlerts";
 import { COLORS } from "@/theme/colors";
 import { daysUntil, dueLabel, formatTime, minutesOf, nowMinutes } from "@/lib/dates";
+import { pullSync } from "@/lib/sync";
 
 /**
  * What the app would have told you about.
@@ -101,7 +102,7 @@ export default function NotificationsScreen() {
   }, [sessions, events, units, alerts]);
 
   return (
-    <Screen bare>
+    <Screen bare onRefresh={pullSync}>
       <ScreenHeader
         title="Notifications"
         right={

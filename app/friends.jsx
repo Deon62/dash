@@ -32,6 +32,7 @@ import {
 } from "@/theme/plans";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
+import { pullSync } from "@/lib/sync";
 
 const FRIENDS = SubscriptionTier.FRIENDS;
 
@@ -120,6 +121,11 @@ export default function FriendsScreen() {
   useEffect(() => {
     loadGroup();
   }, []);
+
+  // The seat list is the server's, and it is the thing a student pulls down to
+  // check — a friend who redeemed the code an hour ago should appear on the
+  // gesture rather than at the next cold start.
+  const refresh = () => Promise.all([pullSync(), loadGroup()]);
 
   const pay = async () => {
     impact("medium");
@@ -272,7 +278,7 @@ export default function FriendsScreen() {
 
   return (
     <>
-      <Screen bare>
+      <Screen bare onRefresh={refresh}>
         <ScreenHeader title="Friends" />
 
         {/* Under the heading for the same reason as on the plans page: this is

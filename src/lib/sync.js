@@ -413,3 +413,18 @@ async function pullChanges(since) {
 
   return { error: null };
 }
+
+/**
+ * What a pull-to-refresh gesture runs.
+ *
+ * Forced, because the student asked. The ordinary debounce and the
+ * "already syncing" guard exist to stop the app syncing too eagerly on its
+ * own; neither should stand between a person pulling a list down and the list
+ * being refreshed, since the whole point of the gesture is that they no longer
+ * trust the automatic one.
+ *
+ * A named export rather than an inline arrow at each call site so every list
+ * in the app pulls the same way — and so the decision above is written down
+ * once instead of six times.
+ */
+export const pullSync = () => sync({ force: true });

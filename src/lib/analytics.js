@@ -150,3 +150,54 @@ export function IdentitySync() {
 
   return null;
 }
+
+// --- Reporting from outside the tree ----------------------------------------
+
+/**
+ * The client, reachable without a hook.
+ *
+ * `usePostHog` is the only supported way to get at it, and a hook cannot be
+ * called from `componentDidCatch` — which is the one place in the app that has
+ * to report, because it is the one place that knows the tree has just died.
+ * The SDK's own `PostHogContext` would do it, but it is not exported from the
+ * package index and the `exports` map blocks reaching for the file, so a deep
+ * import would break silently on an SDK bump rather than loudly.
+ */
+let client = null;
+
+/**
+ * Publishes the client to `reportCrash`. Renders nothing.
+ *
+ * Belongs *outside* `ErrorBoundary` and inside `Analytics`. Outside, because a
+ * bridge mounted among the boundary's children is unmounted by the fallback
+ * render that precedes `componentDidCatch` — so the handle would be gone at
+ * the exact moment it was needed.
+ */
+export function AnalyticsBridge() {
+  const posthog = usePostHog();
+
+  useEffect(() => {
+    client = posthog ?? null;
+    // Deliberately no teardown. There is nothing to leak — the provider lives
+    // as long as the app — and clearing on unmount only creates a window in
+    // which a crash goes unreported.
+  }, [posthog]);
+
+  return null;
+}
+
+/**
+ * Reports an exception the tree could not recover from.
+ *
+ * Silent where analytics is off, which is Expo Go and any build with no
+ * project key. Never throws: this runs on the path to the crash screen, and an
+ * error here would replace a screen the student can act on with one they
+ * cannot.
+ */
+export function reportCrash(error, properties = {}) {
+  try {
+    client?.captureException?.(error, properties);
+  } catch {
+    // Reporting is best-effort by definition. There is nobody left to tell.
+  }
+}

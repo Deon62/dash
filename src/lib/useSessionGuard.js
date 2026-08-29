@@ -35,6 +35,15 @@ export function useSessionGuard() {
   const name = useStudyStore((state) => state.profile.name);
 
   /**
+   * Whether anything has been filed yet.
+   *
+   * Only read to decide where finishing intake lands — see the last lines of
+   * the effect. A count rather than the list, so this does not re-run the
+   * guard every time a note is added.
+   */
+  const hasMaterial = useStudyStore((state) => state.materials.length > 0);
+
+  /**
    * Intake is done if the flag says so — or if the account plainly shows it.
    *
    * The flag alone is one stored boolean between a student and their own
@@ -89,8 +98,25 @@ export function useSessionGuard() {
       return;
     }
 
-    if (onAuthScreen || onOnboarding) router.replace("/(tabs)");
-  }, [hydrated, introSeen, isAuthenticated, onboarded, segments, router]);
+    if (onAuthScreen || onOnboarding) {
+      /**
+       * Finishing intake lands on Knowledge, not on the calendar.
+       *
+       * The app's claim is that the tutor has read *your* material, and it is
+       * unprovable until a student has filed something. Intake used to end on
+       * the month view — empty, because they have not added a deadline either
+       * — leaving them to work out for themselves what the app was for. The
+       * unit list they just typed in is on Knowledge, and the next useful
+       * action is right there under the button.
+       *
+       * Only on the way out of intake, and only while nothing is filed. A
+       * student who has material has a home screen like everyone else, and a
+       * sign-in should always land where they left off.
+       */
+      const start = onOnboarding && !hasMaterial;
+      router.replace(start ? "/(tabs)/knowledge?start=1" : "/(tabs)");
+    }
+  }, [hydrated, introSeen, isAuthenticated, onboarded, hasMaterial, segments, router]);
 
   return hydrated;
 }

@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Archive, ChevronRight, FolderClosed, Plus } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
@@ -14,6 +14,7 @@ import { activeTier } from "@/lib/quota";
 import { useStudyStore } from "@/store/useStudyStore";
 import { fileMaterial } from "@/lib/knowledge";
 import { impact } from "@/lib/haptics";
+import { pullSync } from "@/lib/sync";
 
 /**
  * One unit in the library.
@@ -64,6 +65,7 @@ function UnitRow({ unit, items, events, onPress, last }) {
  */
 export default function KnowledgeScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
@@ -74,6 +76,27 @@ export default function KnowledgeScreen() {
   const [blocked, setBlocked] = useState(null);
 
   const tier = activeTier(subscription);
+
+  /**
+   * Opens the add sheet once, on the way out of intake.
+   *
+   * `?start=1` is set by `useSessionGuard` and only on that one transition, so
+   * this cannot fire on an ordinary visit. Filing the first thing is the step
+   * that makes the app demonstrable, and a student who has just typed in six
+   * unit codes should not have to find the button to prove it.
+   *
+   * The ref is what makes it once: the param survives in the URL, so without
+   * it the sheet would reopen every time this tab regained focus.
+   */
+  const started = useRef(false);
+
+  useEffect(() => {
+    if (started.current || params.start !== "1") return;
+    if (units.length === 0) return;
+
+    started.current = true;
+    setAdding(true);
+  }, [params.start, units.length]);
 
   const counts = useMemo(() => {
     const table = new Map(units.map((unit) => [unit.id, { items: 0, events: 0 }]));
@@ -93,7 +116,7 @@ export default function KnowledgeScreen() {
 
   return (
     <>
-      <Screen fab>
+      <Screen fab onRefresh={pullSync}>
         <View className="flex-row items-start justify-between">
           {/* Title only. The counts were a caption nobody read, and the list
               underneath already says how much is in here. */}

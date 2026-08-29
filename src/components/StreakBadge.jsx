@@ -3,6 +3,7 @@ import { Flame } from "lucide-react-native";
 
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
+import { CHROME_SCALE } from "@/theme/type";
 
 /**
  * Days in a row, as a flame and a number.
@@ -46,6 +47,7 @@ export default function StreakBadge({ days, onPress }) {
         fill={lit ? COLORS.flame : "transparent"}
       />
       <Text
+        maxFontSizeMultiplier={CHROME_SCALE}
         style={{ color: lit ? COLORS.ink : COLORS.muted }}
         className="font-jk-semi text-[13.5px]"
       >

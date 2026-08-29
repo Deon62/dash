@@ -1,7 +1,15 @@
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { useCallback, useState } from "react";
+import {
+  KeyboardAvoidingView,
+  Platform,
+  RefreshControl,
+  ScrollView,
+  View,
+} from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getTabBarHeight } from "@/theme/layout";
+import { COLORS } from "@/theme/colors";
 
 /** Disc height plus its offset, rounded up. */
 const FAB_CLEARANCE = 92;
@@ -23,14 +31,60 @@ export default function Screen({
   keyboardAware = false,
   bare = false,
   fab = false,
+  onRefresh,
 }) {
   const insets = useSafeAreaInsets();
+
+  const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * Pull to refresh, where a page opts in.
+   *
+   * Worth having on almost every list in this app, because of how it is built:
+   * the device is a cache and an outbox, and sync runs on focus, on app-state
+   * change and on a debounce after writes — all of it invisible. When a student
+   * suspects something is stale, the gesture they make is a pull-down. Without
+   * one, nothing happens and the page reads as frozen rather than as not
+   * offering the gesture. It is also the only manual retry for a failed sync;
+   * before this the only recourse was to wait for the next automatic attempt.
+   *
+   * The spinner is held for the whole call and never throws out of here: every
+   * sync path resolves rather than rejecting, but a rejection would otherwise
+   * leave a spinner turning over a page that had already given up.
+   */
+  const refresh = useCallback(async () => {
+    if (!onRefresh) return;
+
+    setRefreshing(true);
+    try {
+      await onRefresh();
+    } catch {
+      // Whatever went wrong has already been recorded by the thing that failed.
+      // This only owns the spinner.
+    } finally {
+      setRefreshing(false);
+    }
+  }, [onRefresh]);
 
   const scroller = (
     <ScrollView
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      refreshControl={
+        onRefresh ? (
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            // Android draws its own circle and takes a single colour; iOS takes
+            // the tint. Both named so the gesture belongs to this app rather
+            // than arriving in the platform's default grey.
+            colors={[COLORS.primary]}
+            tintColor={COLORS.muted}
+            progressBackgroundColor={COLORS.canvas}
+          />
+        ) : undefined
+      }
       contentContainerStyle={{
         paddingTop: 12,
         // `bare` pages are pushed as a stack screen, so there is no tab bar

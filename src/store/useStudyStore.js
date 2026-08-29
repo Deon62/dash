@@ -20,6 +20,16 @@ import { ALWAYS_SHOW_INTRO } from "@/lib/devFlags";
  * does not survive the JSON round-trip persistence does.
  */
 
+/**
+ * The AsyncStorage key everything below is persisted under.
+ *
+ * Exported because `ErrorBoundary` clears it as the last way out of a crash
+ * loop, and a second copy of this string in that file would be a way for the
+ * two to drift — leaving a button that promises to clear the state and quietly
+ * clears nothing.
+ */
+export const STORE_KEY = "study-brain-v1";
+
 /** Stamped on every row the device writes. This is what resolves conflicts. */
 const stamp = () => new Date().toISOString();
 
@@ -787,7 +797,7 @@ export const useStudyStore = create(
 
     }),
     {
-      name: "study-brain-v1",
+      name: STORE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
       version: 4,
       /**

@@ -19,6 +19,7 @@ import Dropdown from "@/components/Dropdown";
 import SessionRow from "@/components/SessionRow";
 import EventRow from "@/components/EventRow";
 import EmptyState from "@/components/EmptyState";
+import UndoBar from "@/components/UndoBar";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AddKnowledge from "@/components/AddKnowledge";
 import LimitSheet from "@/components/LimitSheet";
@@ -32,6 +33,8 @@ import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
+import { pullSync } from "@/lib/sync";
+import { useUndoable } from "@/lib/useUndoable";
 
 const SECTIONS = [
   { value: "knowledge", label: "Knowledge" },
@@ -68,9 +71,24 @@ export default function UnitScreen() {
 
   const unit = unitById(units, unitId);
 
+  /**
+   * Archiving is already reversible — the Archive screen restores in one tap —
+   * but only if you know that screen exists, and nothing on this row says so.
+   * The strip is really a disclosure: it names what happened and offers the
+   * way back, in the two seconds when the student is still looking at the gap
+   * the row left behind.
+   */
+  const filed = useUndoable((material) => archiveMaterial(material.id));
+
   const unitMaterials = useMemo(
-    () => materials.filter((material) => material.unitId === unitId && !material.archived),
-    [materials, unitId]
+    () =>
+      materials.filter(
+        (material) =>
+          material.unitId === unitId &&
+          !material.archived &&
+          material.id !== filed.hiddenId,
+      ),
+    [materials, unitId, filed.hiddenId]
   );
   const unitEvents = useMemo(
     () =>
@@ -112,7 +130,7 @@ export default function UnitScreen() {
 
   return (
     <>
-      <Screen bare>
+      <Screen bare onRefresh={pullSync}>
         <ScreenHeader
           right={
             <IconButton
@@ -231,7 +249,7 @@ export default function UnitScreen() {
                     <Pressable
                       onPress={() => {
                         impact("light");
-                        archiveMaterial(material.id);
+                        filed.remove(material, `Archived “${material.title}”`);
                       }}
                       hitSlop={10}
                       accessibilityRole="button"
@@ -321,6 +339,10 @@ export default function UnitScreen() {
           )
         ) : null}
       </Screen>
+
+      {/* Outside `Screen`, which is a ScrollView — an absolutely-positioned
+          child of one scrolls away with the content. */}
+      <UndoBar pending={filed.pending} onUndo={filed.undo} />
 
       <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
 

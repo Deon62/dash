@@ -4,11 +4,14 @@ import { Archive, ArchiveRestore, Trash2 } from "lucide-react-native";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import EmptyState from "@/components/EmptyState";
+import UndoBar from "@/components/UndoBar";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { formatDateTime } from "@/lib/dates";
 import { kindLabel } from "@/theme/units";
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
+import { pullSync } from "@/lib/sync";
+import { useUndoable } from "@/lib/useUndoable";
 
 /**
  * Everything archived out of Knowledge.
@@ -23,10 +26,29 @@ export default function ArchiveScreen() {
   const archiveMaterial = useStudyStore((state) => state.archiveMaterial);
   const removeMaterial = useStudyStore((state) => state.removeMaterial);
 
-  const archived = materials.filter((material) => material.archived);
+  /**
+   * The one genuinely irreversible action in the app, and it used to be a
+   * single tap with nothing in front of it — no dialog, no confirmation,
+   * nothing. Next to a Restore button of almost the same size, on rows a
+   * student is scrolling through precisely because they are tidying.
+   *
+   * A dialog was the obvious fix and the wrong one: this screen is where
+   * people clear out a semester, so a modal on every row is friction on the
+   * common case to guard the rare mistake. Undo is the other way round.
+   */
+  const trash = useUndoable((material) => removeMaterial(material.id));
+
+  const archived = materials.filter(
+    (material) => material.archived && material.id !== trash.hiddenId,
+  );
 
   return (
-    <Screen bare>
+    /* The bar is a sibling of `Screen`, not a child. `Screen` is a ScrollView,
+       and an absolutely-positioned child of one scrolls away with the content
+       — so an undo strip put inside it would slide off the moment the list
+       moved, which on this screen is immediately. */
+    <>
+      <Screen bare onRefresh={pullSync}>
       <ScreenHeader title="Archive" />
 
       {archived.length === 0 ? (
@@ -85,7 +107,7 @@ export default function ArchiveScreen() {
                 <Pressable
                   onPress={() => {
                     impact("light");
-                    removeMaterial(material.id);
+                    trash.remove(material, `Deleted “${material.title}”`);
                   }}
                   hitSlop={8}
                   accessibilityRole="button"
@@ -99,6 +121,9 @@ export default function ArchiveScreen() {
           })}
         </View>
       )}
-    </Screen>
+      </Screen>
+
+      <UndoBar pending={trash.pending} onUndo={trash.undo} />
+    </>
   );
 }

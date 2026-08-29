@@ -9,6 +9,7 @@ import { PillButton } from "@/components/Button";
 import EmptyState from "@/components/EmptyState";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
+import { pullSync } from "@/lib/sync";
 
 /** Enrolment for the semester. The same list Knowledge browses, managed. */
 export default function UnitsScreen() {
@@ -19,7 +20,7 @@ export default function UnitsScreen() {
   const sessions = useStudyStore((state) => state.sessions);
 
   return (
-    <Screen bare>
+    <Screen bare onRefresh={pullSync}>
       <ScreenHeader
         title="Units"
         right={

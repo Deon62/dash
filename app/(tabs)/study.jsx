@@ -17,6 +17,7 @@ import {
   MessageSquare,
   PanelLeft,
   RotateCcw,
+  Square,
   SquarePen,
   Trash2,
 } from "lucide-react-native";
@@ -29,9 +30,13 @@ import IconButton from "@/components/IconButton";
 import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import ThinkingLabel from "@/components/ThinkingLabel";
+import Markdown from "@/components/Markdown";
+import OfflineState from "@/components/OfflineState";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { askTutor, buildFlashcards, buildQuiz, countCards } from "@/lib/tutor";
 import { NOTE_WORD_LIMIT } from "@/lib/notes";
+import { CHROME_SCALE } from "@/theme/type";
+import { OFFLINE } from "@/api/client";
 import { newId } from "@/lib/ids";
 import { recordStudyDay } from "@/lib/account";
 import { formatDateTime, greeting } from "@/lib/dates";
@@ -47,6 +52,20 @@ const MODES = [
   { key: "ask", label: "Ask", hint: "Answers drawn from your notes" },
   { key: "quiz", label: "Quiz", hint: "Fill-in questions from your notes" },
   { key: "cards", label: "Cards", hint: "Flip through what you filed" },
+];
+
+/**
+ * First questions, for a student who has filed something and not yet asked.
+ *
+ * Chosen to be answerable from *any* material rather than to sound clever —
+ * each one works on a lecture slide, a photographed page or a pasted note, so
+ * none of them can come back with "nothing in your notes matches that", which
+ * is the one first impression worth avoiding entirely.
+ */
+const OPENERS = [
+  "Summarise this in five points",
+  "What am I most likely to be examined on?",
+  "Explain the hardest part simply",
 ];
 
 /**
@@ -116,6 +135,28 @@ export default function StudyScreen() {
 
   /** True while a stream is running, read by the scroll handler below. */
   const live = useRef(false);
+
+  /**
+   * Cancels the answer in flight.
+   *
+   * `askTutor` has always accepted a `signal` and threaded it into its own
+   * `AbortController`; nothing ever passed one, so a student who asked the
+   * wrong question waited out `STREAM_TIMEOUT_MS` — two minutes — with the
+   * composer disabled and no way to ask the right one.
+   */
+  const abort = useRef(null);
+
+  /** The last question asked, so a failure can be retried without retyping. */
+  const lastAsk = useRef(null);
+
+  const stop = useCallback(() => {
+    impact("light");
+    abort.current?.abort();
+  }, []);
+
+  // Leaving the screen mid-answer should not leave a request running against a
+  // component that has gone.
+  useEffect(() => () => abort.current?.abort(), []);
 
   const flushStream = useCallback(() => {
     frame.current = 0;
@@ -201,7 +242,7 @@ export default function StudyScreen() {
    * as a stream, so the first words appear in about a second rather than the
    * whole thing landing after six.
    */
-  const ask = async (question) => {
+  const ask = async (question, { retryOf = null } = {}) => {
     const text = question.trim();
     if (!text || thinking) return;
 
@@ -217,15 +258,30 @@ export default function StudyScreen() {
     impact("medium");
     const target = chat ?? newChat(unitId);
 
-    // Both ids are minted here, before either row exists anywhere, and the
-    // same pair goes to the server. Otherwise each side stores the turn under
-    // ids the other has never seen and the next sync pulls the server's copies
-    // down as extra messages — every answer appearing twice.
-    const studentMessageId = newId();
-    const answerMessageId = newId();
+    /**
+     * Both ids are minted here, before either row exists anywhere, and the
+     * same pair goes to the server. Otherwise each side stores the turn under
+     * ids the other has never seen and the next sync pulls the server's copies
+     * down as extra messages — every answer appearing twice.
+     *
+     * A retry reuses the ids of the attempt that failed, which is the whole
+     * reason they are minted on the device: the second attempt writes the same
+     * two rows rather than a second copy of a question the student only asked
+     * once.
+     */
+    const studentMessageId = retryOf?.studentMessageId ?? newId();
+    const answerMessageId = retryOf?.answerMessageId ?? newId();
 
-    appendMessage(target.id, { id: studentMessageId, role: "student", text });
+    // The question is already in the thread on a retry. Posting it again would
+    // show it twice for the sake of a request that failed.
+    if (!retryOf) {
+      appendMessage(target.id, { id: studentMessageId, role: "student", text });
+    }
+
+    lastAsk.current = { text, studentMessageId, answerMessageId, chatId: target.id };
+
     setDraft("");
+    setFailure(null);
     setThinking(true);
     live.current = true;
     pending.current = { text: "", sources: [] };
@@ -236,10 +292,14 @@ export default function StudyScreen() {
     recordAiQuery();
     recordStudyDay();
 
+    const controller = new AbortController();
+    abort.current = controller;
+
     const result = await askTutor({
       question: text,
       chatId: target.id,
       unitCode: unit?.code ?? null,
+      signal: controller.signal,
       // Both go through `pushStream`, which coalesces to one render a frame.
       // `whole` is the answer so far, not the new piece, so a frame that
       // renders is never behind the tokens that arrived during it.
@@ -248,6 +308,19 @@ export default function StudyScreen() {
       studentMessageId,
       answerMessageId,
     });
+
+    abort.current = null;
+
+    /**
+     * Stopped on purpose.
+     *
+     * Whatever had arrived is kept rather than thrown away — a student who
+     * stops an answer half-read has usually got what they wanted out of it,
+     * and deleting it in front of them would make the stop button feel like a
+     * mistake. An abort with nothing to keep just clears back to the composer,
+     * with no error: they asked for this.
+     */
+    const stopped = controller.signal.aborted;
 
     // Anything still queued belongs to an answer that is about to be replaced
     // by the finished one. Letting it land would paint a stale frame over it.
@@ -258,16 +331,20 @@ export default function StudyScreen() {
     pending.current = null;
     live.current = false;
 
-    if (result.error && !result.text) {
+    if (!result.text) {
       setStreaming(null);
       setThinking(false);
+
+      // Stopped with nothing written yet. Not a failure, so nothing is said
+      // about it — the student pressed the button that does this.
+      if (stopped) return;
 
       // 402 is a plan limit — not included in what you pay for — and belongs in
       // the sheet that explains limits and offers a way out. Everything else is
       // a failure, and telling someone with no signal to upgrade their plan is
       // the wrong answer to the wrong question.
       if (result.status === 402) setBlocked({ reason: "ai", detail: result.error });
-      else setFailure(result.error);
+      else if (result.error) setFailure(result.error);
       return;
     }
 
@@ -284,7 +361,12 @@ export default function StudyScreen() {
       appendMessage(target.id, {
         id: answerMessageId,
         role: "tutor",
-        text: result.error ? `${result.text}\n\n${result.error}` : result.text,
+        // A stop is not an error, so it is not appended as one. The answer
+        // simply ends where the student ended it.
+        text:
+          result.error && !stopped
+            ? `${result.text}\n\n${result.error}`
+            : result.text,
         sources: (result.sources ?? []).map((source) =>
           source.page_number
             ? `${source.title} · p.${source.page_number}`
@@ -297,6 +379,22 @@ export default function StudyScreen() {
     });
   };
 
+  /**
+   * Sends the failed question again, into the same two rows.
+   *
+   * The question is still in the thread — it was posted before the request
+   * went out — so retrying must not post it a second time, and the answer must
+   * land under the id the first attempt reserved. Both are why `ask` takes
+   * `retryOf` rather than being called afresh.
+   */
+  const retry = () => {
+    const last = lastAsk.current;
+    if (!last || thinking) return;
+
+    setFailure(null);
+    ask(last.text, { retryOf: last });
+  };
+
   const scopeLabel = `${unit ? unit.code : "All units"} · ${
     MODES.find((option) => option.key === mode)?.label
   }`;
@@ -305,6 +403,15 @@ export default function StudyScreen() {
 
   /** Something to send, and nothing already in flight. */
   const armed = draft.trim().length > 0 && !thinking;
+
+  /**
+   * The failure that is worth its own screen rather than a dialog.
+   *
+   * `OFFLINE` is the one message in `src/api/client.js` that describes a state
+   * the student is in rather than something that went wrong once, and it is
+   * the most common failure on the connections this app is built for.
+   */
+  const offline = failure === OFFLINE;
 
   // Dictation writes straight into the draft, so a student can speak a
   // sentence and then fix a word by typing without losing either.
@@ -363,10 +470,59 @@ export default function StudyScreen() {
                       scoped.length === 1 ? "item" : "items"
                     }${unit ? ` for ${unit.code}` : ""}. Ask me anything in there.`}
               </Text>
+
+              {/* Openers, once there is something to open with.
+
+                  This is the moment the product either proves itself or does
+                  not, and until now it depended on the student inventing a
+                  good first question about material the app has read and they
+                  have not looked at in a week. Three taps that are known to
+                  work is a better offer than a blank field.
+
+                  They fill the composer rather than sending, so the question
+                  is still theirs to edit — and so a mis-tap costs nothing from
+                  an allowance. */}
+              {scoped.length > 0 ? (
+                <View className="flex-row flex-wrap justify-center gap-2 mt-6">
+                  {OPENERS.map((opener) => (
+                    <Pressable
+                      key={opener}
+                      onPress={() => {
+                        impact("light");
+                        setDraft(opener);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Ask: ${opener}`}
+                      className="rounded-full border border-line px-3.5 py-2 active:bg-surface"
+                    >
+                      <Text
+                        maxFontSizeMultiplier={CHROME_SCALE}
+                        className="font-jk text-ink text-[12.5px]"
+                      >
+                        {opener}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
             </View>
           ) : (
             messages.map((message) => <Bubble key={message.id} message={message} />)
           )}
+
+          {/* Losing the connection is not an error to be dismissed, it is a
+              condition to be waited out — so it is shown in the thread with a
+              way to retry, rather than as a modal that has to be cleared
+              before the student can see their own question again. Every other
+              failure still gets the dialog: those are one-offs with something
+              specific to say. */}
+          {offline ? (
+            <OfflineState
+              compact
+              message="I can't reach your material right now. Your question is saved — try again when you're back."
+              onRetry={retry}
+            />
+          ) : null}
 
           {/* The answer while it is still arriving. Rendered as an ordinary
               bubble so nothing shifts when the finished one replaces it —
@@ -445,7 +601,12 @@ export default function StudyScreen() {
               accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
               className="flex-row items-center gap-x-1.5 rounded-full bg-surface px-3 py-1.5 active:opacity-60"
             >
-              <Text className="font-jk-med text-ink text-[12.5px]">{scopeLabel}</Text>
+              <Text
+                maxFontSizeMultiplier={CHROME_SCALE}
+                className="font-jk-med text-ink text-[12.5px]"
+              >
+                {scopeLabel}
+              </Text>
               <ChevronDown size={14} color={COLORS.muted} strokeWidth={1.8} />
             </Pressable>
 
@@ -483,12 +644,21 @@ export default function StudyScreen() {
                   />
                 </Pressable>
 
+                {/* Send becomes Stop while an answer is coming.
+
+                    In the same place rather than beside it: there is exactly
+                    one thing to do with the conversation at any moment, and
+                    two round buttons where one is always dead is a worse row.
+                    Without this a student who asked the wrong question had no
+                    way out at all — the field is disabled while thinking, so
+                    they could neither stop it nor ask the right one, and the
+                    stream runs for up to two minutes. */}
                 <Pressable
-                  onPress={() => ask(draft)}
-                  disabled={!armed}
+                  onPress={() => (thinking ? stop() : ask(draft))}
+                  disabled={!armed && !thinking}
                   accessibilityRole="button"
-                  accessibilityLabel="Send"
-                  accessibilityState={{ disabled: !armed }}
+                  accessibilityLabel={thinking ? "Stop answering" : "Send"}
+                  accessibilityState={{ disabled: !armed && !thinking }}
                   // Fixed and unshrinkable, so nothing the field does can
                   // squeeze it out of the row.
                   style={{
@@ -499,11 +669,19 @@ export default function StudyScreen() {
                     flexShrink: 0,
                     alignItems: "center",
                     justifyContent: "center",
-                    backgroundColor: armed ? COLORS.primary : COLORS.surface,
+                    backgroundColor: thinking
+                      ? COLORS.surface
+                      : armed
+                        ? COLORS.primary
+                        : COLORS.surface,
                   }}
                   className="active:opacity-85"
                 >
-                  <SendGlyph size={19} color={armed ? COLORS.canvas : COLORS.muted} />
+                  {thinking ? (
+                    <Square size={13} color={COLORS.ink} strokeWidth={2.5} fill={COLORS.ink} />
+                  ) : (
+                    <SendGlyph size={19} color={armed ? COLORS.canvas : COLORS.muted} />
+                  )}
                 </Pressable>
               </View>
             ) : null}
@@ -676,15 +854,20 @@ export default function StudyScreen() {
 
       <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
 
+      {/* The dialog used to say "try sending it again" and then offer only an
+          OK button, leaving the student to retype a question that is sitting
+          in the thread above them. It sends it. */}
       <ConfirmDialog
-        visible={Boolean(failure)}
+        visible={Boolean(failure) && !offline}
         title="We couldn't answer that one"
-        // Their question is still in the thread above, so "ask again" means
-        // tapping send on what is already typed rather than retyping it.
-        message={`${failure} Your question is still here. Try sending it again in a moment.`}
-        confirmLabel="OK"
-        onConfirm={() => setFailure(null)}
-        onDismiss={() => setFailure(null)}
+        message={`${failure} Your question is still here.`}
+        confirmLabel="Try again"
+        cancelLabel="Not now"
+        onConfirm={retry}
+        /* `onCancel` rather than only `onDismiss`: the dialog renders its
+           second button solely on the presence of this prop, so without it the
+           student gets "Try again" and no way to decline. */
+        onCancel={() => setFailure(null)}
       />
 
       <ConfirmDialog
@@ -754,14 +937,17 @@ const Bubble = memo(function Bubble({ message, streaming = false }) {
         fromStudent ? "self-end rounded-2xl bg-surface px-4 py-3" : "self-start"
       }`}
     >
-      <Text
-        className="font-jk text-ink text-[14.5px] leading-[21px]"
-        // The answer is the one thing on this screen worth taking away, and a
-        // student quoting it in an essay needs a part rather than the whole.
-        selectable={!fromStudent}
-      >
-        {message.text}
-      </Text>
+      {/* The student's own words are plain text — they typed them, and any
+          asterisks in there are theirs. The tutor writes markdown, and
+          rendering it is the difference between a structured explanation and a
+          paragraph full of punctuation. */}
+      {fromStudent ? (
+        <Text className="font-jk text-ink text-[14.5px] leading-[21px]">
+          {message.text}
+        </Text>
+      ) : (
+        <Markdown text={message.text} streaming={streaming} />
+      )}
 
       {/* Citations, not decoration: the student has to be able to check the
           answer against the note it came out of. */}
@@ -769,7 +955,15 @@ const Bubble = memo(function Bubble({ message, streaming = false }) {
         <View className="flex-row flex-wrap gap-1.5 mt-3">
           {message.sources.map((source) => (
             <View key={source} className="rounded-full bg-surface px-2.5 py-1">
-              <Text className="font-jk text-muted text-[11px]">{source}</Text>
+              {/* A pill sized around one line of 11px text. Capped, or a
+                  student on large type gets a citation that has burst its
+                  own chip. */}
+              <Text
+                maxFontSizeMultiplier={CHROME_SCALE}
+                className="font-jk text-muted text-[11px]"
+              >
+                {source}
+              </Text>
             </View>
           ))}
         </View>
@@ -792,6 +986,7 @@ const Bubble = memo(function Bubble({ message, streaming = false }) {
             <Copy size={13} color={COLORS.faint} strokeWidth={2} />
           )}
           <Text
+            maxFontSizeMultiplier={CHROME_SCALE}
             className={`font-jk-med text-[11.5px] ${
               copied ? "text-primary" : "text-faint"
             }`}
