@@ -43,3 +43,15 @@ yarn-error.*
 # Local secrets — Supabase project keys
 .env
 .env.local
+
+# Firebase / FCM
+#
+# `google-services.json` is safe to commit — it holds public identifiers only,
+# and a build needs it — so it is deliberately NOT ignored.
+#
+# The service-account key is the opposite: it is a private key that can send
+# push notifications as you, and it never belongs in the repo. It is uploaded
+# to Expo with `eas credentials` and then kept somewhere else entirely.
+*-firebase-adminsdk-*.json
+service-account*.json
+firebase-service-account*.json

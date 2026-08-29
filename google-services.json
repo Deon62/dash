@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "456066744558",
+    "project_id": "als-b6e92",
+    "storage_bucket": "als-b6e92.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:456066744558:android:47f575d80d938f2ed373ff",
+        "android_client_info": {
+          "package_name": "com.ardena.als"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAs_USYe66pYOUr9sQuYmv7buNpngxYCAc"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

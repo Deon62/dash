@@ -24,6 +24,7 @@
     },
     "android": {
       "package": "com.ardena.als",
+      "googleServicesFile": "./google-services.json",
       "adaptiveIcon": {
         "backgroundColor": "#09090B",
         "foregroundImage": "./assets/android-icon-foreground.png",

@@ -10,7 +10,6 @@ import Notice, { toneForError } from "@/components/Notice";
 import { useStudyStore } from "@/store/useStudyStore";
 import { saveSettings } from "@/lib/account";
 import { registerForPush, sendTestPush, usePushPermission } from "@/lib/push";
-import { SHOW_DIAGNOSTICS } from "@/lib/devFlags";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
 
@@ -80,10 +79,16 @@ export default function NotificationSettingsScreen() {
   /**
    * Fires a real notification at every device on the account.
    *
-   * Development only. It is the one thing that tells apart the three ways this
-   * silently fails — no token registered, a token Expo will not accept, and a
-   * notification that was accepted and still did not arrive — and each has a
-   * different fix. The counts come straight from the server.
+   * Shipped, not hidden behind a development flag. Three things have to line up
+   * before a reminder arrives — a registered token, credentials Expo accepts,
+   * and an OS permission — and when one is missing the only symptom is silence
+   * weeks later, on the evening something was due. This is the one control that
+   * tells the three apart, and it reads the server's own counts to do it.
+   *
+   * It also has to be usable in a release build, which is the only honest place
+   * to test push: a notification is about an app you are *not* looking at, and
+   * a development client with Metro attached is the one environment where that
+   * is hard to arrange.
    */
   const test = async () => {
     impact("medium");
@@ -185,18 +190,15 @@ export default function NotificationSettingsScreen() {
           toggle
           toggleValue={settings.sessionReminders}
           onToggle={(sessionReminders) => saveSettings({ sessionReminders })}
-          last={!SHOW_DIAGNOSTICS}
         />
 
-        {SHOW_DIAGNOSTICS ? (
-          <LinkRow
-            Icon={Send}
-            label="Send a test notification"
-            hint="Goes to every device on this account, ignoring quiet hours"
-            onPress={test}
-            last
-          />
-        ) : null}
+        <LinkRow
+          Icon={Send}
+          label="Send a test notification"
+          hint="Checks reminders can actually reach this phone"
+          onPress={test}
+          last
+        />
       </View>
     </Screen>
   );
