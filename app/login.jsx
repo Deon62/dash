@@ -20,6 +20,7 @@ import { sendPhoneOtp } from "@/lib/auth";
 import { useGoogleSignIn } from "@/lib/useGoogleSignIn";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
+import OfflineGate from "@/components/OfflineGate";
 
 /**
  * Soft colour wash behind the top of the screen.
@@ -136,11 +137,16 @@ export default function LoginScreen() {
   }, [keyboard.visible, keyboard.height]);
 
   return (
-    /* No KeyboardAvoidingView. With edge-to-edge enabled the Android window is
-       never resized for the keyboard, so it has nothing to react to and left
-       the number sitting underneath — the measured height below is what
-       actually works, on both platforms. */
-    <View className="flex-1 bg-canvas">
+    /* Signing in is one of the few things in this app that genuinely cannot
+       happen offline — the code comes by SMS and the token comes from the
+       server — so the gate here states a fact rather than withholding
+       anything. Not `bare`: there is nowhere to go back to. */
+    <OfflineGate name="login">
+      {/* No KeyboardAvoidingView. With edge-to-edge enabled the Android window
+          is never resized for the keyboard, so it has nothing to react to and
+          left the number sitting underneath — the measured height below is
+          what actually works, on both platforms. */}
+      <View className="flex-1 bg-canvas">
       <Aurora />
 
       <ScrollView
@@ -256,6 +262,7 @@ export default function LoginScreen() {
           By continuing you agree to the Terms and Privacy Policy.
         </Text>
       </ScrollView>
-    </View>
+      </View>
+    </OfflineGate>
   );
 }

@@ -10,6 +10,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getTabBarHeight } from "@/theme/layout";
 import { COLORS } from "@/theme/colors";
+import OfflineGate from "@/components/OfflineGate";
 
 /** Disc height plus its offset, rounded up. */
 const FAB_CLEARANCE = 92;
@@ -32,6 +33,11 @@ export default function Screen({
   bare = false,
   fab = false,
   onRefresh,
+  /**
+   * The route's own name, so `NETWORK_OPTIONAL` in `OfflineGate` can let this
+   * page through. Optional — an unnamed screen is simply always gated.
+   */
+  name,
 }) {
   const insets = useSafeAreaInsets();
 
@@ -103,7 +109,7 @@ export default function Screen({
     </ScrollView>
   );
 
-  return (
+  const body = (
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-canvas">
       {keyboardAware ? (
         <KeyboardAvoidingView
@@ -117,5 +123,23 @@ export default function Screen({
         scroller
       )}
     </View>
+  );
+
+  /**
+   * Gated here rather than at each call site.
+   *
+   * Nearly every page in the app is a `Screen`, so this is the one place that
+   * covers them all at once — and the one place to look when asking why a page
+   * is showing the offline drawing. The tab bar is drawn by the tabs navigator
+   * *outside* this component, which is why it stays put underneath: the gate
+   * replaces the page, not the chrome around it.
+   *
+   * `app/(tabs)/study.jsx` builds its own layout and does not come through
+   * here, so it gates itself.
+   */
+  return (
+    <OfflineGate bare={bare} name={name}>
+      {body}
+    </OfflineGate>
   );
 }

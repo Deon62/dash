@@ -32,6 +32,7 @@ import EmptyState from "@/components/EmptyState";
 import ThinkingLabel from "@/components/ThinkingLabel";
 import Markdown from "@/components/Markdown";
 import OfflineState from "@/components/OfflineState";
+import OfflineGate from "@/components/OfflineGate";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { askTutor, buildFlashcards, buildQuiz, countCards } from "@/lib/tutor";
 import { NOTE_WORD_LIMIT } from "@/lib/notes";
@@ -419,6 +420,10 @@ export default function StudyScreen() {
   const listening = dictation.listening;
 
   return (
+    /* This tab builds its own layout rather than using `Screen`, so it carries
+       its own gate. Not `bare`: the tab bar is underneath, so there is already
+       a way off the page and a back arrow would be a second one to nowhere. */
+    <OfflineGate name="study">
     <View style={{ paddingTop: insets.top }} className="flex-1 bg-canvas">
       {/* --- Chrome. No title: the page is the conversation. --- */}
       <View className="flex-row items-center justify-between px-5 py-2">
@@ -879,6 +884,7 @@ export default function StudyScreen() {
         onDismiss={dictation.clearError}
       />
     </View>
+    </OfflineGate>
   );
 }
 

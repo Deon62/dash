@@ -25,7 +25,7 @@ works the way it does.
 | 6 | Undo on destructive actions | **Done** — `useUndoable` + `UndoBar` |
 | 7 | Font-scaling caps | **Done** — `src/theme/type.js` |
 | 8 | First win after onboarding | **Done** — lands on Knowledge, openers on Study |
-| 9 | Offline pre-emption | Partly — `OfflineState` exists; no netinfo yet |
+| 9 | Offline pre-emption | **Done, and then some** — see below |
 | 10 | Retry a failed answer | **Done** — retries into the same message ids |
 
 Two notes on what changed while building.
@@ -38,12 +38,29 @@ delete keeps its confirmation dialog on purpose: it is rare, its blast radius is
 a whole semester, and undoing it would have to survive the navigation back to
 the units list.
 
-**Offline got a screen rather than a prediction (#9).** `OfflineState`, built
-around `assets/offline.svg`, now replaces the modal dialog when a question fails
-for lack of a connection — a condition to wait out belongs in the thread with a
-retry, not behind a dialog that has to be cleared before the student can see
-their own question again. Every other failure still gets the dialog. What is
-still open is knowing you are offline *before* pressing send.
+**Offline became a gate, not a hint (#9).** `expo-network` now drives
+`useOnline`, and `OfflineGate` replaces the whole page — every page — the moment
+connectivity drops, keeping only the tab bar. That is broader than this review
+recommended, and it was a deliberate product call, so the trade is written down
+here and in the header comment of `src/components/OfflineGate.jsx`:
+
+- **What it buys.** An app that behaves normally until one action fails teaches
+  people the app is broken. Being told early and plainly is worth something,
+  and the illustration reads faster than any sentence.
+- **What it costs.** The store is a complete local cache. Notes, units, the
+  timetable, deadlines and the flashcard deck all render with the radio off —
+  that is what `src/lib/sync.js` is for, and what `RELEASE.md` promises. Gating
+  them hides material the student already has, on the phone they have it on, in
+  the exact conditions the offline design was built for.
+
+`NETWORK_OPTIONAL` in `OfflineGate` is the dial. It is empty, so everything is
+gated. Adding a route name to it gives that screen its cached content back and
+nothing else changes. `timetable`, `units`, `archive` and the calendar are the
+obvious first four if this proves too broad in testing — none of them has ever
+needed the network to render a single pixel.
+
+`OfflineState` is also still used in-thread on the Study tab for a question that
+fails mid-flight, with a retry.
 
 ---
 

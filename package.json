@@ -31,6 +31,7 @@
     "expo-linking": "~8.0.12",
     "expo-local-authentication": "~17.0.9",
     "expo-localization": "~17.0.9",
+    "expo-network": "~8.0.8",
     "expo-router": "~6.0.24",
     "expo-speech-recognition": "^56.0.1",
     "expo-splash-screen": "~31.0.13",

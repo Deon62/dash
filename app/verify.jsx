@@ -15,6 +15,7 @@ import { ArrowLeft } from "lucide-react-native";
 import { sendPhoneOtp, verifyPhoneOtp } from "@/lib/auth";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
+import OfflineGate from "@/components/OfflineGate";
 
 /** Fixed so no parent can stretch the circle into a lozenge. */
 const DISC = {
@@ -99,10 +100,14 @@ export default function VerifyScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-      className="flex-1 bg-canvas"
-    >
+    /* Same reason as the sign-in screen: the code being typed here has to be
+       checked against the server, so there is nothing this page can usefully
+       do without a connection. */
+    <OfflineGate name="verify">
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        className="flex-1 bg-canvas"
+      >
       <ScrollView
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
@@ -212,6 +217,7 @@ export default function VerifyScreen() {
           </Text>
         </Pressable>
       </ScrollView>
-    </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
+    </OfflineGate>
   );
 }

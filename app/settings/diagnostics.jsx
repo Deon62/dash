@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Pressable, ScrollView, Text, View } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import * as Network from "expo-network";
 import { Bug, Copy, Trash2 } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
@@ -11,6 +12,7 @@ import { API_BASE_URL } from "@/api/client";
 import { clearFailures, failuresAsText, useFailures } from "@/lib/diagnostics";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
+import { recheckOnline, useOnline } from "@/lib/useOnline";
 
 /** `2026-08-29T14:03:11.482Z` is not a thing to read down a list of twenty. */
 function clockTime(iso) {
@@ -87,16 +89,51 @@ function Row({ entry }) {
   );
 }
 
+/** `true` / `false` / `unknown` — the three answers, told apart. */
+function describe(value) {
+  if (value === true) return "true";
+  if (value === false) return "false";
+  return "unknown";
+}
+
 /**
  * What failed, on the phone, without opening the server logs.
  *
  * Reachable from Settings only while `SHOW_DIAGNOSTICS` is on. It reads the
  * in-memory log in `src/lib/diagnostics.js`, so it is empty on a fresh launch
- * and can only ever show what has gone wrong since.
+ * and can only ever show what has gone wrong since — plus the connection state
+ * the offline gate is acting on, which is the first thing to check when a page
+ * blanks or fails to.
  */
 export default function DiagnosticsScreen() {
   const failures = useFailures();
   const [copied, setCopied] = useState(false);
+
+  /**
+   * The raw network state, alongside what the app decided from it.
+   *
+   * `online` is the gate's own view; `state` is what the OS actually reported.
+   * Showing both is the point — when the two disagree, the bug is in
+   * `src/lib/useOnline.js`, and when they agree the phone really is online.
+   */
+  const online = useOnline();
+  const [state, setState] = useState(null);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const read = (next) => {
+      if (!cancelled) setState(next);
+    };
+
+    Network.getNetworkStateAsync().then(read).catch(() => {});
+    const subscription = Network.addNetworkStateListener(read);
+
+    return () => {
+      cancelled = true;
+      subscription?.remove?.();
+    };
+  }, []);
 
   const copy = async () => {
     impact("medium");
@@ -109,7 +146,10 @@ export default function DiagnosticsScreen() {
   };
 
   return (
-    <Screen bare>
+    /* Named, and listed in `NETWORK_OPTIONAL`: this is the page you open to
+       find out *why* everything else is showing the offline screen, so it is
+       the one page that must never show it itself. */
+    <Screen bare name="diagnostics">
       <ScreenHeader
         title="Diagnostics"
         right={
@@ -135,6 +175,45 @@ export default function DiagnosticsScreen() {
         <Text className="font-jk text-muted text-[11px]">API BASE URL</Text>
         <Text selectable className="font-jk-med text-ink text-[12.5px] mt-1">
           {API_BASE_URL}
+        </Text>
+      </View>
+
+      {/* What the OS says about the connection, verbatim.
+
+          `OfflineGate` blanks a page on exactly one value — `isInternetReachable`
+          — and when it does not fire, the question is always whether the app
+          got that wrong or whether the phone is genuinely still online. Guessing
+          at that from behaviour wastes an afternoon; reading it takes a second.
+          Wifi with a working uplink is online no matter what mobile data is
+          doing, which is the answer most of the time. */}
+      <View className="bg-surface rounded-xl px-3.5 py-3">
+        <View className="flex-row items-center justify-between">
+          <Text className="font-jk text-muted text-[11px]">CONNECTION</Text>
+          <Pressable
+            onPress={() => {
+              impact("light");
+              recheckOnline();
+              Network.getNetworkStateAsync().then(setState).catch(() => {});
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Re-read the connection state"
+            hitSlop={10}
+          >
+            <Text className="font-jk-med text-primary text-[11px]">Re-read</Text>
+          </Pressable>
+        </View>
+
+        <Text
+          style={{ color: online ? COLORS.teal : COLORS.flame }}
+          className="font-jk-semi text-[12.5px] mt-1"
+        >
+          {online ? "Online — pages render normally" : "Offline — pages are gated"}
+        </Text>
+
+        <Text selectable className="font-jk text-muted text-[11.5px] leading-[17px] mt-1.5">
+          {`type: ${state?.type ?? "…"}
+isConnected: ${describe(state?.isConnected)}
+isInternetReachable: ${describe(state?.isInternetReachable)}`}
         </Text>
       </View>
 
