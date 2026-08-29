@@ -105,9 +105,10 @@ export default function AddKnowledge({
   };
 
   const pickImage = async () => {
-    const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) return null;
-
+    // Straight to the system photo picker, with nothing asked for first. See
+    // the note in `AvatarPicker.jsx`: the permission request this used to make
+    // could only ever fail, and a silent `return null` made it look like the
+    // picker had been cancelled.
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ["images"],
       quality: 0.7,

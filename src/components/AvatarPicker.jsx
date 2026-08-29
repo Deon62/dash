@@ -31,15 +31,13 @@ export default function AvatarPicker() {
     setBusy(true);
 
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (!permission.granted) {
-        setNotice({
-          title: "Photo access needed",
-          message: "Allow photo access in settings to set a profile picture.",
-        });
-        return;
-      }
-
+      // No permission request. `launchImageLibraryAsync` opens the Android
+      // system photo picker, which hands back only the one image the student
+      // chose and needs nothing granted to do it. Asking first was worse than
+      // pointless: on Android 12 and below the module asks for
+      // READ_EXTERNAL_STORAGE, which `app.json` blocks, so the request came
+      // back denied and this returned early from a picker that would have
+      // opened perfectly well.
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ["images"],
         allowsEditing: true,

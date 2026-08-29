@@ -28,7 +28,6 @@
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
-        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.VIBRATE",
         "android.permission.RECORD_AUDIO",
         "android.permission.USE_BIOMETRIC",
@@ -41,6 +40,7 @@
         "android.permission.ACCESS_BACKGROUND_LOCATION",
         "android.permission.READ_EXTERNAL_STORAGE",
         "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
         "android.permission.READ_MEDIA_VIDEO"
       ]
     },
