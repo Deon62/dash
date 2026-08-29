@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { Image, View } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import * as SplashScreen from "expo-splash-screen";
 import { PostHogProvider } from "posthog-react-native";
@@ -20,6 +20,7 @@ import {
 import { useStudyStore } from "@/store/useStudyStore";
 import { useSessionGuard } from "@/lib/useSessionGuard";
 import { useAccountSync } from "@/lib/bootstrap";
+import { usePushRegistration, usePushTaps } from "@/lib/push";
 import AppLock from "@/components/AppLock";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import {
@@ -50,6 +51,23 @@ function SessionGuard() {
  */
 function AccountSync() {
   useAccountSync();
+  return null;
+}
+
+/**
+ * Push: hand the server a token, and route what gets tapped.
+ *
+ * Below the navigator for the same reason as the guard — a tap on a reminder
+ * has to `push` a route, and there is nothing to push onto until the navigator
+ * exists. Registration could sit anywhere; keeping the pair together means
+ * there is one place to look for anything to do with notifications.
+ */
+function Push() {
+  const router = useRouter();
+
+  usePushRegistration();
+  usePushTaps(router);
+
   return null;
 }
 
@@ -178,6 +196,7 @@ export default function RootLayout() {
             </Stack>
             <SessionGuard />
             <AccountSync />
+            <Push />
 
             {/* Below the navigator: the screen tracker reads the current route
                 segments, and there are none until one exists. */}

@@ -172,6 +172,31 @@ export async function saveSettings(patch) {
   return { error: null };
 }
 
+/**
+ * Sends the handset's timezone and nothing else.
+ *
+ * `saveSettings` already carries it, but only when a student changes a
+ * preference — and most never do, so the server was left with whatever it had
+ * defaulted to. Reminders are wall-clock promises: a session stored as
+ * "Tuesdays at 08:00" has no zone of its own, and neither do quiet hours. An
+ * unrecognised name falls back to UTC on the server rather than refusing to
+ * notify, which makes a wrong zone a quiet three-hour error instead of a
+ * crash — the kind of bug nobody reports and everybody suffers.
+ *
+ * Called from `refreshAccount` on every full launch. Cheap, idempotent, and
+ * silent: nothing on screen depends on it.
+ */
+export async function pushTimezone() {
+  const timezone = deviceTimezone();
+  if (!timezone) return { error: null };
+
+  const { error } = await authed((token) =>
+    accountApi.updateSettings({ timezone }, token),
+  );
+
+  return { error: error ?? null };
+}
+
 function deviceTimezone() {
   try {
     return Intl.DateTimeFormat().resolvedOptions().timeZone ?? null;

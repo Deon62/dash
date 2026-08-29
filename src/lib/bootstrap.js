@@ -2,8 +2,14 @@ import { useEffect, useRef } from "react";
 import { AppState } from "react-native";
 
 import { useStudyStore } from "@/store/useStudyStore";
-import { registerDevice } from "@/lib/session";
-import { loadProfile, loadSettings, loadStreak, loadUsage } from "@/lib/account";
+import { registerForPush } from "@/lib/push";
+import {
+  loadProfile,
+  loadSettings,
+  loadStreak,
+  loadUsage,
+  pushTimezone,
+} from "@/lib/account";
 import { loadGroup, loadSubscription } from "@/lib/billing";
 import { retryFailedUploads } from "@/lib/materials";
 import { sync } from "@/lib/sync";
@@ -49,7 +55,18 @@ export async function refreshAccount({ full = false } = {}) {
     loadSubscription(),
     loadUsage(),
     loadStreak(),
-    ...(full ? [loadProfile(), loadSettings(), loadGroup(), registerDevice()] : []),
+    /**
+     * `registerForPush` rather than `registerDevice`: same PUT, but it collects
+     * a push token first. The bare call registered a row with `push_token:
+     * null` on every launch, which the server stores and then skips — so the
+     * account looked reachable and no reminder could ever arrive.
+     *
+     * `pushTimezone` rides alongside because a reminder is a wall-clock
+     * promise. A session stored as "Tuesdays at 08:00" carries no zone of its
+     * own, so the server needs the device's — and the only other thing that
+     * ever sent it was a settings write, which most students never make.
+     */
+    ...(full ? [loadProfile(), loadSettings(), loadGroup(), registerForPush(), pushTimezone()] : []),
   ]);
 
   // Last, and unawaited by anything that renders: a queued PDF finishing its

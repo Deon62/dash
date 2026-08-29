@@ -2,7 +2,10 @@
   "expo": {
     "name": "als",
     "slug": "als",
-    "scheme": ["als", "com.ardena.als"],
+    "scheme": [
+      "als",
+      "com.ardena.als"
+    ],
     "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -92,7 +95,15 @@
           "faceIDPermission": "ALS uses Face ID to unlock your coursework."
         }
       ],
-      "expo-localization"
+      "expo-localization",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#007FFA",
+          "defaultChannel": "reminders"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": false

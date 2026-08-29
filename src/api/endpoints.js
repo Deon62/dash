@@ -87,6 +87,23 @@ export const account = {
     api.delete(v1(`/me/devices/${deviceId}`), { token }),
 
   /**
+   * Fires a notification at every device on the account, now, ignoring quiet
+   * hours. Answers `{ delivered, has_devices }` — read together, those two
+   * tell apart "no token was ever registered" from "a token is stored and Expo
+   * refused it", which are different problems with the same symptom.
+   */
+  pushTest: (token) => api.post(v1("/me/push/test"), {}, { token }),
+
+  /**
+   * What the server has sent, newest first.
+   *
+   * Push is fire-and-forget — a reminder that arrives while the phone is off is
+   * simply gone — so this is the only way a student sees one they missed.
+   */
+  notifications: (limit, token) =>
+    api.get(v1(`/me/notifications?limit=${limit}`), { token }),
+
+  /**
    * `today` is the student's *local* day, and is not optional in practice.
    *
    * Without it the server dates the read in UTC while `recordStudyDay` below

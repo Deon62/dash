@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { Bell, CalendarOff } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
@@ -32,6 +32,7 @@ import { pullSync } from "@/lib/sync";
  */
 export default function HomeScreen() {
   const router = useRouter();
+  const params = useLocalSearchParams();
 
   const profile = useStudyStore((state) => state.profile);
   const units = useStudyStore((state) => state.units);
@@ -43,6 +44,33 @@ export default function HomeScreen() {
 
   const [composing, setComposing] = useState(false);
   const [openDate, setOpenDate] = useState(null);
+
+  /**
+   * A tapped deadline reminder lands here, on its own day.
+   *
+   * There is no event-detail route — a deadline lives as a dot on the calendar
+   * and inside its unit — so `usePushTaps` sends the id here and the day sheet
+   * is what shows it. Opening the calendar on today instead would answer a
+   * different question from the one the notification asked.
+   *
+   * Once, and only for an event that still exists: a reminder for something
+   * already deleted should land quietly on the month rather than on an empty
+   * sheet. The ref is what stops the sheet reopening every time this tab
+   * regains focus, since the param stays in the URL.
+   */
+  const opened = useRef(null);
+
+  useEffect(() => {
+    const id = params.event ? String(params.event) : null;
+    if (!id || opened.current === id) return;
+
+    const event = events.find((entry) => entry.id === id);
+    opened.current = id;
+
+    // A `Date`, not a day key: `DaySheet` and `MonthCalendar` both work in Date
+    // objects — the sheet calls `date.getDay()` on whatever it is handed.
+    if (event?.at) setOpenDate(new Date(event.at));
+  }, [params.event, events]);
 
   const today = new Date().getDay();
 
