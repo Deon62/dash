@@ -25,6 +25,50 @@ import { withinNoteLimit } from "@/lib/notes";
  */
 
 /**
+ * Em and en dashes, written the way a person types.
+ *
+ * A model reaches for `—` constantly, and it is the single strongest tell that
+ * an answer was generated rather than written: nobody typing on a phone has
+ * ever produced one. The answers are otherwise plain, so the punctuation is
+ * what gives them away.
+ *
+ * Done here rather than by asking the model not to, because a system prompt is
+ * a request the model follows most of the time, and "most of the time" is what
+ * makes it noticeable — the one answer in six that still has them is the one a
+ * student reads as machine-written. This is deterministic.
+ *
+ * Code is left exactly as it came. A dash inside a fenced block or a `code
+ * span` is somebody's syntax, not their punctuation, and rewriting it turns a
+ * working example into one that does not run.
+ */
+const CODE = /(```[\s\S]*?```|```[\s\S]*$|`[^`\n]*`)/g;
+
+export function plainDashes(text) {
+  if (!text) return text;
+
+  return String(text)
+    // The capture means the split keeps the code, at every odd index.
+    .split(CODE)
+    .map((part, index) => (index % 2 ? part : tidyDashes(part)))
+    .join("");
+}
+
+function tidyDashes(part) {
+  return (
+    part
+      // A dash opening a line is a bullet, whatever character was used for it.
+      .replace(/^([^\S\n]*)[—–][^\S\n]*/gm, "$1- ")
+      // `10–15`, `pp. 4–7`: a range, which a plain hyphen says just as well.
+      .replace(/(\d)[^\S\n]*[—–][^\S\n]*(\d)/g, "$1-$2")
+      // Everything else. Spaced, because an unspaced hyphen between words
+      // reads as one hyphenated word rather than as a break in the sentence.
+      // The newline is deliberately kept out of the whitespace either side:
+      // eating it would pull two paragraphs onto one line.
+      .replace(/[^\S\n]*[—–][^\S\n]*/g, " - ")
+  );
+}
+
+/**
  * Long, on purpose.
  *
  * The budget for a streamed answer is not the budget for a JSON call: the
@@ -223,7 +267,10 @@ async function readStream(opened, { onMeta, onToken }) {
           onMeta?.(parsed.data);
         } else if (parsed.event === "token") {
           text += parsed.data.text ?? "";
-          onToken?.(parsed.data.text ?? "", text);
+          // The whole answer each time, not the piece: cleaning a token on its
+          // own cannot see whether the dash it holds is inside a code fence
+          // that opened three tokens ago.
+          onToken?.(parsed.data.text ?? "", plainDashes(text));
         } else if (parsed.event === "done") {
           if (parsed.data.text) text = parsed.data.text;
         } else if (parsed.event === "error") {
@@ -241,7 +288,7 @@ async function readStream(opened, { onMeta, onToken }) {
 
   // A failure inside the stream is never a quota refusal — the allowance was
   // charged before the first frame went out — so the status stays 200.
-  return { text, sources, chatId, model, error: failure, status: 200 };
+  return { text: plainDashes(text), sources, chatId, model, error: failure, status: 200 };
 }
 
 function parseFrame(frame) {
@@ -281,10 +328,10 @@ export async function buildQuiz({ unitCode = null, topic = null, count } = {}) {
   return {
     questions: (data.questions ?? []).map((question, index) => ({
       id: `${index}-${question.prompt.slice(0, 24)}`,
-      prompt: question.prompt,
-      options: question.options ?? [],
-      answer: question.answer,
-      explanation: question.explanation ?? "",
+      prompt: plainDashes(question.prompt),
+      options: (question.options ?? []).map(plainDashes),
+      answer: plainDashes(question.answer),
+      explanation: plainDashes(question.explanation ?? ""),
       source: question.source ?? "",
     })),
     grounded: Boolean(data.grounded),
