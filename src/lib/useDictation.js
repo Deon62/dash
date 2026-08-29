@@ -42,6 +42,11 @@ export function useDictation({ onText }) {
   const [error, setError] = useState(null);
 
   const baseline = useRef("");
+  // Whether results are still wanted. The engine keeps talking for a moment
+  // after it is asked to stop — the final, tidied-up transcript arrives after
+  // `stop()` returns — so this is what tells a late result that the field it
+  // would write into has already been sent and emptied.
+  const active = useRef(false);
   const handle = useRef(onText);
   handle.current = onText;
 
@@ -52,6 +57,8 @@ export function useDictation({ onText }) {
     if (!module_) return undefined;
 
     const onResult = module_.addListener("result", (event) => {
+      if (!active.current) return;
+
       const said = event.results?.[0]?.transcript ?? "";
       if (!said) return;
 
@@ -76,8 +83,30 @@ export function useDictation({ onText }) {
     };
   }, []);
 
+  /**
+   * Stops listening but keeps the last thing said.
+   *
+   * This is the mic button being tapped a second time, so the final result is
+   * still wanted — it is usually a tidier version of the interim text already
+   * in the field.
+   */
   const stop = useCallback(() => {
     module_?.stop();
+    setListening(false);
+  }, []);
+
+  /**
+   * Stops listening and throws away whatever is still coming.
+   *
+   * For sending: the draft has just been posted to the thread and the composer
+   * emptied, and the engine's final result would otherwise land a beat later
+   * and put the question the student just asked straight back in the box.
+   */
+  const cancel = useCallback(() => {
+    active.current = false;
+    baseline.current = "";
+    if (module_?.abort) module_.abort();
+    else module_?.stop();
     setListening(false);
   }, []);
 
@@ -96,6 +125,7 @@ export function useDictation({ onText }) {
     }
 
     baseline.current = currentText;
+    active.current = true;
     setListening(true);
 
     module_.start({
@@ -118,6 +148,7 @@ export function useDictation({ onText }) {
     error,
     start,
     stop,
+    cancel,
     toggle,
     clearError: () => setError(null),
   };

@@ -1,5 +1,5 @@
 import { useStudyStore } from "@/store/useStudyStore";
-import { uploadMaterial, openMaterial } from "@/lib/materials";
+import { uploadMaterial, openMaterial, materialUrl } from "@/lib/materials";
 import { sync } from "@/lib/sync";
 
 /**
@@ -55,4 +55,4 @@ export async function fileMaterial({
   return { material, error: upload.error };
 }
 
-export { openMaterial };
+export { openMaterial, materialUrl };

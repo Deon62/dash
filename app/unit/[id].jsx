@@ -22,13 +22,14 @@ import EmptyState from "@/components/EmptyState";
 import UndoBar from "@/components/UndoBar";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import AddKnowledge from "@/components/AddKnowledge";
+import MaterialViewer from "@/components/MaterialViewer";
 import LimitSheet from "@/components/LimitSheet";
 import EventComposer from "@/components/EventComposer";
 import SessionComposer from "@/components/SessionComposer";
 import { activeTier } from "@/lib/quota";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import UploadStatus from "@/components/UploadStatus";
-import { fileMaterial, openMaterial } from "@/lib/knowledge";
+import { fileMaterial } from "@/lib/knowledge";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
 import { COLORS } from "@/theme/colors";
@@ -68,6 +69,10 @@ export default function UnitScreen() {
 
   const tier = activeTier(subscription);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
+  // The material being read full-screen, or null. The row itself is held
+  // rather than its id so the viewer's header has a title from the first
+  // frame instead of after a lookup.
+  const [viewing, setViewing] = useState(null);
 
   const unit = unitById(units, unitId);
 
@@ -227,7 +232,7 @@ export default function UnitScreen() {
                       onPress={() => {
                         if (!hasFile(material)) return;
                         impact("light");
-                        openMaterial(material.id);
+                        setViewing(material);
                       }}
                       disabled={!hasFile(material)}
                       accessibilityRole={hasFile(material) ? "button" : "text"}
@@ -260,13 +265,28 @@ export default function UnitScreen() {
                     </Pressable>
                   </View>
 
+                  {/* The thumbnail opens it too. It is the biggest thing in
+                      the row and the most obviously tappable, and having it be
+                      the one part that does nothing is the sort of detail that
+                      reads as the app being broken. */}
                   {material.kind === "image" && material.uri ? (
-                    <Image
-                      source={{ uri: material.uri }}
-                      style={{ width: "100%", height: 170, borderRadius: 14 }}
-                      resizeMode="cover"
-                      className="mt-3"
-                    />
+                    <Pressable
+                      onPress={() => {
+                        if (!hasFile(material)) return;
+                        impact("light");
+                        setViewing(material);
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${material.title}`}
+                      className="active:opacity-80"
+                    >
+                      <Image
+                        source={{ uri: material.uri }}
+                        style={{ width: "100%", height: 170, borderRadius: 14 }}
+                        resizeMode="cover"
+                        className="mt-3"
+                      />
+                    </Pressable>
                   ) : null}
 
                   {material.body ? (
@@ -369,6 +389,8 @@ export default function UnitScreen() {
         onClose={() => setComposer(null)}
         onSave={(payload) => addSession({ ...payload, unitId })}
       />
+
+      <MaterialViewer material={viewing} onClose={() => setViewing(null)} />
 
       <ConfirmDialog
         visible={confirmingDelete}

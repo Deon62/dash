@@ -89,6 +89,25 @@ export default function VerifyScreen() {
     // this fire once per completed attempt rather than on each keystroke.
   }, [code]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  /**
+   * Puts the caret back in the hidden field.
+   *
+   * Closing the keyboard — the Android back gesture, the iOS accessory bar —
+   * does not blur this input, it only hides the keyboard. The field therefore
+   * still believes it is focused, and `focus()` on an already-focused input is
+   * a no-op: the six boxes become dead pixels and there is no way back to the
+   * keyboard short of leaving the screen. Blurring first is what makes the
+   * next tap open it again.
+   */
+  const focusCode = () => {
+    const input = inputRef.current;
+    if (!input) return;
+    input.blur();
+    // A tick later. Focusing in the same frame as the blur is swallowed on
+    // Android, which lands back exactly where this started.
+    setTimeout(() => inputRef.current?.focus(), 50);
+  };
+
   const resend = async () => {
     if (secondsLeft > 0 || busy) return;
     impact("light");
@@ -143,7 +162,7 @@ export default function VerifyScreen() {
         {/* One input behind six boxes — simpler and more reliable than six
             separate fields chasing focus between them. */}
         <Pressable
-          onPress={() => inputRef.current?.focus()}
+          onPress={focusCode}
           accessibilityRole="button"
           accessibilityLabel="Enter verification code"
           className="flex-row justify-between mt-9"

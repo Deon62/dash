@@ -235,6 +235,12 @@ export default function StudyScreen() {
   // refuses; this is so a student out of questions is told before the request.
   const tier = activeTier(subscription);
 
+  // Dictation writes straight into the draft, so a student can speak a
+  // sentence and then fix a word by typing without losing either. Declared
+  // above `ask` because sending has to be able to call it off.
+  const dictation = useDictation({ onText: setDraft });
+  const listening = dictation.listening;
+
   /**
    * Asks the tutor, and renders the answer as it comes.
    *
@@ -246,6 +252,12 @@ export default function StudyScreen() {
   const ask = async (question, { retryOf = null } = {}) => {
     const text = question.trim();
     if (!text || thinking) return;
+
+    // Before anything else. The engine delivers its final transcript a moment
+    // after it stops, and if it is still listening when the composer is
+    // emptied below that result lands in the empty box — the question the
+    // student just sent, sitting there again as if it had not gone.
+    dictation.cancel();
 
     // Checked before the question is posted, not after: showing a student's
     // own words in the thread and then refusing to answer them reads as a
@@ -414,11 +426,6 @@ export default function StudyScreen() {
    */
   const offline = failure === OFFLINE;
 
-  // Dictation writes straight into the draft, so a student can speak a
-  // sentence and then fix a word by typing without losing either.
-  const dictation = useDictation({ onText: setDraft });
-  const listening = dictation.listening;
-
   return (
     /* This tab builds its own layout rather than using `Screen`, so it carries
        its own gate. Not `bare`: the tab bar is underneath, so there is already
@@ -436,6 +443,7 @@ export default function StudyScreen() {
           Icon={SquarePen}
           label="New chat"
           onPress={() => {
+            dictation.cancel();
             newChat(unitId);
             setDraft("");
           }}

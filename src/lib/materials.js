@@ -172,21 +172,34 @@ export async function uploadMaterial(material) {
 }
 
 /**
- * Opens the stored file.
+ * A link to the stored file, good for a few minutes.
  *
- * The link is minted per request and expires, because the buckets are private
- * — which is the whole reason not to serve coursework from a public one. The
- * system browser rather than an in-app view, so a PDF opens in whatever the
- * student already reads PDFs in.
+ * Minted per request and expiring, because the buckets are private — which is
+ * the whole reason not to serve coursework from a public one. Resolves to
+ * `{ url, error }`.
  */
-export async function openMaterial(materialId) {
+export async function materialUrl(materialId) {
   const { data, error } = await authed((token) =>
     materialsApi.downloadUrl(materialId, token),
   );
 
+  if (error) return { url: null, error };
+  return { url: data.url, error: null };
+}
+
+/**
+ * Hands the file to the system browser.
+ *
+ * The fallback, not the way in: files are read in `MaterialViewer` without
+ * leaving the app. This is what the viewer offers when it cannot render one —
+ * a format it has no reader for, or a PDF whose pages refused to draw — so
+ * that "we couldn't show it here" is never the end of the conversation.
+ */
+export async function openMaterial(materialId) {
+  const { url, error } = await materialUrl(materialId);
   if (error) return { error };
 
-  await WebBrowser.openBrowserAsync(data.url);
+  await WebBrowser.openBrowserAsync(url);
   return { error: null };
 }
 
