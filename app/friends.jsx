@@ -127,7 +127,7 @@ export default function FriendsScreen() {
 
     // Minted by the server for this student — see `src/lib/checkout.js`. The
     // fixed payment link this replaced produced a charge that named nobody.
-    const { reference, error } = await startCheckout(FRIENDS);
+    const { reference, returned, error } = await startCheckout(FRIENDS);
 
     if (error) {
       setNotice({
@@ -140,7 +140,16 @@ export default function FriendsScreen() {
     }
 
     setPaymentReference(reference);
-    // Nothing here can see a charge, so it asks rather than assuming.
+
+    // Kora redirected back, so the payment page reached an ending of some
+    // kind. Which ending is the server's to say, not the student's. The
+    // reference goes in by argument because the state above has not settled.
+    if (returned) {
+      startGroup(reference);
+      return;
+    }
+
+    // They closed the tab themselves, which says nothing either way.
     setConfirming(true);
   };
 
@@ -151,9 +160,9 @@ export default function FriendsScreen() {
    * here would be one nobody else could redeem — the seats it claims to give
    * away live on the account, and only the server can hand them out.
    */
-  const startGroup = async () => {
+  const startGroup = async (ref = paymentReference) => {
     setBusy(true);
-    const { error, pending } = await confirmCheckout(paymentReference);
+    const { error, pending } = await confirmCheckout(ref);
 
     if (error) {
       setBusy(false);
@@ -168,13 +177,13 @@ export default function FriendsScreen() {
               title: "Your payment is still clearing",
               message:
                 "Mobile money can take a minute or two to confirm. Nothing has gone wrong. Check again shortly and the group is yours as soon as it lands.",
-              retry: startGroup,
+              retry: () => startGroup(ref),
             }
           : {
               tone: toneForError(error),
               title: "We couldn't confirm that payment",
               message: `${error} If you were charged, the payment is safe and the group will appear on its own once it reaches us.`,
-              retry: startGroup,
+              retry: () => startGroup(ref),
             }
       );
       return;
@@ -191,7 +200,7 @@ export default function FriendsScreen() {
         tone: toneForError(created.error),
         title: "Your payment went through, but the group didn't open",
         message: `${created.error} You have not lost anything. Try again and your seats will be there.`,
-        retry: startGroup,
+        retry: () => startGroup(ref),
       });
       return;
     }
@@ -497,7 +506,9 @@ export default function FriendsScreen() {
             busyLabel="Checking…"
             busy={busy}
             disabled={busy}
-            onPress={startGroup}
+            /* Wrapped, not passed: `startGroup` now takes a reference, and a
+               bare handler would hand it the press event instead. */
+            onPress={() => startGroup()}
           />
           <Pressable
             onPress={() => {

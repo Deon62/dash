@@ -1,0 +1,19 @@
+{
+  // `global.css` is not CSS the browser ever sees. It is the three directives
+  // Tailwind reads before it generates anything, and NativeWind compiles the
+  // result into React Native styles. The editor's built-in CSS validator knows
+  // none of that and flags `@tailwind` and `@apply` as unknown at-rules, so
+  // the one file in the project that is exactly right is also the only one
+  // with a red squiggle on it. Nothing is wrong with the file; this is what
+  // stops the editor claiming otherwise.
+  "css.lint.unknownAtRules": "ignore",
+  "less.lint.unknownAtRules": "ignore",
+  "scss.lint.unknownAtRules": "ignore",
+
+  // Tells the Tailwind CSS IntelliSense extension where the config is, so
+  // class-name completion works in `.jsx` as well as in CSS.
+  "tailwindCSS.experimental.configFile": "tailwind.config.js",
+  "files.associations": {
+    "global.css": "tailwindcss"
+  }
+}

@@ -4,6 +4,7 @@ import { API_BASE_URL, API_V1, OFFLINE } from "@/api/client";
 import { recordFailure } from "@/lib/diagnostics";
 import { tutor as tutorApi } from "@/api/endpoints";
 import { accessToken, authed, refreshSession, NOT_SIGNED_IN } from "@/lib/session";
+import { withinNoteLimit } from "@/lib/notes";
 
 /**
  * The tutor.
@@ -305,37 +306,58 @@ export async function tutorModels() {
 // --- Cards ------------------------------------------------------------------
 
 /**
- * Each note as a two-sided card: title on the front, opening lines behind.
+ * The short notes as two-sided cards: title on the front, the note behind.
  *
  * Built on the device rather than asked for, and deliberately so — this is a
  * different view of material already synced down, not a new answer, and a
  * round trip to re-cut text the app is already holding would only make it
  * slower and unavailable underground.
+ *
+ * **A card shows its note whole, or there is no card.** The deck used to cut
+ * every note to its first sentence and 220 characters, so a student who had
+ * written six lines turned one over and found one of them, with nothing to say
+ * the rest existed — the frustrating kind of wrong, because it looks like the
+ * app lost the note.
+ *
+ * Long material is not truncated now; it is simply not a card. It stays filed
+ * and the tutor still reads all of it, which is the honest division of labour:
+ * Ask is where a document is useful, and a deck is for the things short enough
+ * to recall in one glance. `countCards` below is what lets the empty state say
+ * so rather than implying nothing was filed.
  */
 export function buildFlashcards(materials, { count = 12 } = {}) {
   return materials
-    .filter((material) => (material.body ?? "").length > 0)
+    .filter((material) => cardable(material))
     .slice(0, count)
     .map((material) => ({
       id: material.id,
       front: material.title,
-      back: trim(firstPassage(material) ?? material.body, 220),
+      back: String(material.body ?? "").trim(),
       unitId: material.unitId,
     }));
 }
 
-/** The opening thought of a note — a person would call it the first sentence. */
-function firstPassage(material) {
-  // Blank lines first, then sentence ends inside the block. Two passes rather
-  // than one regex because the lookbehind that would do it in one is not safe
-  // to rely on in Hermes.
-  return String(material.body ?? "")
-    .split(/\n{2,}/)
-    .flatMap((block) => block.match(/[^.!?\n]+[.!?]*/g) ?? [])
-    .map((passage) => passage.trim())
-    .find((passage) => passage.length > 24);
+/** True where a material's whole body fits on a card. */
+function cardable(material) {
+  const body = String(material.body ?? "").trim();
+  return body.length > 0 && withinNoteLimit(body);
 }
 
-function trim(text, max = 320) {
-  return text.length <= max ? text : `${text.slice(0, max).trimEnd()}…`;
+/**
+ * How the filed material divides between the deck and everything else.
+ *
+ * The count of what was left out is the difference between "you have not filed
+ * anything" and "what you filed is too long to be a card", and those need
+ * different things said to them.
+ */
+export function countCards(materials) {
+  let cards = 0;
+  let tooLong = 0;
+
+  for (const material of materials) {
+    if (cardable(material)) cards += 1;
+    else if (String(material.body ?? "").trim().length > 0) tooLong += 1;
+  }
+
+  return { cards, tooLong };
 }

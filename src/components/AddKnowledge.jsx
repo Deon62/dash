@@ -10,6 +10,7 @@ import Disc from "@/components/Disc";
 import { canAttachFile } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import TextField from "@/components/TextField";
+import { NOTE_WORD_LIMIT, countWords } from "@/lib/notes";
 import { impact, notify } from "@/lib/haptics";
 
 const FORMATS = [
@@ -189,6 +190,23 @@ export default function AddKnowledge({
 
   const unit = units.find((option) => option.id === unitId);
 
+  /**
+   * Where a note stops being a card, said while it is being written.
+   *
+   * Not a cap. Nothing here refuses a long note or shortens one — it is filed
+   * whole and the tutor reads all of it, which is the point of typing it out.
+   * What changes past the line is only that it stops appearing in the deck,
+   * because a card that cannot show its note whole is worse than no card. That
+   * is a thing worth knowing before you press the button rather than after,
+   * when the deck is short and there is nothing to explain why.
+   *
+   * Counted only for notes: a link has no body to speak of, and a PDF was
+   * never going to be a card.
+   */
+  const writingNote = format === "note";
+  const words = writingNote ? countWords(body) : 0;
+  const pastCardLength = words > NOTE_WORD_LIMIT;
+
   return (
     <Sheet
       visible={visible}
@@ -271,6 +289,29 @@ export default function AddKnowledge({
             autoCorrect={format !== "link"}
             keyboardType={format === "link" ? "url" : "default"}
           />
+
+          {/* Under the field the whole time rather than appearing at the end.
+              Somebody pasting three pages should find out what happens to it
+              at the moment they paste, not by noticing later that it never
+              turned up in the deck.
+
+              Muted in both states, and never red: going long is a decision,
+              not a mistake, and colouring it as a failure would push people
+              into cutting notes that were the right length for what they
+              were. */}
+          {writingNote ? (
+            <View className="flex-row items-baseline justify-between -mt-2">
+              <Text className="font-jk text-muted text-[11.5px] leading-[16px] flex-1 pr-3">
+                {pastCardLength
+                  ? "Long enough that it won't become a flashcard — it stays filed, and the tutor still reads all of it."
+                  : `Under ${NOTE_WORD_LIMIT} words also becomes a flashcard, shown whole.`}
+              </Text>
+
+              <Text className="font-jk-med text-faint text-[11.5px]">
+                {words}/{NOTE_WORD_LIMIT}
+              </Text>
+            </View>
+          ) : null}
 
           <Button
             label="File it"

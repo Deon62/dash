@@ -18,7 +18,7 @@ import {
   seatsFor,
 } from "@/theme/plans";
 import { activeTier, daysRemaining, hasEverPaid, isExpired } from "@/lib/quota";
-import { confirmCheckout, startCheckout } from "@/lib/checkout";
+import { confirmCheckout, pendingCheckout, startCheckout } from "@/lib/checkout";
 import { loadPlans, loadSubscription } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
@@ -91,6 +91,24 @@ export default function BillingScreen() {
     // webhook that landed while the app was closed.
     loadSubscription();
 
+    /**
+     * Picks up a payment this screen never saw the end of.
+     *
+     * Android is free to kill a backgrounded app while the student is at Kora,
+     * and it does, on the phones this is written for. The reference outlives
+     * that — `src/lib/checkout.js` keeps it on disk — so the way back is to
+     * offer the check rather than to pretend the payment never happened.
+     * `PLAN_CARDS` is looked up because the sheet is written around a card.
+     */
+    pendingCheckout().then((payment) => {
+      if (cancelled || !payment) return;
+      const card = PLAN_CARDS.find((entry) => entry.tier === payment.tier);
+      if (!card) return;
+
+      setReference(payment.reference);
+      setConfirming(card);
+    });
+
     return () => {
       cancelled = true;
     };
@@ -109,7 +127,7 @@ export default function BillingScreen() {
 
     // The link is minted by the server for this student and this plan — see
     // `src/lib/checkout.js`. There is no hardcoded payment page any more.
-    const { reference: opened, error } = await startCheckout(card.tier);
+    const { reference: opened, returned, error } = await startCheckout(card.tier);
     setBusy(false);
 
     if (error) {
@@ -123,7 +141,18 @@ export default function BillingScreen() {
     }
 
     setReference(opened);
-    // The browser closing says nothing about whether money moved, so we ask.
+
+    // Kora redirected back, so the payment page reached an ending of some
+    // kind. Which ending is the server's to say, not the student's — so this
+    // checks rather than asking them. The reference goes in by argument
+    // because the state set above has not settled yet.
+    if (returned) {
+      unlock(card, opened);
+      return;
+    }
+
+    // They closed the tab themselves, which says nothing either way — so this
+    // asks before spending a verification on it.
     setConfirming(card);
   };
 
@@ -135,9 +164,9 @@ export default function BillingScreen() {
    * outcome, not a failure: mobile money takes a minute and the webhook will
    * credit the plan when it lands.
    */
-  const unlock = async (card = confirming) => {
+  const unlock = async (card = confirming, ref = reference) => {
     setBusy(true);
-    const { error, pending } = await confirmCheckout(reference);
+    const { error, pending } = await confirmCheckout(ref);
     setBusy(false);
 
     if (error) {
@@ -152,13 +181,13 @@ export default function BillingScreen() {
               title: "Your payment is still clearing",
               message:
                 "Mobile money can take a minute or two to confirm. Nothing has gone wrong. Check again shortly and your plan unlocks as soon as it lands.",
-              retry: () => unlock(card),
+              retry: () => unlock(card, ref),
             }
           : {
               tone: toneForError(error),
               title: "We couldn't confirm that payment",
               message: `${error} If you were charged, the payment is safe and your plan will unlock on its own once it reaches us.`,
-              retry: () => unlock(card),
+              retry: () => unlock(card, ref),
             }
       );
       return;

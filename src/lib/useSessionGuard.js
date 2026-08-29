@@ -3,8 +3,17 @@ import { useRouter, useSegments } from "expo-router";
 
 import { useStudyStore } from "@/store/useStudyStore";
 
-/** Routes reachable without a session. */
-const AUTH_ROUTES = new Set(["login", "verify"]);
+/**
+ * Routes reachable without a session.
+ *
+ * `oauthredirect` is one of them for a moment rather than as a destination:
+ * Google's redirect arrives as a deep link, Expo Router navigates to it, and
+ * the code is still being exchanged. Bouncing that to /login would land on the
+ * sign-in screen a beat before the session it is waiting for, which reads as
+ * the sign-in having failed. Being an auth route also means the guard sweeps
+ * off it the instant the session lands — see the last line of the effect.
+ */
+const AUTH_ROUTES = new Set(["login", "verify", "oauthredirect"]);
 
 /**
  * Keeps the student on a screen they are allowed to be on.

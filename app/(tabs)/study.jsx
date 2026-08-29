@@ -1,10 +1,19 @@
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  Pressable,
+  ScrollView,
+  Text,
+  TextInput,
+  View,
+  unstable_batchedUpdates,
+} from "react-native";
+import * as Clipboard from "expo-clipboard";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import {
   Check,
   ChevronDown,
+  Copy,
   MessageSquare,
   PanelLeft,
   RotateCcw,
@@ -21,7 +30,8 @@ import Disc from "@/components/Disc";
 import EmptyState from "@/components/EmptyState";
 import ThinkingLabel from "@/components/ThinkingLabel";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
-import { askTutor, buildFlashcards, buildQuiz } from "@/lib/tutor";
+import { askTutor, buildFlashcards, buildQuiz, countCards } from "@/lib/tutor";
+import { NOTE_WORD_LIMIT } from "@/lib/notes";
 import { newId } from "@/lib/ids";
 import { recordStudyDay } from "@/lib/account";
 import { formatDateTime, greeting } from "@/lib/dates";
@@ -88,6 +98,63 @@ export default function StudyScreen() {
 
   const scrollRef = useRef(null);
 
+  /**
+   * The stream, between frames.
+   *
+   * Tokens arrive far faster than the screen refreshes — a dozen or more
+   * between two frames — and setting state on each one made React re-render
+   * the whole thread that many times for one frame of visible change. That is
+   * where the flicker came from: layout ran mid-paint, the scroll below was
+   * restarted before it had finished, and the text stepped rather than grew.
+   *
+   * So the text lands here, and one `requestAnimationFrame` per frame is what
+   * puts it on screen. Nothing is dropped — `whole` is cumulative, so the
+   * frame that renders carries every token that arrived before it.
+   */
+  const pending = useRef(null);
+  const frame = useRef(0);
+
+  /** True while a stream is running, read by the scroll handler below. */
+  const live = useRef(false);
+
+  const flushStream = useCallback(() => {
+    frame.current = 0;
+    const next = pending.current;
+    if (next) setStreaming(next);
+  }, []);
+
+  const pushStream = useCallback(
+    (patch) => {
+      pending.current = { ...(pending.current ?? { text: "", sources: [] }), ...patch };
+      if (frame.current) return;
+      frame.current = requestAnimationFrame(flushStream);
+    },
+    [flushStream],
+  );
+
+  // A stream left running when the screen goes is a callback into a component
+  // that is not there any more.
+  useEffect(
+    () => () => {
+      if (frame.current) cancelAnimationFrame(frame.current);
+    },
+    [],
+  );
+
+  /**
+   * Follows the answer down as it is written.
+   *
+   * `animated: false` while streaming, and that is the point rather than a
+   * shortcut: content grows every frame, each growth fires this, and an
+   * animated scroll that is restarted before it can finish never arrives —
+   * it just judders in place. Unanimated, the view is simply already at the
+   * bottom on every frame, which is what following along looks like.
+   */
+  const stickToBottom = useCallback(() => {
+    if (messagesRef.current === 0) return;
+    scrollRef.current?.scrollToEnd({ animated: !live.current });
+  }, []);
+
   // The composer is lifted by hand rather than by KeyboardAvoidingView: with
   // edge-to-edge on, Android never resizes the window for the keyboard, so the
   // KAV had nothing to react to and the field stayed underneath it. Below the
@@ -114,6 +181,12 @@ export default function StudyScreen() {
   );
 
   const messages = chat?.messages ?? [];
+
+  // Read from `stickToBottom`, which must not be rebuilt every render — a new
+  // `onContentSizeChange` identity on each token is another thing for the
+  // ScrollView to reconcile mid-stream.
+  const messagesRef = useRef(0);
+  messagesRef.current = messages.length;
 
   // What the current plan allows, read before `ask` is defined because `ask`
   // closes over it. The server meters the same allowance and is what actually
@@ -154,6 +227,8 @@ export default function StudyScreen() {
     appendMessage(target.id, { id: studentMessageId, role: "student", text });
     setDraft("");
     setThinking(true);
+    live.current = true;
+    pending.current = { text: "", sources: [] };
     setStreaming({ text: "", sources: [] });
 
     // The device's own counters, so a limit can still be refused with no
@@ -165,21 +240,28 @@ export default function StudyScreen() {
       question: text,
       chatId: target.id,
       unitCode: unit?.code ?? null,
-      onMeta: (meta) =>
-        setStreaming((current) => ({
-          ...(current ?? { text: "" }),
-          sources: meta.sources ?? [],
-        })),
-      onToken: (_piece, whole) =>
-        setStreaming((current) => ({ ...(current ?? { sources: [] }), text: whole })),
+      // Both go through `pushStream`, which coalesces to one render a frame.
+      // `whole` is the answer so far, not the new piece, so a frame that
+      // renders is never behind the tokens that arrived during it.
+      onMeta: (meta) => pushStream({ sources: meta.sources ?? [] }),
+      onToken: (_piece, whole) => pushStream({ text: whole }),
       studentMessageId,
       answerMessageId,
     });
 
-    setStreaming(null);
-    setThinking(false);
+    // Anything still queued belongs to an answer that is about to be replaced
+    // by the finished one. Letting it land would paint a stale frame over it.
+    if (frame.current) {
+      cancelAnimationFrame(frame.current);
+      frame.current = 0;
+    }
+    pending.current = null;
+    live.current = false;
 
     if (result.error && !result.text) {
+      setStreaming(null);
+      setThinking(false);
+
       // 402 is a plan limit — not included in what you pay for — and belongs in
       // the sheet that explains limits and offers a way out. Everything else is
       // a failure, and telling someone with no signal to upgrade their plan is
@@ -189,15 +271,29 @@ export default function StudyScreen() {
       return;
     }
 
-    appendMessage(target.id, {
-      id: answerMessageId,
-      role: "tutor",
-      text: result.error ? `${result.text}\n\n${result.error}` : result.text,
-      sources: (result.sources ?? []).map((source) =>
-        source.page_number
-          ? `${source.title} · p.${source.page_number}`
-          : source.title,
-      ),
+    /**
+     * The handover, in one paint.
+     *
+     * The streamed bubble and the stored one are the same answer coming from
+     * two different places — React state and the store — and clearing one
+     * before writing the other leaves a frame showing either both or neither.
+     * Both read as a blink at the end of every answer. Batched, the swap
+     * happens between frames and there is nothing to see.
+     */
+    unstable_batchedUpdates(() => {
+      appendMessage(target.id, {
+        id: answerMessageId,
+        role: "tutor",
+        text: result.error ? `${result.text}\n\n${result.error}` : result.text,
+        sources: (result.sources ?? []).map((source) =>
+          source.page_number
+            ? `${source.title} · p.${source.page_number}`
+            : source.title,
+        ),
+      });
+
+      setStreaming(null);
+      setThinking(false);
     });
   };
 
@@ -237,9 +333,7 @@ export default function StudyScreen() {
       {mode === "ask" ? (
         <ScrollView
           ref={scrollRef}
-          onContentSizeChange={() =>
-            messages.length > 0 && scrollRef.current?.scrollToEnd({ animated: true })
-          }
+          onContentSizeChange={stickToBottom}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{
@@ -275,9 +369,11 @@ export default function StudyScreen() {
           )}
 
           {/* The answer while it is still arriving. Rendered as an ordinary
-              bubble so nothing shifts when the finished one replaces it. */}
+              bubble so nothing shifts when the finished one replaces it —
+              minus the copy button, which would offer half an answer. */}
           {streaming?.text ? (
             <Bubble
+              streaming
               message={{
                 role: "tutor",
                 text: streaming.text,
@@ -605,8 +701,52 @@ export default function StudyScreen() {
 
 // --- Ask -------------------------------------------------------------------
 
-function Bubble({ message }) {
+/**
+ * Tidies an answer on its way to the clipboard.
+ *
+ * What the model writes is already formatted — headings, lists, the odd code
+ * fence — and that formatting is the reason anyone copies it, so none of it is
+ * touched. This only removes what the stream leaves behind: trailing spaces on
+ * a line that was written in pieces, and the runs of blank lines that come of
+ * a paragraph break arriving in two frames. Pasted into notes, the difference
+ * is between text that looks typed and text that looks scraped.
+ */
+function forClipboard(text) {
+  return String(text ?? "")
+    .replace(/[ \t]+$/gm, "")
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+/**
+ * One turn.
+ *
+ * `memo` is not a micro-optimisation here. A streamed answer re-renders this
+ * screen many times a second, and without it every bubble in the thread —
+ * every paragraph of every previous answer — is laid out again on each of
+ * those renders. That was most of the flicker: the work per frame grew with
+ * the length of the conversation, so the longer a student had been talking,
+ * the worse the stream looked. A settled message never changes, so it never
+ * needs to be measured twice.
+ */
+const Bubble = memo(function Bubble({ message, streaming = false }) {
   const fromStudent = message.role === "student";
+
+  const [copied, setCopied] = useState(false);
+
+  // The label reverts on its own: a "Copied" that never leaves has stopped
+  // saying anything by the second tap.
+  useEffect(() => {
+    if (!copied) return undefined;
+    const id = setTimeout(() => setCopied(false), 2000);
+    return () => clearTimeout(id);
+  }, [copied]);
+
+  const copy = async () => {
+    impact("light");
+    await Clipboard.setStringAsync(forClipboard(message.text));
+    setCopied(true);
+  };
 
   return (
     <View
@@ -614,7 +754,12 @@ function Bubble({ message }) {
         fromStudent ? "self-end rounded-2xl bg-surface px-4 py-3" : "self-start"
       }`}
     >
-      <Text className="font-jk text-ink text-[14.5px] leading-[21px]">
+      <Text
+        className="font-jk text-ink text-[14.5px] leading-[21px]"
+        // The answer is the one thing on this screen worth taking away, and a
+        // student quoting it in an essay needs a part rather than the whole.
+        selectable={!fromStudent}
+      >
         {message.text}
       </Text>
 
@@ -629,9 +774,35 @@ function Bubble({ message }) {
           ))}
         </View>
       ) : null}
+
+      {/* Under the answer and quiet with it. Not on the student's own words —
+          they have those already — and not while the answer is still being
+          written, where it would copy half a sentence. */}
+      {!fromStudent && !streaming && message.text ? (
+        <Pressable
+          onPress={copy}
+          accessibilityRole="button"
+          accessibilityLabel={copied ? "Answer copied" : "Copy answer"}
+          hitSlop={10}
+          className="flex-row items-center gap-1.5 mt-2.5 -ml-0.5 self-start active:opacity-60"
+        >
+          {copied ? (
+            <Check size={13} color={COLORS.primary} strokeWidth={2.5} />
+          ) : (
+            <Copy size={13} color={COLORS.faint} strokeWidth={2} />
+          )}
+          <Text
+            className={`font-jk-med text-[11.5px] ${
+              copied ? "text-primary" : "text-faint"
+            }`}
+          >
+            {copied ? "Copied" : "Copy"}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
-}
+});
 
 // --- Quiz ------------------------------------------------------------------
 
@@ -990,6 +1161,12 @@ function Flashcard({ card, unitCode, open, onPress }) {
 
 function CardsPane({ materials, units, unit }) {
   const cards = useMemo(() => buildFlashcards(materials), [materials]);
+
+  // Not `materials.length - cards.length`: a PDF has no text on this device
+  // and was never a candidate, so counting it as something held back would be
+  // explaining an absence that has nothing to do with length.
+  const { tooLong } = useMemo(() => countCards(materials), [materials]);
+
   const [flipped, setFlipped] = useState(() => new Set());
 
   if (cards.length === 0) {
@@ -997,10 +1174,22 @@ function CardsPane({ materials, units, unit }) {
       <View className="flex-1 justify-center px-5">
         <EmptyState
           Icon={RotateCcw}
-          title="No cards yet"
-          message={`Each note becomes a card: its title in front, its opening lines behind. File one${
-            unit ? ` under ${unit.code}` : ""
-          } to start.`}
+          title={tooLong > 0 ? "Nothing short enough yet" : "No cards yet"}
+          /* Two different things to say. Told "no cards yet" while holding a
+             dozen filed notes, a student reasonably concludes the app has lost
+             them — so where there is long material, the message is about
+             length rather than about filing. */
+          message={
+            tooLong > 0
+              ? `A card shows a note whole, so only ones under ${NOTE_WORD_LIMIT} words become one. Your longer ${
+                  tooLong === 1 ? "note is" : "notes are"
+                } still filed, and the tutor reads ${
+                  tooLong === 1 ? "it" : "them"
+                } in full — ask about ${tooLong === 1 ? "it" : "them"} in Ask.`
+              : `A note under ${NOTE_WORD_LIMIT} words becomes a card: its title in front, the note behind. File one${
+                  unit ? ` under ${unit.code}` : ""
+                } to start.`
+          }
         />
       </View>
     );
@@ -1021,8 +1210,15 @@ function CardsPane({ materials, units, unit }) {
       showsVerticalScrollIndicator={false}
       contentContainerStyle={{ paddingHorizontal: 20, paddingBottom: 24 }}
     >
+      {/* The count, and — when some were left out — why the deck is shorter
+          than the library. Said once at the top rather than as a placeholder
+          card per note, which would fill the deck with things you cannot
+          revise from. */}
       <Text className="font-jk text-muted text-[12px] pb-2.5">
         {cards.length} {cards.length === 1 ? "card" : "cards"}
+        {tooLong > 0
+          ? ` · ${tooLong} ${tooLong === 1 ? "note" : "notes"} too long for one, still filed`
+          : ""}
       </Text>
 
       {cards.map((card) => (

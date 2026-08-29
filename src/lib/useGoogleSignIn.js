@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import * as WebBrowser from "expo-web-browser";
 
-import { GOOGLE_CLIENT_IDS, googleConfigured, signInWithGoogle } from "@/lib/auth";
+import { googleConfigured } from "@/lib/auth";
 
 /**
  * Loaded only where it can be used.
@@ -15,9 +15,9 @@ import { GOOGLE_CLIENT_IDS, googleConfigured, signInWithGoogle } from "@/lib/aut
  * runtime; the value is a module-level constant, so the hook count below never
  * changes between renders.
  */
-const Google = googleConfigured
+export const googleAuth = googleConfigured
   ? // eslint-disable-next-line global-require
-    require("expo-auth-session/providers/google")
+    require("@/lib/googleAuth")
   : null;
 
 // Closes the browser tab the consent screen opened once it redirects back.
@@ -34,110 +34,52 @@ const UNAVAILABLE = {
 };
 
 /**
- * Google sign-in, ending in a session.
+ * Google sign-in, as a screen sees it.
  *
- * A hook rather than a function because the consent screen is a round trip
- * through the browser: the request has to be prepared while the screen renders,
- * and the answer arrives later as a response object rather than as the return
- * value of the call that started it.
+ * Thin on purpose. The flow itself lives in `src/lib/googleAuth.js`, at module
+ * scope, because it outlives this hook: the redirect from Google arrives as a
+ * deep link, Expo Router treats a deep link as a navigation, and that
+ * navigation unmounts whichever screen started the sign-in. Anything held in
+ * component state at that moment — the PKCE verifier above all — is gone
+ * before the code can be exchanged. So this only subscribes to progress and
+ * forwards the button press.
  *
- * `useIdTokenAuthRequest` rather than the plain auth request: the server wants
- * an ID token, not an access token, and this is what makes Google issue one.
- *
- * All three client ids go in and the library picks by platform. The one it
- * picks becomes the token's audience, which is what the server checks against
- * its own allow-list — so on Android that is the *Android* client id, not the
- * web one, and the server has to know about it.
- *
- * Two things outside this file have to be true, and neither fails loudly:
- *
- * * **`com.ardena.als` is in `scheme` in app.json.** The library redirects to
- *   `<applicationId>:/oauthredirect`, which is the only redirect shape Google
- *   accepts for an Android client. Without an intent filter for that scheme
- *   Android has nothing to hand the redirect to: the consent screen completes,
- *   the browser sits on a blank page, and the app never hears that anyone
- *   signed in. That is a native manifest entry, so it needs a new build — an
- *   over-the-air update cannot carry it.
- * * **"Custom URI scheme" is enabled on the Android OAuth client**, under
- *   Advanced Settings in the Google Cloud console. New clients have it off,
- *   and with it off Google refuses the request before the consent screen with
- *   a 400 that reads "Ardena sent an invalid request".
+ * `onSignedIn` is optional and rarely wanted: the session lands in the store,
+ * and `useSessionGuard` routes off it. A screen that passes one is asking for
+ * something extra, not for navigation.
  */
 export function useGoogleSignIn({ onSignedIn } = {}) {
-  // Conditional, and safe: `Google` is decided once when this module is first
-  // loaded and never changes, so the number of hooks called is constant for
-  // the life of the process — which is the rule that actually matters.
   // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [request, response, promptAsync] = Google
-    ? // eslint-disable-next-line react-hooks/rules-of-hooks
-      Google.useIdTokenAuthRequest({
-        clientId: GOOGLE_CLIENT_IDS.webClientId,
-        iosClientId: GOOGLE_CLIENT_IDS.iosClientId,
-        androidClientId: GOOGLE_CLIENT_IDS.androidClientId,
-      })
-    : [null, null, null];
-
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [busy, setBusy] = useState(false);
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const [error, setError] = useState("");
-
-  // The callback changes identity every render; a ref keeps the effect below
-  // keyed on the response alone, so it runs once per sign-in rather than on
-  // every re-render of the screen that mounted this.
-  // eslint-disable-next-line react-hooks/rules-of-hooks
-  const done = useRef(onSignedIn);
-  done.current = onSignedIn;
+  const [state, setState] = useState(() =>
+    googleAuth ? googleAuth.getState() : { busy: false, error: "" },
+  );
 
   // eslint-disable-next-line react-hooks/rules-of-hooks
   useEffect(() => {
-    if (!response) return undefined;
+    if (!googleAuth) return undefined;
 
-    if (response.type === "dismiss" || response.type === "cancel") {
-      setBusy(false);
-      return undefined;
-    }
+    // Read once on mount as well as subscribing: a sign-in can complete while
+    // this screen is unmounted — that is the whole reason the flow moved out
+    // of here — and remounting must not show stale idle state under it.
+    setState(googleAuth.getState());
+    return googleAuth.subscribe(setState);
+  }, []);
 
-    if (response.type === "error") {
-      setBusy(false);
-      setError("Google sign-in did not complete. Try again.");
-      return undefined;
-    }
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  useEffect(() => {
+    if (!googleAuth || !onSignedIn) return undefined;
 
-    if (response.type !== "success") return undefined;
+    googleAuth.setSignedInHandler(onSignedIn);
+    return () => googleAuth.setSignedInHandler(null);
+  }, [onSignedIn]);
 
-    const idToken =
-      response.params?.id_token ?? response.authentication?.idToken ?? null;
-
-    let cancelled = false;
-
-    (async () => {
-      const result = await signInWithGoogle(idToken);
-      if (cancelled) return;
-
-      setBusy(false);
-      if (result.error) setError(result.error);
-      else done.current?.(result);
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [response]);
-
-  if (!Google) return UNAVAILABLE;
+  if (!googleAuth) return UNAVAILABLE;
 
   return {
-    /** False until the request is prepared, so the button cannot be pressed early. */
-    available: Boolean(request),
-    busy,
-    error,
-    clearError: () => setError(""),
-    start: async () => {
-      if (!request) return;
-      setBusy(true);
-      setError("");
-      await promptAsync();
-    },
+    available: googleAuth.available,
+    busy: state.busy,
+    error: state.error,
+    clearError: googleAuth.clearError,
+    start: googleAuth.start,
   };
 }

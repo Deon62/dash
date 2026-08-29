@@ -18,6 +18,12 @@ module.exports = {
         /** Secondary text, placeholders, inactive glyphs. */
         muted: "#71717A",
         /**
+         * Text that is still there but no longer live — a date already past,
+         * an affordance offered rather than urged. A step lighter than
+         * `muted`, which is for text meant to be read.
+         */
+        faint: "#A1A1AA",
+        /**
          * The brand. Every filled button, every active state, every
          * highlight — one blue doing all of it, always with white on top.
          * Nothing decorative is painted in it: if it is this colour, it is
