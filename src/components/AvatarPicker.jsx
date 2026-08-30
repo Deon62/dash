@@ -7,7 +7,7 @@ import ConfirmDialog from "@/components/ConfirmDialog";
 import { COLORS } from "@/theme/colors";
 import { useStudyStore } from "@/store/useStudyStore";
 import { impact } from "@/lib/haptics";
-import { uploadAvatar } from "@/lib/avatar";
+import { refreshAvatarUrl, uploadAvatar } from "@/lib/avatar";
 
 const SIZE = 96;
 
@@ -96,6 +96,12 @@ export default function AvatarPicker() {
             source={{ uri: profile.avatarUri }}
             style={{ width: SIZE, height: SIZE }}
             resizeMode="cover"
+            /* The safety net under the URL cache. A held signature can be
+               refused — the server may sign for less time than assumed, or a
+               phone's clock may be wrong — and the honest answer to a photo
+               that will not load is to sign a new URL once, not to leave a
+               blank disc there until the next launch. */
+            onError={() => refreshAvatarUrl({ force: true })}
           />
         ) : profile.initials ? (
           <Text className="font-jk-semi text-canvas text-[30px] tracking-[1px]">

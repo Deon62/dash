@@ -89,6 +89,9 @@ export async function uploadAvatar(asset) {
   const previous = {
     avatarUri: store.profile.avatarUri,
     avatarPath: store.profile.avatarPath,
+    // Carried so a failed upload puts back a URL that is still usable rather
+    // than one the next launch has to sign again for no reason.
+    avatarUriExpiresAt: store.profile.avatarUriExpiresAt,
   };
 
   const revert = (error) => {
@@ -152,29 +155,66 @@ export async function uploadAvatar(asset) {
 
   // The local file is fine to display now, but it is a cache entry the OS may
   // clear. Swapping in the signed URL means the next launch has something that
-  // works even if it has gone.
-  await refreshAvatarUrl();
+  // works even if it has gone. Forced, because what is held is a `file://` URI
+  // for the previous photo and no cache may survive a deliberate change.
+  await refreshAvatarUrl({ force: true });
 
   return { error: null };
 }
 
 /**
- * Replaces the displayed photo with a freshly signed URL.
+ * How long a signed URL is assumed good for when the server does not say.
  *
- * Called after the profile loads and after an upload. Silent on failure: an
- * expired or unreachable photo is not worth an error in front of somebody who
- * did not ask for one, and the initials behind it are a reasonable fallback.
+ * Deliberately short of any plausible real expiry. Being wrong in this
+ * direction costs one extra request; being wrong the other way shows a broken
+ * image, which is why `AvatarPicker` also re-signs on a load error.
  */
-export async function refreshAvatarUrl() {
+const ASSUMED_URL_TTL_MS = 30 * 60 * 1000;
+
+/** Re-sign this far before expiry, so a URL cannot die mid-render. */
+const EXPIRY_MARGIN_MS = 2 * 60 * 1000;
+
+/**
+ * Replaces the displayed photo with a freshly signed URL — if it needs one.
+ *
+ * Called after the profile loads and after an upload, which is to say on every
+ * cold start and every return from the background. Signing unconditionally was
+ * a download of the same photo each time: a new signature is a new URL, the
+ * image cache keys on the URL, and so nothing was ever reused.
+ *
+ * So a URL that has not expired is kept. The photo itself is not versioned by
+ * this — `loadProfile` forces a re-sign when the server reports a different
+ * `avatar_path`, which is what changing the photo on another handset looks
+ * like from here.
+ *
+ * Silent on failure: an expired or unreachable photo is not worth an error in
+ * front of somebody who did not ask for one, and the initials behind it are a
+ * reasonable fallback.
+ */
+export async function refreshAvatarUrl({ force = false } = {}) {
   const { profile } = useStudyStore.getState();
   if (!profile.avatarPath) return { error: null };
+
+  const fresh =
+    profile.avatarUri &&
+    profile.avatarUriExpiresAt &&
+    profile.avatarUriExpiresAt - EXPIRY_MARGIN_MS > Date.now();
+
+  if (fresh && !force) return { error: null };
 
   const { data, error } = await authed((token) => accountApi.avatarUrl(token));
   if (error) return { error };
 
+  // The server's own expiry where it sends one, in either shape it might use.
+  const expiresAt =
+    (data.expires_at ? new Date(data.expires_at).getTime() : null) ||
+    (data.expires_in ? Date.now() + data.expires_in * 1000 : null) ||
+    Date.now() + ASSUMED_URL_TTL_MS;
+
   useStudyStore.getState().setAvatar({
     avatarUri: data.url,
     avatarPath: profile.avatarPath,
+    avatarUriExpiresAt: expiresAt,
   });
 
   return { error: null };

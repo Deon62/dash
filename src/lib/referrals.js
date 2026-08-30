@@ -4,6 +4,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 import { account } from "@/api/endpoints";
 import { authed } from "@/lib/session";
+import { useStudyStore } from "@/store/useStudyStore";
 
 /**
  * Referrals, from the device's side.
@@ -55,28 +56,45 @@ function fromServer(data) {
 }
 
 /**
- * The student's code and totals, re-read on every visit.
+ * How long a cached snapshot is used without asking again.
  *
- * On focus rather than on mount: a reward vests after a hold, and the natural
- * gesture for "has it landed yet" is to open the screen again. Failures are
- * kept rather than shown — this is a card beside the rest of a profile, and a
- * red line across it because a background read timed out is noise about
- * something the student did not ask for.
+ * The code inside it never changes, so this is really a limit on how stale the
+ * *counts* may be. Ten minutes is chosen against what actually happens: a
+ * friend subscribes, the reward waits out a seven-day hold, and then a number
+ * moves. Nobody is watching this screen for a change that takes a week.
+ */
+const MAX_AGE_MS = 10 * 60 * 1000;
+
+/**
+ * The student's code and totals, from the cache first.
+ *
+ * Renders whatever was last read — instantly, and offline — then revalidates
+ * behind it if that snapshot is old. The code is minted once and never
+ * changes, so re-reading it on every visit is a request that can only return
+ * what is already on screen.
+ *
+ * Nothing here can go badly wrong: the cache decides only what is drawn a beat
+ * before the server answers, and the server's answer replaces it whenever one
+ * arrives. A stale count is a number that is briefly low, which is the safe
+ * direction — this app never grants anything, it only reports what was
+ * granted.
+ *
+ * Failures are kept rather than shown. A red line across a page because a
+ * background revalidation timed out is noise about something nobody asked for,
+ * and the cached snapshot underneath it is still true.
  */
 export function useReferral() {
-  const [state, setState] = useState({ ...EMPTY, loading: true, error: null });
+  const cached = useStudyStore((state) => state.referral);
+  const [error, setError] = useState(null);
 
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
 
-      loadReferrals().then(({ referral, error }) => {
-        if (cancelled) return;
-        setState({
-          ...(referral ?? EMPTY),
-          loading: false,
-          error: referral ? null : error,
-        });
+      // Only when it is worth asking. `loadReferrals` decides that rather than
+      // this hook, so the same rule applies to any other caller.
+      loadReferrals().then((result) => {
+        if (!cancelled) setError(result.error);
       });
 
       return () => {
@@ -85,15 +103,42 @@ export function useReferral() {
     }, []),
   );
 
-  return state;
+  return {
+    ...EMPTY,
+    ...(cached ?? {}),
+    // Only the very first read has nothing to draw. After that there is always
+    // a snapshot, and a spinner over one is a screen hiding what it knows.
+    loading: !cached,
+    error: cached ? null : error,
+  };
 }
 
-/** One read. Resolves to `{ referral, error }` and never throws. */
-export async function loadReferrals() {
-  const { data, error } = await authed((token) => account.referrals(token));
-  if (error) return { referral: null, error };
+/**
+ * One read, cached. Resolves to `{ referral, error }` and never throws.
+ *
+ * `force` is for the places that have just changed something the counts depend
+ * on. Nothing does yet — every reward is granted server-side, on a hold — but
+ * the door is here rather than in a screen's own `if`.
+ */
+export async function loadReferrals({ force = false } = {}) {
+  const store = useStudyStore.getState();
+  const cached = store.referral;
 
-  return { referral: fromServer(data), error: null };
+  const fresh = cached?.readAt && Date.now() - cached.readAt < MAX_AGE_MS;
+  if (fresh && !force) return { referral: cached, error: null };
+
+  const { data, error } = await authed((token) => account.referrals(token));
+
+  // The cached snapshot is returned on a failure rather than null: a request
+  // that did not answer has not made what we already knew untrue, and a screen
+  // that blanks itself on a dropped connection is worse than one showing a
+  // number from ten minutes ago.
+  if (error) return { referral: cached ?? null, error };
+
+  const referral = fromServer(data);
+  store.setReferral(referral);
+
+  return { referral, error: null };
 }
 
 /**

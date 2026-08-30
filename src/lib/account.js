@@ -49,6 +49,13 @@ export async function loadProfile() {
   if (error) return { error };
 
   const store = useStudyStore.getState();
+
+  // Read before the profile is applied: a different object in the bucket is
+  // what a photo changed on another handset looks like from here, and it is
+  // the one case where the URL held on this device is stale rather than
+  // merely old.
+  const swapped = (data.avatar_path ?? null) !== store.profile.avatarPath;
+
   store.applyServerProfile(fromProfile(data));
 
   // A name on the account means intake was completed, on this phone or another
@@ -56,11 +63,16 @@ export async function loadProfile() {
   // device, which reads as their details having been lost.
   if (data.full_name) store.setOnboarded(true);
 
-  // The photo is stored as a path and displayed as a signed URL that expires,
-  // so the URL is fetched fresh here rather than kept. Not awaited: an image
-  // arriving a moment after the name is fine, and a slow storage call must not
-  // hold up the screen that is waiting on this.
-  refreshAvatarUrl();
+  // The photo is stored as a path and displayed as a signed URL that expires.
+  // `refreshAvatarUrl` signs a new one only when the held URL is near its own
+  // expiry — a new signature is a new URL, and re-signing on every launch
+  // meant the same photo was downloaded again every time. Forced when the path
+  // changed, which is the only case where what is held is wrong rather than
+  // simply old.
+  //
+  // Not awaited: an image arriving a moment after the name is fine, and a slow
+  // storage call must not hold up the screen that is waiting on this.
+  refreshAvatarUrl({ force: swapped });
 
   if (data.subscription) {
     store.setSubscription({

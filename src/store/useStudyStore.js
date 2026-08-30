@@ -58,6 +58,16 @@ const EMPTY_PROFILE = {
    */
   avatarUri: null,
   /**
+   * When that URL stops working, as epoch ms — or null for a local file.
+   *
+   * Kept so a launch does not sign a new URL for a photo that has not changed.
+   * A freshly signed URL is a *different* URL, so the image cache misses and
+   * the same photo is downloaded again on every cold start and every return
+   * from the background. Holding the URL until it actually expires is what
+   * turns that into one download.
+   */
+  avatarUriExpiresAt: null,
+  /**
    * The object in the `avatars` bucket. This is what the server stores and
    * what survives a sign-out, and `avatarUri` is re-signed from it on load.
    * Keeping only the URL is what made the photo vanish: a stored link expires.
@@ -151,6 +161,16 @@ const BLANK = {
    * authority on who holds a seat, and `loadGroup` replaces this wholesale.
    */
   group: null,
+  /**
+   * The referral code and its counts, as `/me/referrals` last reported them.
+   *
+   * Cached because the code is minted once and never changes: re-reading it to
+   * draw the same six characters is a request that can only ever return what
+   * is already on screen. The counts move rarely and slowly — a friend has to
+   * subscribe, and the reward waits out a hold — so the screen renders from
+   * here and revalidates behind it. `null` until it has ever been read.
+   */
+  referral: null,
   usage: { ...EMPTY_USAGE },
   /** The three explainer screens, shown once on the very first launch. */
   introSeen: false,
@@ -402,8 +422,10 @@ export const useStudyStore = create(
        * displayable link was set and the path behind it never was, so nothing
        * on the account pointed at the file and the picture did not come back.
        */
-      setAvatar: ({ avatarUri, avatarPath }) =>
-        set((state) => ({ profile: { ...state.profile, avatarUri, avatarPath } })),
+      setAvatar: ({ avatarUri, avatarPath, avatarUriExpiresAt = null }) =>
+        set((state) => ({
+          profile: { ...state.profile, avatarUri, avatarPath, avatarUriExpiresAt },
+        })),
 
       updateSettings: (patch) =>
         set((state) => ({
@@ -423,6 +445,16 @@ export const useStudyStore = create(
 
       /** The Friends group, as `/billing/group` reported it. */
       setGroup: (group) => set({ group }),
+
+      /**
+       * The referral snapshot, replaced wholesale.
+       *
+       * Stamped on arrival rather than trusted to be current: what decides
+       * whether to ask again is how old this is, and a cache with no age is a
+       * cache that either never refreshes or always does.
+       */
+      setReferral: (referral) =>
+        set({ referral: referral ? { ...referral, readAt: Date.now() } : null }),
 
       // --- Usage ------------------------------------------------------------
       //
