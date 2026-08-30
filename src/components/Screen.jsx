@@ -1,19 +1,25 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  Dimensions,
   KeyboardAvoidingView,
   Platform,
   RefreshControl,
   ScrollView,
+  TextInput,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { getTabBarHeight } from "@/theme/layout";
 import { COLORS } from "@/theme/colors";
+import { useKeyboard } from "@/lib/useKeyboardVisible";
 import OfflineGate from "@/components/OfflineGate";
 
 /** Disc height plus its offset, rounded up. */
 const FAB_CLEARANCE = 92;
+
+/** Air left between a focused field and the top of the keyboard. */
+const FIELD_CLEARANCE = 24;
 
 /**
  * Standard scrolling page.
@@ -42,6 +48,59 @@ export default function Screen({
   const insets = useSafeAreaInsets();
 
   const [refreshing, setRefreshing] = useState(false);
+
+  /**
+   * The keyboard, measured — not left to `KeyboardAvoidingView`.
+   *
+   * With `edgeToEdgeEnabled` the Android window is never resized when the
+   * keyboard opens, so a `KeyboardAvoidingView` there has nothing to react to:
+   * it renders, does nothing, and the fields at the bottom of a form sit
+   * underneath the keys. That is exactly what happened on Personal details —
+   * Institution, Year and Semester were unreachable the moment anything above
+   * them was focused.
+   *
+   * So on Android the room is made by padding the scroll content by the
+   * keyboard's real height, and the focused field is scrolled up into it. iOS
+   * keeps the `KeyboardAvoidingView`, which does work there.
+   */
+  const keyboard = useKeyboard();
+  const lifts = keyboardAware && Platform.OS !== "ios";
+
+  const scrollRef = useRef(null);
+  /** Last known scroll position, so a lift can be expressed as an absolute y. */
+  const offset = useRef(0);
+
+  useEffect(() => {
+    if (!lifts || !keyboard.visible) return undefined;
+
+    // A beat after the keyboard reports itself: the padding below has to be in
+    // place before anything is scrolled into it, and on a slower handset the
+    // focused input has not finished laying out either.
+    const timer = setTimeout(() => {
+      const input = TextInput.State.currentlyFocusedInput?.();
+      if (!input?.measureInWindow || !scrollRef.current) return;
+
+      input.measureInWindow((x, y, width, height) => {
+        const covered =
+          y + height + FIELD_CLEARANCE -
+          (Dimensions.get("window").height - keyboard.height);
+
+        // Only ever upward, and only when the field is actually covered. A
+        // scroll fired on every focus would yank the page under someone
+        // correcting a field that was already perfectly visible.
+        if (covered <= 0) return;
+
+        scrollRef.current.scrollTo({
+          y: offset.current + covered,
+          animated: true,
+        });
+      });
+    }, 80);
+
+    return () => clearTimeout(timer);
+    // `height` as well as `visible`: switching from the text keyboard to the
+    // emoji or number pad changes the height without closing anything.
+  }, [lifts, keyboard.visible, keyboard.height]);
 
   /**
    * Pull to refresh, where a page opts in.
@@ -74,9 +133,14 @@ export default function Screen({
 
   const scroller = (
     <ScrollView
+      ref={scrollRef}
       showsVerticalScrollIndicator={false}
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode="on-drag"
+      onScroll={(event) => {
+        offset.current = event.nativeEvent.contentOffset.y;
+      }}
+      scrollEventThrottle={16}
       refreshControl={
         onRefresh ? (
           <RefreshControl
@@ -99,7 +163,10 @@ export default function Screen({
         // pages carrying one need the last row pushed clear of it.
         paddingBottom:
           (bare ? Math.max(insets.bottom, 16) : getTabBarHeight(insets)) +
-          (fab ? FAB_CLEARANCE : 28),
+          (fab ? FAB_CLEARANCE : 28) +
+          // The room the keyboard takes. Without it the last field on a form
+          // cannot be scrolled clear of the keys however hard anyone drags.
+          (lifts && keyboard.visible ? keyboard.height : 0),
         paddingHorizontal: 20,
         rowGap: 22,
         ...contentStyle,

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import * as WebBrowser from "expo-web-browser";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -17,10 +18,34 @@ import {
 import { COLORS } from "@/theme/colors";
 import { detectCountry } from "@/lib/geo";
 import { sendPhoneOtp } from "@/lib/auth";
+import {
+  pendingReferralCode,
+  setPendingReferralCode,
+  tidyCode,
+} from "@/lib/referrals";
 import { useGoogleSignIn } from "@/lib/useGoogleSignIn";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
 import OfflineGate from "@/components/OfflineGate";
+
+/**
+ * The published pages, not screens in the app.
+ *
+ * One copy of each, on the web, so a change to either reaches every installed
+ * build without a release — and so the version a student agreed to is the
+ * version a court could be shown.
+ */
+const TERMS_URL = "https://als.ardena.co.ke/terms";
+const PRIVACY_URL = "https://als.ardena.co.ke/privacy";
+
+/** Opens in the in-app browser, which keeps the sign-in behind it alive. */
+function openLegal(url) {
+  impact("light");
+  // Nothing is awaited and nothing is caught for a reason: this is a link on a
+  // sign-in screen, and a browser that will not open must not be able to throw
+  // its way into the sign-in flow.
+  WebBrowser.openBrowserAsync(url).catch(() => {});
+}
 
 /**
  * Soft colour wash behind the top of the screen.
@@ -70,6 +95,52 @@ export default function LoginScreen() {
   const [phone, setPhone] = useState("");
   const [busy, setBusy] = useState(null);
   const [error, setError] = useState("");
+
+  /**
+   * A friend's code, optional in every sense.
+   *
+   * Behind a disclosure rather than on the page, because this screen is also
+   * where a returning student signs back in — the server only reads the code
+   * on the request that *creates* an account, and a field offered to somebody
+   * who already has one produces a support ticket that begins "I typed my
+   * friend's code and nothing happened".
+   *
+   * Arriving by link opens it, already filled, as a line rather than a field:
+   * there is nothing left to type and an input pre-populated with something a
+   * student did not write invites them to change it.
+   */
+  const [referral, setReferral] = useState("");
+  const [showReferral, setShowReferral] = useState(false);
+  const [fromLink, setFromLink] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    pendingReferralCode().then((code) => {
+      if (cancelled || !code) return;
+      setReferral(code);
+      setFromLink(true);
+      setShowReferral(true);
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  /**
+   * Written through as it is typed, not on Continue.
+   *
+   * `src/lib/auth.js` reads it out of there when it exchanges the code, and
+   * Google sign-in leaves this screen entirely — so a value living in this
+   * component's state would be attached to one of the two ways in and not the
+   * other.
+   */
+  const writeReferral = (next) => {
+    const code = tidyCode(next);
+    setReferral(code);
+    setPendingReferralCode(code);
+  };
 
   const selected = getCountry(country);
 
@@ -238,6 +309,59 @@ export default function LoginScreen() {
               : `We'll text a code to ${selected.dial} ${digits || "…"}`}
           </Text>
 
+          {/* Never blocks Continue, never validates, never shows an error. An
+              unknown code is ignored by the server and the account is created
+              normally — a student mistyping their friend's code must still
+              end up with an account. */}
+          {fromLink ? (
+            <Text className="font-jk text-muted text-[12px] mt-4">
+              Joining with{" "}
+              <Text className="font-jk-med text-ink tracking-[1px]">
+                {referral}
+              </Text>
+            </Text>
+          ) : showReferral ? (
+            <View style={{ marginTop: 20 }}>
+              <Text className="font-jk-med text-muted text-[11px] tracking-[0.8px] mb-1">
+                REFERRAL CODE (OPTIONAL)
+              </Text>
+              <View
+                style={{ borderBottomWidth: 1, borderBottomColor: COLORS.line }}
+              >
+                <TextInput
+                  value={referral}
+                  onChangeText={writeReferral}
+                  placeholder="K7M2QX"
+                  placeholderTextColor="#A1A1AA"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  maxLength={6}
+                  autoFocus
+                  className="py-3 font-jk text-ink text-[15.5px] tracking-[2px]"
+                />
+              </View>
+            </View>
+          ) : (
+            <Pressable
+              onPress={() => {
+                impact("light");
+                setShowReferral(true);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel="I have a referral code"
+              hitSlop={8}
+              className="self-start py-2 mt-2 active:opacity-60"
+            >
+              {/* Underlined, because it is the only thing on this screen that
+                  opens something rather than submitting it, and a bare grey
+                  sentence among two fields reads as a caption nobody can
+                  press. */}
+              <Text className="font-jk-med text-muted text-[12px] underline">
+                I have a referral code
+              </Text>
+            </Pressable>
+          )}
+
           {error || google.error ? (
             <Text className="font-jk text-danger text-[12px] leading-[17px] mt-2">
               {error || google.error}
@@ -258,8 +382,29 @@ export default function LoginScreen() {
           </View>
         </View>
 
+        {/* Both underlined and pressable. "You agree to the Terms" with no way
+            to read them is a sentence that asks for consent to something it
+            will not show you. They open in the system browser rather than a
+            screen in the app: the pages are published on the web, and a copy
+            inlined here is a copy that goes stale the day either is edited. */}
         <Text className="font-jk text-muted text-[11px] leading-[16px] text-center">
-          By continuing you agree to the Terms and Privacy Policy.
+          By continuing you agree to the{" "}
+          <Text
+            className="font-jk-med text-ink underline"
+            accessibilityRole="link"
+            onPress={() => openLegal(TERMS_URL)}
+          >
+            Terms
+          </Text>{" "}
+          and{" "}
+          <Text
+            className="font-jk-med text-ink underline"
+            accessibilityRole="link"
+            onPress={() => openLegal(PRIVACY_URL)}
+          >
+            Privacy Policy
+          </Text>
+          .
         </Text>
       </ScrollView>
       </View>

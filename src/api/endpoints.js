@@ -28,21 +28,26 @@ export const account = {
    * student signs in elsewhere, which is exactly the hole a paid account gets
    * shared through.
    */
-  verifyOtp: (phone, code, { deviceId, platform, appVersion } = {}) =>
+  verifyOtp: (phone, code, { deviceId, platform, appVersion, referralCode } = {}) =>
     api.post(v1("/auth/otp/verify"), {
       phone,
       code,
       device_id: deviceId,
       platform,
       app_version: appVersion,
+      // Read only when this request creates the account, and ignored — never
+      // refused — when it is unknown. A student mistyping a friend's code must
+      // still end up with an account.
+      ...(referralCode ? { referral_code: referralCode } : {}),
     }),
 
-  signInWithGoogle: (idToken, { deviceId, platform, appVersion } = {}) =>
+  signInWithGoogle: (idToken, { deviceId, platform, appVersion, referralCode } = {}) =>
     api.post(v1("/auth/google"), {
       id_token: idToken,
       device_id: deviceId,
       platform,
       app_version: appVersion,
+      ...(referralCode ? { referral_code: referralCode } : {}),
     }),
 
   /** Access tokens last half an hour; this is what keeps a session alive. */
@@ -121,6 +126,15 @@ export const account = {
 
   /** What is left of this month's allowances, counted server-side. */
   usage: (token) => api.get(v1("/me/usage"), { token }),
+
+  /**
+   * The referral code and what it has earned.
+   *
+   * The first call to this is what mints the code, so it is asked for on the
+   * screen that shows one rather than on launch. Counts, not people: the
+   * payload names nobody, and there is no route that does.
+   */
+  referrals: (token) => api.get(v1("/me/referrals"), { token }),
 
   /**
    * One idea from one student. Write-only, on purpose.

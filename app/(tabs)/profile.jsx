@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import {
   CalendarDays,
   ChartNoAxesColumn,
+  Gift,
   IdCard,
   Layers,
   Lightbulb,
@@ -53,7 +54,17 @@ export default function ProfileScreen() {
 
   return (
     <Screen onRefresh={refresh}>
-      <View className="flex-row justify-end">
+      {/* Two controls, and the order is deliberate: settings stays furthest
+          right, where it has always been and where a thumb goes for it without
+          looking. Invites sit beside it rather than in the list below, because
+          this is the one thing on the page a student might come here to do
+          rather than to check. */}
+      <View className="flex-row justify-end gap-x-2">
+        <IconButton
+          Icon={Gift}
+          label="Invite a friend"
+          onPress={() => router.push("/referrals")}
+        />
         <IconButton
           Icon={Settings}
           label="Settings"

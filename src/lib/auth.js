@@ -5,6 +5,7 @@ import { account } from "@/api/endpoints";
 import { useStudyStore } from "@/store/useStudyStore";
 import { DEVICE, deviceId } from "@/lib/session";
 import { loadProfile } from "@/lib/account";
+import { clearPendingReferralCode, pendingReferralCode } from "@/lib/referrals";
 
 /**
  * Signing in, against the real API.
@@ -93,6 +94,10 @@ export async function verifyPhoneOtp(phone, code) {
     deviceId: deviceId(),
     platform: DEVICE.platform,
     appVersion: DEVICE.appVersion,
+    // Sent on every sign-in and read by the server only when this request
+    // creates the account. Attribution is written once, which is what stops a
+    // code being added after somebody has already paid.
+    referralCode: await pendingReferralCode(),
   });
 
   if (error) return { error };
@@ -115,6 +120,7 @@ export async function signInWithGoogle(idToken) {
     deviceId: deviceId(),
     platform: DEVICE.platform,
     appVersion: DEVICE.appVersion,
+    referralCode: await pendingReferralCode(),
   });
 
   if (error) return { error };
@@ -150,6 +156,11 @@ async function openSession(data) {
     refreshToken: data.refresh_token,
     expiresIn: data.expires_in,
   });
+
+  // Spent, whether or not it was used. It was attached to a request that has
+  // now succeeded, and a code that survives a sign-in would attribute the next
+  // person to use this handset to somebody they have never met.
+  clearPendingReferralCode();
 
   return { isNewUser: Boolean(data.is_new_user) };
 }
