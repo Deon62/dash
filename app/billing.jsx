@@ -331,7 +331,7 @@ export default function BillingScreen() {
             for the whole screen rather than a length picker on each card:
             three separate choices to make is three chances to buy the wrong
             one, and nobody wants Focus monthly and Synapse by the season. */}
-        <View className="gap-y-2.5">
+        <View className="gap-y-3">
           <Segmented
             value={period}
             onChange={setPeriod}
@@ -340,7 +340,7 @@ export default function BillingScreen() {
               {
                 value: BillingPeriod.SEASON,
                 label: "Season",
-                badge: bestSaving ? `Save ${bestSaving}%` : undefined,
+                badge: bestSaving ? `−${bestSaving}%` : undefined,
               },
             ]}
           />
@@ -349,7 +349,7 @@ export default function BillingScreen() {
               Season is the same allowance four times over, and a student
               expecting four times the questions in one lump will feel cheated
               at week three. */}
-          <Text className="font-jk text-muted text-[11.5px] leading-[17px] px-1">
+          <Text className="font-jk text-muted text-[11.5px] leading-[17px] text-center px-4">
             {period === BillingPeriod.SEASON
               ? "Four months, one payment. The same allowance each month — a Season buys time, not a bigger allowance."
               : "One month at a time. Everything refills on the 1st."}

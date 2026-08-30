@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Text, View } from "react-native";
 import { useRouter } from "expo-router";
-import { CloudOff, Send, TriangleAlert } from "lucide-react-native";
+import { CloudOff, TriangleAlert } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
@@ -144,7 +144,6 @@ export default function SuggestScreen() {
           busyLabel="Sending…"
           busy={sending}
           disabled={!canSend}
-          Icon={Send}
           onPress={send}
         />
       </View>

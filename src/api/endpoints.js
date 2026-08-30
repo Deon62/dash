@@ -91,6 +91,11 @@ export const account = {
    * hours. Answers `{ delivered, has_devices }` — read together, those two
    * tell apart "no token was ever registered" from "a token is stored and Expo
    * refused it", which are different problems with the same symptom.
+   *
+   * Nothing in the app calls it. The control that did was removed from
+   * Settings — a build a student installs should have no test buttons in it —
+   * and the route is listed here because the server still serves it, which is
+   * what this file is a record of.
    */
   pushTest: (token) => api.post(v1("/me/push/test"), {}, { token }),
 

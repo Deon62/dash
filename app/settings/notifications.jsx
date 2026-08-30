@@ -1,7 +1,7 @@
 import { useCallback, useState } from "react";
 import { Linking, Pressable, Text, View } from "react-native";
 import { useFocusEffect } from "expo-router";
-import { BellOff, BellRing, CalendarClock, Send } from "lucide-react-native";
+import { BellOff, BellRing, CalendarClock } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
@@ -9,9 +9,9 @@ import LinkRow from "@/components/LinkRow";
 import Notice, { toneForError } from "@/components/Notice";
 import { useStudyStore } from "@/store/useStudyStore";
 import { saveSettings } from "@/lib/account";
-import { registerForPush, sendTestPush, usePushPermission } from "@/lib/push";
+import { registerForPush, usePushPermission } from "@/lib/push";
 import { COLORS } from "@/theme/colors";
-import { impact, notify } from "@/lib/haptics";
+import { impact } from "@/lib/haptics";
 
 /**
  * Reminders are sent by the server, so the switch has to reach it.
@@ -76,66 +76,6 @@ export default function NotificationSettingsScreen() {
     }
   };
 
-  /**
-   * Fires a real notification at every device on the account.
-   *
-   * Shipped, not hidden behind a development flag. Three things have to line up
-   * before a reminder arrives — a registered token, credentials Expo accepts,
-   * and an OS permission — and when one is missing the only symptom is silence
-   * weeks later, on the evening something was due. This is the one control that
-   * tells the three apart, and it reads the server's own counts to do it.
-   *
-   * It also has to be usable in a release build, which is the only honest place
-   * to test push: a notification is about an app you are *not* looking at, and
-   * a development client with Metro attached is the one environment where that
-   * is hard to arrange.
-   */
-  const test = async () => {
-    impact("medium");
-    setBusy(true);
-    setNotice(null);
-
-    const { delivered, hasDevices, error } = await sendTestPush();
-    setBusy(false);
-
-    if (error) {
-      setNotice({
-        tone: toneForError(error),
-        title: "Couldn't send a test",
-        message: error,
-      });
-      return;
-    }
-
-    if (!hasDevices) {
-      setNotice({
-        tone: "error",
-        title: "This phone isn't registered",
-        message:
-          "No push token has reached the account. Permission was denied, or this build has no notification credentials.",
-      });
-      return;
-    }
-
-    if (delivered === 0) {
-      setNotice({
-        tone: "error",
-        title: "Expo wouldn't take it",
-        message:
-          "A token is stored but the push service rejected it — usually FCM credentials missing from the Expo project, or a token left behind by an uninstalled build.",
-      });
-      return;
-    }
-
-    notify("success");
-    setNotice({
-      tone: "info",
-      title: `Sent to ${delivered} ${delivered === 1 ? "device" : "devices"}`,
-      message:
-        "If nothing appears within a few seconds, it is credentials or the OS permission rather than the server.",
-    });
-  };
-
   return (
     <Screen bare>
       <ScreenHeader title="Notifications" />
@@ -190,13 +130,6 @@ export default function NotificationSettingsScreen() {
           toggle
           toggleValue={settings.sessionReminders}
           onToggle={(sessionReminders) => saveSettings({ sessionReminders })}
-        />
-
-        <LinkRow
-          Icon={Send}
-          label="Send a test notification"
-          hint="Checks reminders can actually reach this phone"
-          onPress={test}
           last
         />
       </View>

@@ -139,18 +139,6 @@ export async function unregisterPush() {
   return authed((token) => account.unregisterDevice(deviceId(), token));
 }
 
-/** Fires a notification at every device on the account, ignoring quiet hours. */
-export async function sendTestPush() {
-  const { data, error } = await authed((token) => account.pushTest(token));
-  if (error) return { delivered: 0, hasDevices: false, error };
-
-  return {
-    delivered: data?.delivered ?? 0,
-    hasDevices: Boolean(data?.has_devices),
-    error: null,
-  };
-}
-
 // --- Registration, on launch -------------------------------------------------
 
 /**
