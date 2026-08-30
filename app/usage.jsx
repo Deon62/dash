@@ -13,6 +13,7 @@ import { UNLIMITED, limitsFor, planName, unitCap } from "@/theme/plans";
 import { activeTier, daysRemaining, rollUsage } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import { pullSync } from "@/lib/sync";
+import { useMidnightCountdown } from "@/lib/useMidnightCountdown";
 
 /**
  * One line: what it counts on the left, the number on the right.
@@ -48,6 +49,7 @@ function Figure({ label, value, last = false }) {
  */
 export default function UsageScreen() {
   const router = useRouter();
+  const resetsIn = useMidnightCountdown();
 
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
@@ -170,7 +172,18 @@ export default function UsageScreen() {
             limit={totalAi.limit}
           />
         ) : null}
-        <UsageMeter label="AI questions today" used={ai.used} limit={ai.limit} />
+        {/* The daily meter is the only one that says when it refills. A
+            student reads this bar to find out whether to wait or to pay, and
+            "3 / 3" alone answers neither. Hours and minutes, because the
+            answer is either "later today" or "go to bed". */}
+        <UsageMeter
+          label="AI questions today"
+          used={ai.used}
+          limit={ai.limit}
+          note={
+            ai.limit === UNLIMITED ? null : `Resets in ${resetsIn}, at midnight`
+          }
+        />
         <UsageMeter
           label={weekly ? "Quizzes this week" : "Quizzes taken"}
           used={quizzes.used}

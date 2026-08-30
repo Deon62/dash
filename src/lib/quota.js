@@ -25,8 +25,8 @@ import {
 
 const ALLOWED = { ok: true };
 
-function denied(reason, detail) {
-  return { ok: false, reason, detail };
+function denied(reason, detail, extra) {
+  return { ok: false, reason, detail, ...extra };
 }
 
 // --- Subscription state ----------------------------------------------------
@@ -184,7 +184,13 @@ export function canAskAi(tier, usage) {
 
   if (rolled.aiQueriesToday < limit) return ALLOWED;
 
-  return denied("ai", `You have used today's ${limit} AI questions.`);
+  // `resetsAtMidnight` rather than a countdown baked into the sentence: the
+  // refusal is read on a sheet that may sit open for a while, and a wait that
+  // was written once is wrong by the time anyone acts on it. The screen ticks
+  // it.
+  return denied("ai", `You have used today's ${limit} AI questions.`, {
+    resetsAtMidnight: true,
+  });
 }
 
 export function canStartQuiz(tier, usage) {

@@ -83,3 +83,31 @@ export function greeting(date = new Date()) {
   if (hour < 17) return "Good afternoon";
   return "Good evening";
 }
+
+/** Milliseconds until the next local midnight, when the daily counters roll. */
+export function msUntilMidnight(now = new Date()) {
+  const next = startOfDay(now);
+  next.setDate(next.getDate() + 1);
+  return next.getTime() - now.getTime();
+}
+
+/**
+ * How long until the daily allowance comes back: "5h 6m", "20m", "1m".
+ *
+ * Hours and minutes only. A seconds digit on a wait this long is a ticking
+ * clock nobody asked for — it makes a student watch the number instead of
+ * closing the app, and it is wrong by the time they read it anyway.
+ *
+ * Rounded up, and never below a minute: the last fifty seconds before the
+ * reset are still a wait, and "0m left" reads as a bug rather than as nearly
+ * there.
+ */
+export function untilMidnightLabel(now = new Date()) {
+  const minutes = Math.max(1, Math.ceil(msUntilMidnight(now) / 60000));
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+
+  if (!hours) return `${rest}m`;
+  if (!rest) return `${hours}h`;
+  return `${hours}h ${rest}m`;
+}

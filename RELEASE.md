@@ -224,6 +224,28 @@ what you want here.
 at the printed URL and read upward from the first red line; the failing module
 is usually named.
 
+**"Something went wrong. Check that Google Play is enabled on your device..."**
+— this dialog is not ours. Nothing in the app or its dependencies draws it:
+there is no Play Billing, no Play Games, no Play Core call anywhere in the
+tree. It comes from **automatic protection** ("Protected with Play"), which the
+Play Console applies to an uploaded bundle unless it is told not to. It adds an
+installer check that runs *at launch*, and shows that dialog when it cannot
+confirm Google Play installed this copy.
+
+At launch is why it looks like a resume bug. Backgrounding the app and coming
+back is a cold start whenever Android has killed the process, so the check runs
+again and the dialog lands on what looks like a reopen.
+
+It fires on a genuinely Play-installed app when the check cannot verify rather
+than when it actively fails: Play Store disabled or mid-update on the handset,
+a device without Play services, or an install that came from somewhere else
+(a `preview` APK sideloaded over the Play copy, or internal app sharing).
+
+To turn it off, per release, in the Play Console: **Test and release → the
+release → App bundle enhancements → the info button beside automatic
+protection → Turn off protection for this release**. It has to be done on every
+upload — the next bundle is protected again.
+
 **App installs but crashes on launch, only in release** — a ProGuard keep rule
 is missing for something added since. Add it to `extraProguardRules` in
 `app.json`. To confirm that is the cause, set

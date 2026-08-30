@@ -12,8 +12,11 @@ import { UNLIMITED } from "@/theme/plans";
  *
  * The track is always full width, so four meters stacked read as four
  * comparable lengths rather than four unrelated readings.
+ *
+ * `note` is a line under the track for whatever the bar cannot say — when a
+ * spent allowance comes back, most of all.
  */
-export default function UsageMeter({ label, used, limit, unit, last = false }) {
+export default function UsageMeter({ label, used, limit, unit, note, last = false }) {
   const unlimited = limit === UNLIMITED || limit === null;
   const ratio = unlimited ? 0 : Math.min(1, limit === 0 ? 1 : used / limit);
 
@@ -52,6 +55,10 @@ export default function UsageMeter({ label, used, limit, unit, last = false }) {
           }}
         />
       </View>
+
+      {note ? (
+        <Text className="font-jk text-muted text-[11.5px] mt-1.5">{note}</Text>
+      ) : null}
     </View>
   );
 }
