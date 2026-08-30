@@ -1,5 +1,7 @@
 import { Modal, Pressable, Text, View } from "react-native";
 
+import Disc from "@/components/Disc";
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -8,6 +10,10 @@ import { impact } from "@/lib/haptics";
  * The system alert can't be styled and looks like a different app on top of
  * this one. Omitting `onCancel` gives a single-button notice rather than a
  * confirmation.
+ *
+ * `Icon` is optional and only earns its place where one dialog has to say two
+ * different things — sent, or not sent. On a dialog that says one thing, the
+ * title already said it and a glyph above it is decoration.
  */
 export default function ConfirmDialog({
   visible,
@@ -16,6 +22,9 @@ export default function ConfirmDialog({
   confirmLabel = "Confirm",
   cancelLabel = "Cancel",
   destructive = false,
+  Icon,
+  /** The glyph alone, never the title: a red heading reads as an accusation. */
+  iconTone = "ink",
   onConfirm,
   onCancel,
   onDismiss,
@@ -47,6 +56,18 @@ export default function ConfirmDialog({
           }}
           className="w-full rounded-3xl bg-canvas p-6"
         >
+          {Icon ? (
+            <View className="mb-4">
+              <Disc size={40}>
+                <Icon
+                  size={18}
+                  color={iconTone === "danger" ? COLORS.danger : COLORS.ink}
+                  strokeWidth={1.8}
+                />
+              </Disc>
+            </View>
+          ) : null}
+
           <Text className="font-jk-semi text-ink text-[18px] leading-[24px]">
             {title}
           </Text>

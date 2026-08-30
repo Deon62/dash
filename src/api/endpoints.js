@@ -116,6 +116,28 @@ export const account = {
 
   /** What is left of today's allowances, counted server-side. */
   usage: (token) => api.get(v1("/me/usage"), { token }),
+
+  /**
+   * One idea from one student. Write-only, on purpose.
+   *
+   * There is no `GET` — the route 405s — because a list of your own requests
+   * has one honest state, a paragraph with no answer beside it, and that reads
+   * as being ignored rather than as being heard. `201` carries the wording for
+   * the confirmation, so the copy can change without a release.
+   *
+   * `app_version` and `platform` are unvalidated and untrusted. They are there
+   * so "the timetable is empty" can be read against the build it came from.
+   */
+  featureRequest: ({ body, appVersion, platform }, token) =>
+    api.post(
+      v1("/me/feature-requests"),
+      {
+        body,
+        ...(appVersion ? { app_version: appVersion } : {}),
+        ...(platform ? { platform } : {}),
+      },
+      { token },
+    ),
 };
 
 // --- Coursework ------------------------------------------------------------

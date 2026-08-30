@@ -6,6 +6,7 @@ import {
   ChartNoAxesColumn,
   IdCard,
   Layers,
+  Lightbulb,
   LogOut,
   Receipt,
   Settings,
@@ -106,6 +107,14 @@ export default function ProfileScreen() {
           label="Billing"
           value={planName(activeTier(subscription))}
           onPress={() => router.push("/billing")}
+        />
+        {/* A row, not a floating button: this is something a student goes
+            looking for once, not a thing that should follow them around the
+            app. Under the account rows, above sign-out. */}
+        <LinkRow
+          Icon={Lightbulb}
+          label="Suggest a feature"
+          onPress={() => router.push("/suggest")}
         />
         <LinkRow
           Icon={LogOut}
