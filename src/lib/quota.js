@@ -18,7 +18,7 @@ import {
  *
  * None of this is enforcement. The server meters the same allowances from the
  * same config and refuses for real; this is the copy that lets a screen say
- * "you have used today's questions" before spending a round trip finding out,
+ * "you have used this month's questions" before spending a round trip finding out,
  * and that keeps working with no connection at all. When the two disagree, the
  * server wins.
  */
@@ -39,9 +39,9 @@ function denied(reason, detail, extra) {
  * keeps working in a reduced way instead of locking a student out of their own
  * notes.
  *
- * It used to fall back to the *trial*, which was two units and fifteen
- * questions a day. That was more generous than the plan a new account gets
- * now, and it would have made lapsing an upgrade.
+ * It used to fall back to the *trial*, which was two units and a fortnight of
+ * questions. That was more generous than the plan a new account gets now, and
+ * it would have made lapsing an upgrade.
  */
 export function activeTier(subscription, now = Date.now()) {
   if (!subscription?.tier) return SubscriptionTier.FREE;
@@ -105,41 +105,40 @@ export function daysRemaining(subscription, now = Date.now()) {
   return Math.max(0, Math.floor(ms / 86400000));
 }
 
-/** Start of the ISO week (Monday), as a day key. Used for weekly quotas. */
-export function weekKey(value = new Date()) {
-  const date = new Date(value);
-  date.setHours(0, 0, 0, 0);
-  // getDay() is Sunday-first; shift so Monday starts the week.
-  const offset = (date.getDay() + 6) % 7;
-  date.setDate(date.getDate() - offset);
-  return dayKey(date);
+/**
+ * The month a counter belongs to, as `YYYY-MM`.
+ *
+ * Local, off `dayKey`, for the same reason the streak is: a student in Nairobi
+ * whose allowance refilled at 3am on the 1st because the server was counting
+ * in UTC has been given a month that does not match their calendar.
+ */
+export function monthKey(value = new Date()) {
+  return dayKey(value).slice(0, 7);
 }
 
 /**
  * Rolls counters that have moved into a new period.
  *
  * Called before every read as well as every write, because a student who
- * leaves the app open overnight must wake up with a fresh daily allowance
- * without having to restart it.
+ * leaves the app open over the turn of the month must wake up with a fresh
+ * allowance without having to restart it.
  */
 export function rollUsage(usage, now = new Date()) {
-  const today = dayKey(now);
-  const week = weekKey(now);
-  const month = today.slice(0, 7);
+  const month = monthKey(now);
+  // Everything meters on the same clock now, so one comparison decides the lot.
+  const current = usage.month === month;
 
   return {
     ...usage,
-    day: today,
-    aiQueriesToday: usage.day === today ? usage.aiQueriesToday : 0,
-    week,
-    quizzesThisWeek: usage.week === week ? usage.quizzesThisWeek : 0,
     month,
-    ocrPagesThisMonth: usage.month === month ? usage.ocrPagesThisMonth : 0,
+    // `?? 0` throughout, because an install that predates a field has no value
+    // for it. Reading `undefined` here would compare as NaN and quietly allow
+    // past the ceiling, which is the one thing these counters exist to stop.
+    aiQueriesThisMonth: current ? usage.aiQueriesThisMonth ?? 0 : 0,
+    quizzesThisMonth: current ? usage.quizzesThisMonth ?? 0 : 0,
+    ocrPagesThisMonth: current ? usage.ocrPagesThisMonth ?? 0 : 0,
     // Lifetime counters never roll — that is what makes them lifetime.
     quizzesEver: usage.quizzesEver ?? 0,
-    // `?? 0` because an install that predates this field has no value for it.
-    // Reading `undefined` here would compare as NaN and quietly allow past the
-    // ceiling, which is the one thing this counter exists to stop.
     aiQueriesEver: usage.aiQueriesEver ?? 0,
   };
 }
@@ -159,12 +158,13 @@ export function canAddUnit(tier, unitCount) {
 /**
  * Two ceilings, and they mean different things to whoever hits them.
  *
- * The daily one is a rate: come back tomorrow. The lifetime one is the end of
- * the free plan, and the message has to say so — sending someone away to wait
- * for a reset that is never coming is worse than telling them it is over.
+ * The monthly one is a rate: it comes back on the 1st. The lifetime one is the
+ * end of the free plan, and the message has to say so — sending someone away
+ * to wait for a refill that is never coming is worse than telling them it is
+ * over.
  *
  * The lifetime one is checked first for that reason. Once it is spent, "you
- * have used today's five" is technically true and completely misleading.
+ * have used this month's thirty" is technically true and completely misleading.
  */
 export function canAskAi(tier, usage) {
   const limits = limitsFor(tier);
@@ -179,17 +179,16 @@ export function canAskAi(tier, usage) {
     );
   }
 
-  const limit = limits.dailyAiQueries;
+  const limit = limits.monthlyAiQueries;
   if (limit === UNLIMITED) return ALLOWED;
 
-  if (rolled.aiQueriesToday < limit) return ALLOWED;
+  if (rolled.aiQueriesThisMonth < limit) return ALLOWED;
 
-  // `resetsAtMidnight` rather than a countdown baked into the sentence: the
-  // refusal is read on a sheet that may sit open for a while, and a wait that
-  // was written once is wrong by the time anyone acts on it. The screen ticks
-  // it.
-  return denied("ai", `You have used today's ${limit} AI questions.`, {
-    resetsAtMidnight: true,
+  // `refills` rather than a countdown baked into the sentence: the refusal is
+  // read on a sheet that may sit open for a while, and a wait that was written
+  // once is wrong by the time anyone acts on it. The screen ticks it.
+  return denied("ai", `You have used this month's ${limit} AI questions.`, {
+    refills: true,
   });
 }
 
@@ -198,14 +197,15 @@ export function canStartQuiz(tier, usage) {
   if (count === UNLIMITED || interval === "unlimited") return ALLOWED;
 
   const rolled = rollUsage(usage);
-  const used = interval === "weekly" ? rolled.quizzesThisWeek : rolled.quizzesEver;
+  const used = interval === "monthly" ? rolled.quizzesThisMonth : rolled.quizzesEver;
   if (used < count) return ALLOWED;
 
   return denied(
     "quiz",
-    interval === "weekly"
-      ? `You have used this week's ${count} quizzes.`
-      : `${planName(tier)} includes ${count} quizzes in total.`
+    interval === "monthly"
+      ? `You have used this month's ${count} quizzes.`
+      : `${planName(tier)} includes ${count} quizzes in total.`,
+    interval === "monthly" ? { refills: true } : undefined,
   );
 }
 
@@ -244,7 +244,11 @@ export function canUseOcr(tier, usage) {
   const used = rollUsage(usage).ocrPagesThisMonth;
   if (used < monthlyOcrPageLimit) return ALLOWED;
 
-  return denied("ocr", `You have scanned this month's ${monthlyOcrPageLimit} pages.`);
+  return denied(
+    "ocr",
+    `You have scanned this month's ${monthlyOcrPageLimit} pages.`,
+    { refills: true },
+  );
 }
 
 /** Timetable alerts are off on free, which only supports manual entry. */

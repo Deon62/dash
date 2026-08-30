@@ -267,16 +267,29 @@ export async function loadUsage() {
   const { data, error } = await authed((token) => accountApi.usage(token));
   if (error) return { error };
 
-  const meter = (row) => ({
-    used: row?.used ?? 0,
-    limit: row?.limit ?? 0,
-    unlimited: Boolean(row?.unlimited),
-  });
+  // `resetsAt` is the server's date for when this meter refills, in the
+  // student's own timezone. Carried per meter rather than once for the screen:
+  // they all land on the 1st today, and a single shared date is the sort of
+  // assumption that quietly becomes wrong.
+  const meter = (row) =>
+    row
+      ? {
+          used: row.used ?? 0,
+          limit: row.limit ?? 0,
+          unlimited: Boolean(row.unlimited),
+          resetsAt: row.resets_at ?? null,
+        }
+      // Null, not a zeroed meter. A server that has not shipped the monthly
+      // rename yet sends nothing under this name, and `{ used: 0, limit: 0 }`
+      // would draw a full red bar reading "0 / 0" over an allowance the
+      // student has barely touched. Null lets the screen fall back to the
+      // device's own count, which is what it is for.
+      : null;
 
   useStudyStore.getState().applyServerUsage({
     tier: data.tier,
     planName: data.plan_name,
-    aiQueriesToday: meter(data.ai_queries_today),
+    aiQueriesThisMonth: meter(data.ai_queries_this_month),
     // Only the free plan sets one. It arrives as unlimited on every paid tier,
     // and `UsageMeter` is not drawn for it there.
     aiQueriesTotal: meter(data.ai_queries_total),

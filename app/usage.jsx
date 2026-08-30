@@ -13,7 +13,7 @@ import { UNLIMITED, limitsFor, planName, unitCap } from "@/theme/plans";
 import { activeTier, daysRemaining, rollUsage } from "@/lib/quota";
 import { COLORS } from "@/theme/colors";
 import { pullSync } from "@/lib/sync";
-import { useMidnightCountdown } from "@/lib/useMidnightCountdown";
+import { useRefillCountdown } from "@/lib/useRefillCountdown";
 
 /**
  * One line: what it counts on the left, the number on the right.
@@ -49,7 +49,6 @@ function Figure({ label, value, last = false }) {
  */
 export default function UsageScreen() {
   const router = useRouter();
-  const resetsIn = useMidnightCountdown();
 
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
@@ -98,27 +97,45 @@ export default function UsageScreen() {
   );
 
   const quiz = limits.quizzesPerInterval;
-  const weekly = (serverUsage?.quizInterval ?? quiz.interval) === "weekly";
+  const monthly = (serverUsage?.quizInterval ?? quiz.interval) === "monthly";
 
-  /** A meter the server sent, or the device's own count of the same thing. */
+  /**
+   * A meter the server sent, or the device's own count of the same thing.
+   *
+   * `resetsAt` only ever comes from the server. With no date the countdown
+   * falls back to the 1st of next month, which is the same answer — until a
+   * plan's own clock disagrees with the calendar's, and then the server's is
+   * the one that decides.
+   */
   const meter = (name, used, limit) => {
     const remote = serverUsage?.[name];
-    if (!remote) return { used, limit };
-    return { used: remote.used, limit: remote.unlimited ? UNLIMITED : remote.limit };
+    if (!remote) return { used, limit, resetsAt: null };
+    return {
+      used: remote.used,
+      limit: remote.unlimited ? UNLIMITED : remote.limit,
+      resetsAt: remote.resetsAt ?? null,
+    };
   };
 
-  const ai = meter("aiQueriesToday", usage.aiQueriesToday, limits.dailyAiQueries);
+  const ai = meter(
+    "aiQueriesThisMonth",
+    usage.aiQueriesThisMonth,
+    limits.monthlyAiQueries,
+  );
   const quizzes = meter(
     "quizzes",
-    weekly ? usage.quizzesThisWeek : usage.quizzesEver,
+    monthly ? usage.quizzesThisMonth : usage.quizzesEver,
     quiz.count,
   );
   const courseUnits = meter("courseUnits", units.length, unitCap(tier));
 
-  // Free is the only plan with a ceiling that does not reset, and it is the
+  // Ticking, so a screen left open does not sit on "1 day" into the new month.
+  const refillsIn = useRefillCountdown(ai.resetsAt);
+
+  // Free is the only plan with a ceiling that does not refill, and it is the
   // number that decides when the app stops answering — so it is drawn, and
-  // drawn above the daily one, which is the less important of the two once it
-  // starts running out.
+  // drawn above the monthly one, which is the less important of the two once
+  // it starts running out.
   const totalAi = meter(
     "aiQueriesTotal",
     // The device's own counter, not the number of questions in the chat list:
@@ -172,20 +189,19 @@ export default function UsageScreen() {
             limit={totalAi.limit}
           />
         ) : null}
-        {/* The daily meter is the only one that says when it refills. A
+        {/* The monthly meter is the only one that says when it refills. A
             student reads this bar to find out whether to wait or to pay, and
-            "3 / 3" alone answers neither. Hours and minutes, because the
-            answer is either "later today" or "go to bed". */}
+            "380 / 400" alone answers neither. Days until the 1st, down to
+            hours and minutes on the last day, because by then the answer has
+            turned into "tonight". */}
         <UsageMeter
-          label="AI questions today"
+          label="AI questions this month"
           used={ai.used}
           limit={ai.limit}
-          note={
-            ai.limit === UNLIMITED ? null : `Resets in ${resetsIn}, at midnight`
-          }
+          note={ai.limit === UNLIMITED ? null : `Refills in ${refillsIn}`}
         />
         <UsageMeter
-          label={weekly ? "Quizzes this week" : "Quizzes taken"}
+          label={monthly ? "Quizzes this month" : "Quizzes taken"}
           used={quizzes.used}
           limit={quizzes.limit}
         />

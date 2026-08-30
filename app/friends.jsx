@@ -26,7 +26,10 @@ import { confirmCheckout, startCheckout } from "@/lib/checkout";
 import { createGroup, loadGroup, removeMember } from "@/lib/billing";
 import {
   SubscriptionTier,
+  cardFor,
+  isSeason,
   planFor,
+  pricePerMonth,
   pricePerSeat,
   seatsFor,
 } from "@/theme/plans";
@@ -42,7 +45,7 @@ const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 /**
  * The rules of the plan, numbered.
  *
- * Money shared between five students raises questions the price does not
+ * Money shared between six students raises questions the price does not
  * answer — who pays, what happens to my notes, what if they stop. Left
  * unanswered they get asked in the group chat and answered wrongly, so they
  * are answered here, in the fewest words that are still true.
@@ -71,7 +74,7 @@ function HowItWorks({ items }) {
 }
 
 /**
- * The Friends plan: one payment, five seats.
+ * The Friends plan: one payment, six seats.
  *
  * What this screen shows depends on how the student got here, and there are
  * three ways:
@@ -101,13 +104,31 @@ export default function FriendsScreen() {
   const [inviting, setInviting] = useState(false);
   const [email, setEmail] = useState("");
 
-  const plan = planFor(FRIENDS);
-  const seats = seatsFor(FRIENDS);
-  const perSeat = pricePerSeat(FRIENDS);
+  /**
+   * The Friends tier this student is actually on, or the monthly one.
+   *
+   * Friends is sold in two lengths and they are separate tiers, so every
+   * number on this screen — the price, what each person paid, what it says in
+   * the share message — has to come from the one they hold. Falling back to
+   * monthly is right for the third state below, where nothing has been bought
+   * yet and the plans screen is where a Season is chosen.
+   */
+  const held = cardFor(activeTier(subscription))?.family === "friends"
+    ? activeTier(subscription)
+    : FRIENDS;
+
+  const plan = planFor(held);
+  const seats = seatsFor(held);
+  const perSeat = pricePerSeat(held);
+  // Per person per month, which is the figure that means anything next to
+  // Synapse's own monthly price.
+  const perSeatMonthly = Math.round(pricePerMonth(held) / Math.max(1, seats));
   const solo = planFor(SubscriptionTier.PRO);
 
   const members = group?.members ?? [];
-  const onPlan = activeTier(subscription) === FRIENDS && Boolean(group?.inviteCode);
+  const onPlan =
+    cardFor(activeTier(subscription))?.family === "friends" &&
+    Boolean(group?.inviteCode);
   const owns = onPlan && (members.find((member) => member.isMe)?.isOwner ?? true);
 
   // The server counts the taken seats; the member list is only what it sent.
@@ -270,7 +291,7 @@ export default function FriendsScreen() {
     impact("medium");
     await Share.share({
       message:
-        `Join my ALS plan. We each pay KES ${perSeat} a month instead of ` +
+        `Join my ALS plan. We each pay KES ${perSeatMonthly} a month instead of ` +
         `${solo.priceKsh}. Open ALS, go to Plans, tap Join with a code and ` +
         `enter ${invite}.`,
     });
@@ -467,7 +488,9 @@ export default function FriendsScreen() {
           items={
             owns
               ? [
-                  `You pay KES ${plan.priceKsh} a month. The other ${seats - 1} pay nothing.`,
+                  isSeason(held)
+                    ? `You pay KES ${plan.priceKsh} for four months. The other ${seats - 1} pay nothing.`
+                    : `You pay KES ${plan.priceKsh} a month. The other ${seats - 1} pay nothing.`,
                   `Anyone who enters your code gets everything in ${solo.name}, for as long as the plan runs.`,
                   "Invite by email or send the code. Either way it is the same code, and it works until the seats run out.",
                   "Remove someone and their seat frees up straight away for the next person.",

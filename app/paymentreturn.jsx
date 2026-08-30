@@ -3,7 +3,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 
 import { PageLoader } from "@/components/Loader";
 import { confirmCheckout, pendingCheckout } from "@/lib/checkout";
-import { SubscriptionTier } from "@/theme/plans";
+import { cardFor } from "@/theme/plans";
 
 /**
  * Where Kora's redirect lands.
@@ -67,12 +67,12 @@ export default function PaymentReturn() {
        * when it cannot settle, so the button there still has something to
        * check.
        *
-       * Friends is the exception worth routing for: it buys four other seats,
+       * Friends is the exception worth routing for: it buys five other seats,
        * and a code nobody has been handed is the same as not having bought
-       * them.
+       * them. Either length of it — the family is what decides, never the id.
        */
       router.replace(
-        payment?.tier === SubscriptionTier.FRIENDS ? "/friends" : "/billing",
+        cardFor(payment?.tier)?.family === "friends" ? "/friends" : "/billing",
       );
     })();
 

@@ -84,21 +84,19 @@ const EMPTY_SETTINGS = {
 /**
  * Counters the plan limits are measured against.
  *
- * Each carries the period it belongs to, so a stale counter can be recognised
- * and reset rather than silently spending yesterday's allowance. `quizzesEver`
- * and `aiQueriesEver` have no period on purpose — the free plan's ceilings on
- * both are lifetime ones, and a counter that rolled over would be no ceiling
- * at all.
+ * One period, `month`, for all three metered counters: everything refills on
+ * the 1st, so a single stale month is what marks the lot for reset rather than
+ * silently spending last month's allowance. `quizzesEver` and `aiQueriesEver`
+ * have no period on purpose — the free plan's ceilings on both are lifetime
+ * ones, and a counter that rolled over would be no ceiling at all.
  */
 const EMPTY_USAGE = {
-  day: dayKey(),
-  aiQueriesToday: 0,
+  month: dayKey().slice(0, 7),
+  aiQueriesThisMonth: 0,
+  quizzesThisMonth: 0,
+  ocrPagesThisMonth: 0,
   /** No period. The free plan's ceiling is a lifetime one. */
   aiQueriesEver: 0,
-  week: null,
-  quizzesThisWeek: 0,
-  month: dayKey().slice(0, 7),
-  ocrPagesThisMonth: 0,
   quizzesEver: 0,
 };
 
@@ -442,9 +440,9 @@ export const useStudyStore = create(
           return {
             usage: {
               ...usage,
-              aiQueriesToday: usage.aiQueriesToday + 1,
-              // Both, always. The daily counter alone would let the free
-              // plan's lifetime ceiling be walked past a day at a time.
+              aiQueriesThisMonth: usage.aiQueriesThisMonth + 1,
+              // Both, always. The monthly counter alone would let the free
+              // plan's lifetime ceiling be walked past a month at a time.
               aiQueriesEver: (usage.aiQueriesEver ?? 0) + 1,
             },
           };
@@ -456,7 +454,7 @@ export const useStudyStore = create(
           return {
             usage: {
               ...usage,
-              quizzesThisWeek: usage.quizzesThisWeek + 1,
+              quizzesThisMonth: usage.quizzesThisMonth + 1,
               quizzesEver: usage.quizzesEver + 1,
             },
           };
@@ -799,7 +797,7 @@ export const useStudyStore = create(
     {
       name: STORE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
-      version: 4,
+      version: 5,
       /**
        * Renames and reshapes carried forward, so nobody loses a timetable to
        * vocabulary or a semester of notes to a schema change.
@@ -816,6 +814,9 @@ export const useStudyStore = create(
        * history up on the first sync, and the session is cleared so the
        * student signs in for real once. Signing in is the only way to get a
        * token, and without one there is nothing to push to.
+       *
+       * v5 is the move from daily to monthly allowances. The old day and week
+       * counters are dropped rather than converted — see the block itself.
        */
       migrate: (persisted, version) => {
         if (!persisted) return persisted;
@@ -888,6 +889,37 @@ export const useStudyStore = create(
             materials: soil(state.materials),
             events: soil(state.events),
             chats: soil(state.chats),
+          };
+        }
+
+        if (version < 5) {
+          // Allowances became monthly. The counters filed under a day and an
+          // ISO week are simply never read again — at this version every
+          // student starts a fresh month, which is a one-off giveaway of at
+          // most one month's allowance and cheaper than any migration clever
+          // enough to avoid it. The two lifetime counters are carried across
+          // untouched: the free plan's ceilings are the numbers that actually
+          // bound what a free account can cost.
+          const { day, week, aiQueriesToday, quizzesThisWeek, ...usage } =
+            state.usage ?? {};
+
+          state = {
+            ...state,
+            usage: {
+              ...EMPTY_USAGE,
+              ...usage,
+              month: dayKey().slice(0, 7),
+              aiQueriesThisMonth: 0,
+              quizzesThisMonth: 0,
+              ocrPagesThisMonth: 0,
+              aiQueriesEver: usage.aiQueriesEver ?? 0,
+              quizzesEver: usage.quizzesEver ?? 0,
+            },
+            // The meters on the Usage screen are the server's, and its copy
+            // still has the old field names until the deploy lands. Dropping
+            // it means the screen draws from the device for one refresh
+            // instead of showing a bar with no number behind it.
+            serverUsage: null,
           };
         }
 

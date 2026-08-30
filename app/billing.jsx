@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { useRouter } from "expo-router";
 import { Check, Minus } from "lucide-react-native";
@@ -6,15 +6,23 @@ import { Check, Minus } from "lucide-react-native";
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import Button from "@/components/Button";
+import Segmented from "@/components/Segmented";
 import Sheet from "@/components/Sheet";
 import Notice, { toneForError } from "@/components/Notice";
 import { useStudyStore } from "@/store/useStudyStore";
 import {
+  BillingPeriod,
   PLAN_CARDS,
   SubscriptionTier,
+  cardFor,
+  isSeason,
+  monthsFor,
   planFeatures,
   planFor,
+  planName,
+  pricePerMonth,
   pricePerSeat,
+  savingPercent,
   seatsFor,
 } from "@/theme/plans";
 import { activeTier, daysRemaining, hasEverPaid, isExpired } from "@/lib/quota";
@@ -27,14 +35,17 @@ import { pullSync } from "@/lib/sync";
 /**
  * Pricing.
  *
- * Three cards, because three things are for sale. Free is not one of them, so
- * it is not a fourth column with a KES 0 button on it — it is the panel above,
+ * Three cards, because three things are for sale — each in two lengths, which
+ * is a toggle above them rather than six cards. Free is not one of them, so it
+ * is not a fourth column with a KES 0 button on it — it is the panel above,
  * stating what the student already has. A card you cannot buy sitting in a row
  * of cards you can is a thing people try to press.
  *
- * It replaced a fourteen-day trial, which used to be a line on every card.
- * That line is gone: there is no fortnight to advertise, and copy promising
- * one would be the worst kind of stale.
+ * The toggle opens on **Monthly**. The lower number is the honest default; a
+ * screen that opens on the bigger figure reads as a trick, however much better
+ * value it is. Switching swaps the price on every card in place — both sets
+ * arrive in the same `GET /billing/plans`, so there is nothing to fetch and
+ * nowhere to navigate.
  *
  * Every line on a card is generated from `PLAN_CONFIGS`, so a limit cannot be
  * changed in the config and left advertised wrongly here. The *prices* come
@@ -48,6 +59,10 @@ export default function BillingScreen() {
   const subscription = useStudyStore((state) => state.subscription);
   const group = useStudyStore((state) => state.group);
 
+  /** Which length is on show. Screen state — deliberately not persisted. */
+  const [period, setPeriod] = useState(BillingPeriod.MONTHLY);
+
+  /** The tier a payment is being confirmed for, or null. */
   const [confirming, setConfirming] = useState(null);
   /** The reference the server gave us, so the sheet can verify rather than ask. */
   const [reference, setReference] = useState(null);
@@ -71,6 +86,24 @@ export default function BillingScreen() {
   // are now a great many of those.
   const lapsed = expired && hasEverPaid(subscription);
   const onFree = tier === SubscriptionTier.FREE;
+
+  /**
+   * The badge on the Season side: the best saving of the three, floored.
+   *
+   * The best rather than a per-plan figure, because it is a reason to tap and
+   * not a spec — the exact number for the plan they choose is on the card
+   * itself. The server's `saving_percent` wins wherever the prices have
+   * arrived, so the badge cannot drift from what is actually charged.
+   */
+  const bestSaving = useMemo(
+    () =>
+      PLAN_CARDS.reduce((best, card) => {
+        const season = card.tiers[BillingPeriod.SEASON];
+        const fromServer = prices[season]?.savingPercent;
+        return Math.max(best, fromServer || savingPercent(card.family));
+      }, 0),
+    [prices],
+  );
 
   // A payment that was still clearing usually lands while this screen is open,
   // through the webhook rather than through anything the student did. When it
@@ -99,15 +132,16 @@ export default function BillingScreen() {
      * and it does, on the phones this is written for. The reference outlives
      * that — `src/lib/checkout.js` keeps it on disk — so the way back is to
      * offer the check rather than to pretend the payment never happened.
-     * `PLAN_CARDS` is looked up because the sheet is written around a card.
      */
     pendingCheckout().then((payment) => {
       if (cancelled || !payment) return;
-      const card = PLAN_CARDS.find((entry) => entry.tier === payment.tier);
-      if (!card) return;
+      if (!cardFor(payment.tier)) return;
 
       setReference(payment.reference);
-      setConfirming(card);
+      setConfirming(payment.tier);
+      // Opening on the length they were buying, so the card being confirmed is
+      // the card on screen behind the sheet.
+      if (isSeason(payment.tier)) setPeriod(BillingPeriod.SEASON);
     });
 
     return () => {
@@ -132,14 +166,15 @@ export default function BillingScreen() {
   const paysForGroup =
     (group?.members ?? []).find((member) => member.isMe)?.isOwner ?? true;
 
-  const checkout = async (card) => {
+  const checkout = async (buying) => {
     impact("medium");
     setBusy(true);
     setNotice(null);
 
     // The link is minted by the server for this student and this plan — see
-    // `src/lib/checkout.js`. There is no hardcoded payment page any more.
-    const { reference: opened, returned, error } = await startCheckout(card.tier);
+    // `src/lib/checkout.js`. There is no hardcoded payment page any more, and
+    // the toggle decides nothing except which tier id goes with the request.
+    const { reference: opened, returned, error } = await startCheckout(buying);
     setBusy(false);
 
     if (error) {
@@ -147,7 +182,7 @@ export default function BillingScreen() {
         tone: toneForError(error),
         title: "We couldn't open the payment page",
         message: `${error} Nothing has been charged.`,
-        retry: () => checkout(card),
+        retry: () => checkout(buying),
       });
       return;
     }
@@ -159,13 +194,13 @@ export default function BillingScreen() {
     // checks rather than asking them. The reference goes in by argument
     // because the state set above has not settled yet.
     if (returned) {
-      unlock(card, opened);
+      unlock(buying, opened);
       return;
     }
 
     // They closed the tab themselves, which says nothing either way — so this
     // asks before spending a verification on it.
-    setConfirming(card);
+    setConfirming(buying);
   };
 
   /**
@@ -176,7 +211,7 @@ export default function BillingScreen() {
    * outcome, not a failure: mobile money takes a minute and the webhook will
    * credit the plan when it lands.
    */
-  const unlock = async (card = confirming, ref = reference) => {
+  const unlock = async (bought = confirming, ref = reference) => {
     setBusy(true);
     const { error, pending } = await confirmCheckout(ref);
     setBusy(false);
@@ -193,13 +228,13 @@ export default function BillingScreen() {
               title: "Your payment is still clearing",
               message:
                 "Mobile money can take a minute or two to confirm. Nothing has gone wrong. Check again shortly and your plan unlocks as soon as it lands.",
-              retry: () => unlock(card, ref),
+              retry: () => unlock(bought, ref),
             }
           : {
               tone: toneForError(error),
               title: "We couldn't confirm that payment",
               message: `${error} If you were charged, the payment is safe and your plan will unlock on its own once it reaches us.`,
-              retry: () => unlock(card, ref),
+              retry: () => unlock(bought, ref),
             }
       );
       return;
@@ -210,10 +245,10 @@ export default function BillingScreen() {
     setConfirming(null);
     setReference(null);
 
-    // Paying for Friends buys four other seats, and a code nobody has been
+    // Paying for Friends buys five other seats, and a code nobody has been
     // handed yet is the same as not having bought them — so the payer lands
     // straight on the screen that gives it out.
-    if (card.tier === SubscriptionTier.FRIENDS) router.push("/friends");
+    if (cardFor(bought)?.family === "friends") router.push("/friends");
   };
 
   return (
@@ -272,8 +307,18 @@ export default function BillingScreen() {
             <View className="gap-y-2.5 mt-5">
               {planFeatures(SubscriptionTier.FREE).map((feature) => (
                 <View key={feature.text} className="flex-row items-start">
-                  <Check size={14} color={COLORS.primary} strokeWidth={2.4} />
-                  <Text className="font-jk text-ink text-[13px] leading-[19px] flex-1 ml-2.5">
+                  {feature.available ? (
+                    <Check size={14} color={COLORS.primary} strokeWidth={2.4} />
+                  ) : (
+                    <Minus size={14} color={COLORS.line} strokeWidth={2.4} />
+                  )}
+                  <Text
+                    className={`text-[13px] leading-[19px] flex-1 ml-2.5 ${
+                      feature.available
+                        ? "font-jk text-ink"
+                        : "font-jk text-muted line-through"
+                    }`}
+                  >
                     {feature.text}
                   </Text>
                 </View>
@@ -282,15 +327,57 @@ export default function BillingScreen() {
           </View>
         ) : null}
 
+        {/* Above the cards, because it changes all three of them. One control
+            for the whole screen rather than a length picker on each card:
+            three separate choices to make is three chances to buy the wrong
+            one, and nobody wants Focus monthly and Synapse by the season. */}
+        <View className="gap-y-2.5">
+          <Segmented
+            value={period}
+            onChange={setPeriod}
+            options={[
+              { value: BillingPeriod.MONTHLY, label: "Monthly" },
+              {
+                value: BillingPeriod.SEASON,
+                label: "Season",
+                badge: bestSaving ? `Save ${bestSaving}%` : undefined,
+              },
+            ]}
+          />
+
+          {/* Said once, above the cards, rather than repeated on each: a
+              Season is the same allowance four times over, and a student
+              expecting four times the questions in one lump will feel cheated
+              at week three. */}
+          <Text className="font-jk text-muted text-[11.5px] leading-[17px] px-1">
+            {period === BillingPeriod.SEASON
+              ? "Four months, one payment. The same allowance each month — a Season buys time, not a bigger allowance."
+              : "One month at a time. Everything refills on the 1st."}
+          </Text>
+        </View>
+
         {PLAN_CARDS.map((card) => {
+          const cardTier = card.tiers[period];
           // The server's price where it has arrived, the shipped one until
           // then, so a card is never blank while a request is in flight.
-          const plan = { ...planFor(card.tier), ...(prices[card.tier] ?? {}) };
-          const current = card.tier === tier && !expired;
+          const plan = { ...planFor(cardTier), ...(prices[cardTier] ?? {}) };
+
+          // The plan they hold, in the length they hold it. Focus monthly does
+          // not make the Focus Season card unbuyable — it is the next thing
+          // that student might sensibly do.
+          const current = cardTier === tier && !expired;
+          // Held in the other length: worth saying so, or the card looks like
+          // one they have not bought when they nearly have.
+          const heldOtherLength =
+            !current && !expired && cardFor(tier)?.family === card.family;
+
+          const season = period === BillingPeriod.SEASON;
+          const perMonth = plan.pricePerMonthKsh ?? pricePerMonth(cardTier);
+          const seats = plan.seats ?? seatsFor(cardTier);
 
           return (
             <View
-              key={card.tier}
+              key={card.family}
               style={{
                 borderColor: current ? COLORS.primary : COLORS.line,
                 backgroundColor:
@@ -324,29 +411,53 @@ export default function BillingScreen() {
                       </Text>
                     ) : null}
                   </View>
+                ) : heldOtherLength ? (
+                  <View className="items-end mt-1">
+                    <Text className="font-jk text-muted text-[11px]">
+                      On {planName(tier)}
+                    </Text>
+                  </View>
                 ) : null}
               </View>
 
+              {/* The total, big, because the total is what M-Pesa will ask for
+                  — and a surprise at the STK prompt is a failed payment. What
+                  it works out at per month goes underneath, smaller, where it
+                  can be checked rather than sold. */}
               <View className="flex-row items-baseline mt-4">
                 <Text className="font-jk-bold text-ink text-[28px]">
                   KES {plan.priceKsh}
                 </Text>
                 <Text className="font-jk text-muted text-[13px] ml-1.5">
-                  / {plan.durationDays} days
+                  {season ? `/ ${monthsFor(cardTier)} months` : `/ ${plan.durationDays} days`}
                 </Text>
               </View>
 
+              {season ? (
+                <Text className="font-jk text-muted text-[12.5px] mt-1">
+                  KES {perMonth}/month · {monthsFor(cardTier)} months
+                  {plan.savingPercent || savingPercent(card.family)
+                    ? ` · save ${plan.savingPercent || savingPercent(card.family)}%`
+                    : ""}
+                </Text>
+              ) : null}
+
               {/* What it costs each person is the whole point of the group
-                  plan, and it is not something to make anyone divide. */}
+                  plan, and it is not something to make anyone divide. Per
+                  month on a Season, so the two lengths can be compared at all
+                  — KES 700 each against KES 208 each is not a comparison. */}
               {card.perSeatNote ? (
                 <Text className="font-jk text-muted text-[12.5px] mt-1">
-                  KES {plan.pricePerSeatKsh ?? pricePerSeat(card.tier)} each, for{" "}
-                  {plan.seats ?? seatsFor(card.tier)} of you
+                  KES{" "}
+                  {season
+                    ? `${Math.round(perMonth / Math.max(1, seats))} each a month`
+                    : `${plan.pricePerSeatKsh ?? pricePerSeat(cardTier)} each`}
+                  , for {seats} of you
                 </Text>
               ) : null}
 
               <View className="gap-y-2.5 mt-5">
-                {planFeatures(card.tier).map((feature) => (
+                {planFeatures(cardTier).map((feature) => (
                   <View key={feature.text} className="flex-row items-start">
                     {/* A limit you do not get is listed and struck through
                         rather than hidden — the difference between the plans
@@ -375,7 +486,7 @@ export default function BillingScreen() {
                     screen and this card is the only route to it. Every other
                     plan has nothing behind it, so its button just states the
                     fact and stops being pressable. */}
-                {current && card.tier === SubscriptionTier.FRIENDS ? (
+                {current && card.family === "friends" ? (
                   <Button
                     label={paysForGroup ? "See code" : "See the plan"}
                     onPress={() => {
@@ -385,9 +496,15 @@ export default function BillingScreen() {
                   />
                 ) : (
                   <Button
-                    label={current ? "Your current plan" : `Get ${card.name}`}
+                    label={
+                      current
+                        ? "Your current plan"
+                        : season
+                          ? `Get ${card.name} for 4 months`
+                          : `Get ${card.name}`
+                    }
                     disabled={current}
-                    onPress={() => checkout(card)}
+                    onPress={() => checkout(cardTier)}
                   />
                 )}
 
@@ -395,7 +512,7 @@ export default function BillingScreen() {
                     is where someone holding a code will look for it. Grey
                     rather than blue: it is a real choice, but not the one
                     being sold. */}
-                {card.tier === SubscriptionTier.FRIENDS && !current ? (
+                {card.family === "friends" && !current ? (
                   <Button
                     label="Join with a code"
                     variant="soft"
@@ -415,6 +532,7 @@ export default function BillingScreen() {
             ? "Your plan has ended. You are on the free plan until you renew. "
             + "Nothing you filed has gone anywhere. "
             : ""}
+          Questions, quizzes and scans all refill on the 1st of the month.
           Payment is handled by Kora, which accepts M-Pesa, Airtel Money and
           cards. Your plan activates once the payment clears.
         </Text>
@@ -428,13 +546,13 @@ export default function BillingScreen() {
         title="Did the payment go through?"
         subtitle={
           confirming
-            ? `If Kora charged you for ${confirming.name}, tap below and we will check it against our records.`
+            ? `If Kora charged you for ${planName(confirming)}, tap below and we will check it against our records.`
             : undefined
         }
       >
         <View className="gap-y-3">
           <Button
-            label={confirming ? `Check my ${confirming.name} payment` : "Check"}
+            label={confirming ? `Check my ${planName(confirming)} payment` : "Check"}
             busyLabel="Checking…"
             busy={busy}
             onPress={() => unlock()}

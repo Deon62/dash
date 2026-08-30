@@ -51,6 +51,22 @@ export async function loadPlans() {
       pricePerSeatKsh: plan.price_per_seat_ksh,
       durationDays: plan.duration_days,
       seats: plan.seats,
+      /**
+       * `focus` | `synapse` | `friends`, and `monthly` | `season`.
+       *
+       * The pair is what matches a plan to a card and to a side of the toggle.
+       * Never parsed out of the id: the server sends both for exactly this
+       * reason, and an id is a key, not a description.
+       */
+      family: plan.family ?? null,
+      billingPeriod: plan.billing_period ?? null,
+      /**
+       * Both derived server-side, so the figure under a Season price and the
+       * badge on the toggle cannot drift from the amount actually charged.
+       * `saving_percent` is 0 on a monthly plan.
+       */
+      pricePerMonthKsh: plan.price_per_month_ksh ?? null,
+      savingPercent: plan.saving_percent ?? 0,
     })),
     error: null,
   };

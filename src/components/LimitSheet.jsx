@@ -4,7 +4,7 @@ import { useRouter } from "expo-router";
 import Sheet from "@/components/Sheet";
 import Button from "@/components/Button";
 import { impact } from "@/lib/haptics";
-import { useMidnightCountdown } from "@/lib/useMidnightCountdown";
+import { useRefillCountdown } from "@/lib/useRefillCountdown";
 
 /**
  * What a student sees when a plan limit stops them.
@@ -19,7 +19,7 @@ import { useMidnightCountdown } from "@/lib/useMidnightCountdown";
  */
 export default function LimitSheet({ verdict, onClose }) {
   const router = useRouter();
-  const resetsIn = useMidnightCountdown();
+  const refillsIn = useRefillCountdown();
 
   return (
     <Sheet
@@ -30,11 +30,11 @@ export default function LimitSheet({ verdict, onClose }) {
     >
       <View className="gap-y-3">
         {/* Only for the limits that actually come back. A lifetime ceiling
-            offers no "tomorrow", and saying otherwise sends someone away to
+            offers no "next month", and saying otherwise sends someone away to
             wait for something that is never going to happen. */}
-        {verdict?.resetsAtMidnight ? (
+        {verdict?.refills ? (
           <Text className="font-jk text-muted text-[13px] -mt-1">
-            More questions in {resetsIn}.
+            Everything refills on the 1st — in {refillsIn}.
           </Text>
         ) : null}
 

@@ -1077,7 +1077,7 @@ function QuizPane({ unit, tier, usage, onStart, onBlocked }) {
   };
 
   // Nothing is fetched on mount: a quiz costs a request and counts against a
-  // weekly allowance, so it starts when the student asks for one.
+  // monthly allowance, so it starts when the student asks for one.
   if (questions.length === 0) {
     // A failed first attempt gets the card rather than being folded into the
     // empty state's own copy. "Ready when you are" sitting above the reason it

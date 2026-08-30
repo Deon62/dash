@@ -114,7 +114,7 @@ export const account = {
     api.get(v1(`/me/streak?today=${encodeURIComponent(day)}`), { token }),
   recordStudyDay: (day, token) => api.post(v1("/me/streak"), { day }, { token }),
 
-  /** What is left of today's allowances, counted server-side. */
+  /** What is left of this month's allowances, counted server-side. */
   usage: (token) => api.get(v1("/me/usage"), { token }),
 
   /**
@@ -232,7 +232,7 @@ export const billing = {
   verifyPayment: (reference, token) =>
     api.post(v1("/billing/verify"), { reference }, { token }),
 
-  // --- Friends: one payment, five seats -----------------------------------
+  // --- Friends: one payment, six seats ------------------------------------
 
   /** Creates the group the payer owns. Only valid on a Friends plan. */
   createGroup: (token) => api.post(v1("/billing/group"), {}, { token }),

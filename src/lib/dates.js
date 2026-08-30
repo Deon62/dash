@@ -84,26 +84,69 @@ export function greeting(date = new Date()) {
   return "Good evening";
 }
 
-/** Milliseconds until the next local midnight, when the daily counters roll. */
-export function msUntilMidnight(now = new Date()) {
-  const next = startOfDay(now);
-  next.setDate(next.getDate() + 1);
-  return next.getTime() - now.getTime();
+/**
+ * Local midnight on the 1st of next month — when every allowance refills.
+ *
+ * Local, like `dayKey`: "the 1st" means the student's 1st. `setDate(1)` before
+ * `setMonth` is not tidiness — from the 31st, adding a month lands on a day
+ * the next month may not have, and JavaScript rolls that forward into the one
+ * after.
+ */
+export function startOfNextMonth(now = new Date()) {
+  const date = startOfDay(now);
+  date.setDate(1);
+  date.setMonth(date.getMonth() + 1);
+  return date;
 }
 
 /**
- * How long until the daily allowance comes back: "5h 6m", "20m", "1m".
+ * When the server says the meters refill, as a local Date.
  *
- * Hours and minutes only. A seconds digit on a wait this long is a ticking
- * clock nobody asked for — it makes a student watch the number instead of
- * closing the app, and it is wrong by the time they read it anyway.
- *
- * Rounded up, and never below a minute: the last fifty seconds before the
- * reset are still a wait, and "0m left" reads as a bug rather than as nearly
- * there.
+ * `resets_at` arrives as a plain `YYYY-MM-DD` in the student's own timezone,
+ * and `new Date("2026-09-01")` parses that as UTC midnight — which is the 31st,
+ * in the evening, for anyone west of Greenwich. Splitting the parts and
+ * building a local date is what keeps "refills in 6 days" from reading 5.
  */
-export function untilMidnightLabel(now = new Date()) {
-  const minutes = Math.max(1, Math.ceil(msUntilMidnight(now) / 60000));
+export function parseResetDate(value) {
+  if (!value) return null;
+
+  const plainDay = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(value));
+  if (plainDay) {
+    const [, year, month, day] = plainDay;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+/** Milliseconds until the allowance refills. The server's date wins over ours. */
+export function msUntilRefill(resetsAt = null, now = new Date()) {
+  const target = parseResetDate(resetsAt) ?? startOfNextMonth(now);
+  return Math.max(0, target.getTime() - now.getTime());
+}
+
+/**
+ * How long until the allowance comes back: "6 days", "1 day", "5h 6m", "20m".
+ *
+ * Days while there are days left, and hours and minutes only on the last one.
+ * Nobody plans revision around "143h", and a seconds digit on a wait this long
+ * is a ticking clock nobody asked for — it makes a student watch the number
+ * instead of closing the app, and it is wrong by the time they read it anyway.
+ *
+ * Days are floored: with five and a bit left, "5 days" is true and "6 days" is
+ * a promise the calendar does not keep. Minutes are rounded up and never below
+ * one, because the last fifty seconds are still a wait and "0m" reads as a bug.
+ */
+export function untilRefillLabel(resetsAt = null, now = new Date()) {
+  const ms = msUntilRefill(resetsAt, now);
+
+  if (ms >= MS_PER_DAY) {
+    const days = Math.floor(ms / MS_PER_DAY);
+    return `${days} ${days === 1 ? "day" : "days"}`;
+  }
+
+  const minutes = Math.max(1, Math.ceil(ms / 60000));
   const hours = Math.floor(minutes / 60);
   const rest = minutes % 60;
 
