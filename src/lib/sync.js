@@ -169,23 +169,17 @@ const fromMaterial = (row, existing) => ({
   addedAt: row.updated_at,
   updatedAt: row.updated_at,
   pageCount: row.page_count ?? null,
+  uploadStatus: statusOf(row, existing),
   /**
-   * The server's extraction states, translated so they cannot collide with the
-   * device's own. Both sides have a "failed" and they mean opposite things:
-   * here it is "the bytes never left this phone", there it is "the bytes
-   * arrived and the text could not be read out of them". Only the first can be
-   * retried with the same bytes, so showing one Retry for both would be a
-   * button that walks a student round a loop.
+   * When this row started waiting on the server, or null once it has stopped.
    *
-   * The local state wins while the bytes are still on the handset. The server
-   * cannot have an opinion about an upload that has not reached it, and
-   * without this a pull landing mid-upload — which the extraction poll now
-   * makes likely rather than rare — would overwrite "Uploading…" with the
-   * server's view of a row that has no file against it yet.
+   * Not `updatedAt`: that is stamped by every local write, so renaming a note
+   * would reset the clock on a document stuck behind it. This exists so a card
+   * can eventually say "this is taking longer than usual" instead of showing a
+   * progress bar for ever — which is the honest difference between waiting and
+   * being broken, and the only version of that question a student can act on.
    */
-  uploadStatus: IN_FLIGHT.has(existing?.uploadStatus)
-    ? existing.uploadStatus
-    : EXTRACTION[row.extraction_status] ?? "pending",
+  waitingSince: waitedSince(row, existing),
   /**
    * Why it is not `done`, in the server's own words, written for a student.
    *
@@ -219,6 +213,55 @@ const EXTRACTION = {
 
 /** Device-side states the server knows nothing about yet. */
 const IN_FLIGHT = new Set(["queued", "uploading"]);
+
+/** Kinds with no file behind them. Nothing is ever extracted from these. */
+const NO_FILE = new Set(["note", "link"]);
+
+/**
+ * Where one material has got to, deciding between two sources that disagree.
+ *
+ * The order is the whole content of this function.
+ *
+ * **The device wins while the bytes are still here.** The server cannot have an
+ * opinion about an upload that has not reached it, and without this a pull
+ * landing mid-upload — which the extraction poll makes likely rather than rare
+ * — overwrites "Uploading…" with the server's view of a row that has no file
+ * against it yet.
+ *
+ * **A row with no file is ready, always.** This is the line that was wrong. A
+ * typed note and a link have nothing to extract, so the server reports no
+ * extraction state for them — and the old `?? "pending"` turned that silence
+ * into "waiting to be read", under a note that was never going to be read and
+ * could never stop waiting. It is the same permanent-spinner bug the terminal
+ * states were meant to kill, one field further along.
+ *
+ * **Silence about a file means nothing is queued.** The server stamps a status
+ * on anything it is working on, so a file row with none is not in the queue.
+ * Reading that as `ready` is right for every row that predates extraction, and
+ * self-heals a row already stuck at `pending` on a handset. A file genuinely
+ * mid-read arrives with `pending` or `running` and is drawn as such.
+ */
+function statusOf(row, existing) {
+  if (IN_FLIGHT.has(existing?.uploadStatus)) return existing.uploadStatus;
+  if (NO_FILE.has(row.kind ?? "note")) return "ready";
+
+  return EXTRACTION[row.extraction_status] ?? "ready";
+}
+
+/** Statuses the server is responsible for moving on. */
+const WAITING = new Set(["pending", "reading"]);
+
+/**
+ * Keeps the clock running across pulls, and stops it the moment it settles.
+ *
+ * Preserved rather than restamped while it is still waiting — restamping on
+ * every poll would reset the very measurement the poll exists to take, and the
+ * card could never notice that nothing was happening.
+ */
+function waitedSince(row, existing) {
+  if (!WAITING.has(statusOf(row, existing))) return null;
+  return existing?.waitingSince ?? new Date().toISOString();
+}
 
 const fromEvent = (row) => ({
   id: row.id,

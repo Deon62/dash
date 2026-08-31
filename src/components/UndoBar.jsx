@@ -61,9 +61,19 @@ export default function UndoBar({ pending, onUndo, overTabs = false }) {
         bottom: (overTabs ? getTabBarHeight(insets) : Math.max(insets.bottom, 16)) + 12,
       }}
     >
-      <Animated.View
-        style={[
-          {
+      {/*
+        The animated wrapper carries the animation and nothing else.
+
+        `Animated.View` is registered with NativeWind's `cssInterop`, which
+        takes over its `style` prop — and `style={[staticObject, animatedStyle]}`
+        on a wrapped component is not reliably kept whole. When the static half
+        is the one that goes, this bar loses its dark fill and its padding while
+        the white label keeps its own colour, leaving an invisible strip over a
+        white page. Keeping the two on separate elements removes the question.
+      */}
+      <Animated.View style={style}>
+        <View
+          style={{
             flexDirection: "row",
             alignItems: "center",
             justifyContent: "space-between",
@@ -72,32 +82,48 @@ export default function UndoBar({ pending, onUndo, overTabs = false }) {
             paddingLeft: 16,
             paddingRight: 8,
             paddingVertical: 10,
-          },
-          style,
-        ]}
-      >
-        <Text
-          numberOfLines={1}
-          style={{ color: COLORS.canvas, flex: 1 }}
-          className="font-jk text-[13px]"
-        >
-          {pending.label}
-        </Text>
-
-        <Pressable
-          onPress={() => {
-            impact("light");
-            onUndo();
           }}
-          accessibilityRole="button"
-          accessibilityLabel="Undo"
-          hitSlop={12}
-          className="px-3 py-1.5 rounded-lg active:opacity-60"
         >
-          <Text className="font-jk-semi text-[13px]" style={{ color: COLORS.primary }}>
-            Undo
+          {/* Inline rather than through a class, for the same reason: the one
+              thing this bar has to do is be readable. */}
+          <Text
+            numberOfLines={1}
+            style={{
+              color: COLORS.canvas,
+              flex: 1,
+              fontFamily: "PlusJakartaSans_400Regular",
+              fontSize: 13,
+            }}
+          >
+            {pending.label}
           </Text>
-        </Pressable>
+
+          <Pressable
+            onPress={() => {
+              impact("light");
+              onUndo();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Undo"
+            hitSlop={12}
+            style={{
+              paddingHorizontal: 12,
+              paddingVertical: 6,
+              borderRadius: 8,
+            }}
+            className="active:opacity-60"
+          >
+            <Text
+              style={{
+                color: COLORS.primary,
+                fontFamily: "PlusJakartaSans_600SemiBold",
+                fontSize: 13,
+              }}
+            >
+              Undo
+            </Text>
+          </Pressable>
+        </View>
       </Animated.View>
     </View>
   );

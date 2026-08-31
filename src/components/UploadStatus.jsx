@@ -4,6 +4,7 @@ import { useRouter } from "expo-router";
 import { CircleAlert, CircleCheck, Lock } from "lucide-react-native";
 
 import { uploadMaterial } from "@/lib/materials";
+import { pullSync } from "@/lib/sync";
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
@@ -56,6 +57,21 @@ const FALLBACK = {
 
 /** How long the "ready" confirmation stays up before the row goes quiet. */
 const CONFIRM_MS = 6000;
+
+/**
+ * When "still reading" stops being a credible thing to say.
+ *
+ * A normal PDF is done inside ten seconds and a photo in a few, so three
+ * minutes is far past anything ordinary — long enough that a slow queue or a
+ * provider retry has not tripped it, short enough that nobody sits watching a
+ * bar wondering whether the app has forgotten about them.
+ *
+ * Past it the card stops pretending to know. It does not claim a failure
+ * either, because it does not have one: the server requeues on a provider
+ * outage and recovers a lost worker after fifteen minutes, so "taking longer
+ * than usual" is the true statement and "something went wrong" is not.
+ */
+const STALL_MS = 3 * 60 * 1000;
 
 /**
  * The track, with a shimmer while something is happening.
@@ -294,6 +310,38 @@ export default function UploadStatus({ material, onReplace, scanningAllowed = tr
 
   const stage = STAGES[status] ?? STAGES.pending;
 
+  const waiting = status === "pending" || status === "reading";
+  const since = material.waitingSince ? Date.parse(material.waitingSince) : null;
+  const stalled = waiting && since && Date.now() - since > STALL_MS;
+
+  /**
+   * Past the point where a progress bar is honest.
+   *
+   * The bar goes, because a bar that has been at 82% for ten minutes is a
+   * claim the app cannot support, and it is the exact thing that made students
+   * ask whether anything was happening at all. What replaces it says the true
+   * thing — nobody here knows — and offers the one action that can find out.
+   */
+  if (stalled) {
+    return (
+      <View className="flex-row items-start mt-2">
+        <View className="mt-[2px]">
+          <CircleAlert size={13} color={COLORS.muted} strokeWidth={2} />
+        </View>
+
+        <View className="flex-1 ml-1.5">
+          <Text className="font-jk text-muted text-[12.5px] leading-[17px]">
+            This is taking longer than usual. It is still queued — nothing has
+            been lost, and it will finish on its own.
+          </Text>
+          <View className="mt-1.5">
+            <Action label="Check again" onPress={() => pullSync()} />
+          </View>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View className="mt-2">
       <View className="flex-row items-baseline justify-between">
@@ -301,7 +349,7 @@ export default function UploadStatus({ material, onReplace, scanningAllowed = tr
         {/* Said once, under the bar, rather than on every stage: it is the
             reassurance ("you can leave"), and repeating it at each step turns
             reassurance into nagging. */}
-        {status === "reading" || status === "pending" ? (
+        {waiting ? (
           <Text className="font-jk text-faint text-[11.5px]">
             You can close the app
           </Text>

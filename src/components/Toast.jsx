@@ -91,33 +91,67 @@ export default function Toast({
         bottom: (overTabs ? getTabBarHeight(insets) : Math.max(insets.bottom, 16)) + 12,
       }}
     >
-      <Animated.View
-        style={[
-          {
+      {/*
+        The animated wrapper carries the animation and nothing else.
+
+        Every visual property is on the plain View inside it, and that split is
+        load-bearing rather than tidiness. `Animated.View` is registered with
+        NativeWind's `cssInterop`, which takes over its `style` prop — and a
+        `style={[staticObject, animatedStyle]}` array handed to a wrapped
+        component is not reliably kept whole. When the static half is the one
+        that goes, the bar loses its dark fill and its padding while the white
+        text keeps its own colour: an invisible message on the white page,
+        which is exactly what this looked like.
+
+        Nothing here needs to animate except opacity and position, so there is
+        no reason for the two ever to share a style prop again.
+      */}
+      <Animated.View style={style}>
+        <View
+          style={{
             flexDirection: "row",
             alignItems: "center",
             backgroundColor: COLORS.ink,
             borderRadius: 14,
             paddingHorizontal: 16,
             paddingVertical: 12,
-          },
-          style,
-        ]}
-        accessibilityRole="alert"
-        accessibilityLiveRegion="polite"
-      >
-        {Icon ? (
-          <View className="mr-2.5">
-            <Icon size={16} color={iconColor} />
-          </View>
-        ) : null}
-
-        <Text
-          style={{ color: COLORS.canvas, flex: 1 }}
-          className="font-jk text-[13px] leading-[18px]"
+          }}
+          accessibilityRole="alert"
+          accessibilityLiveRegion="polite"
         >
-          {message}
-        </Text>
+          {Icon ? (
+            // Fixed box rather than a margin class. An SVG glyph with no
+            // bounds of its own will happily take the width the text needs.
+            <View
+              style={{
+                width: 16,
+                height: 16,
+                marginRight: 10,
+                flexGrow: 0,
+                flexShrink: 0,
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Icon size={16} color={iconColor} />
+            </View>
+          ) : null}
+
+          {/* Colour, size and face are all inline. This is the one component
+              in the app whose entire job is to be legible, so nothing it needs
+              in order to be read goes through a layer that can drop it. */}
+          <Text
+            style={{
+              color: COLORS.canvas,
+              flex: 1,
+              fontFamily: "PlusJakartaSans_400Regular",
+              fontSize: 13,
+              lineHeight: 18,
+            }}
+          >
+            {message}
+          </Text>
+        </View>
       </Animated.View>
     </View>
   );

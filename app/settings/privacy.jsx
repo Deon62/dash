@@ -1,7 +1,10 @@
-import { Text, View } from "react-native";
+import { Pressable, Text, View } from "react-native";
+import { ExternalLink } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
+import { COLORS } from "@/theme/colors";
+import { PRIVACY_URL, openLegal } from "@/lib/legal";
 
 /** Plain statements of what is true today, not a policy template. */
 const POINTS = [
@@ -42,6 +45,36 @@ export default function PrivacyScreen() {
           </View>
         ))}
       </View>
+
+      {/* The full policy, at the foot rather than the head of the page.
+
+          What is above is the plain-English version, and it is what somebody
+          opening this screen actually wants — leading with a link off to a
+          legal page would send them away from the answer to read the long form
+          of it. This is here for the person who wants the binding text, and
+          for the version a student agreed to, which lives on the web so that
+          changing it does not need a release.
+
+          The URL is printed rather than hidden behind "Privacy Policy". A link
+          you cannot see the destination of is worth less on a page about
+          trust, and it is also what somebody types into a laptop later. */}
+      <Pressable
+        onPress={() => openLegal(PRIVACY_URL)}
+        accessibilityRole="link"
+        accessibilityLabel="Read the full privacy policy at als.ardena.co.ke"
+        className="border-t border-hairline pt-5 active:opacity-60"
+      >
+        <Text className="font-jk-med text-ink text-[13.5px]">
+          The full privacy policy
+        </Text>
+
+        <View className="flex-row items-center mt-1.5">
+          <Text className="font-jk text-primary text-[13px]">{PRIVACY_URL}</Text>
+          <View className="ml-1.5">
+            <ExternalLink size={13} color={COLORS.primary} strokeWidth={1.9} />
+          </View>
+        </View>
+      </Pressable>
     </Screen>
   );
 }

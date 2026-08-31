@@ -190,6 +190,10 @@ export async function uploadMaterial(material) {
     uploadStatus: COMPLETION[done.data?.extraction_status] ?? "pending",
     pageCount: done.data?.page_count ?? null,
     extractionError: done.data?.extraction_error ?? null,
+    // The moment the server took responsibility for this file. What the card
+    // measures against to decide whether "still reading" has stopped being
+    // credible.
+    waitingSince: new Date().toISOString(),
   });
 
   return { error: null };

@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import * as WebBrowser from "expo-web-browser";
 import { Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -26,26 +25,16 @@ import {
 import { useGoogleSignIn } from "@/lib/useGoogleSignIn";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { impact } from "@/lib/haptics";
-import OfflineGate from "@/components/OfflineGate";
-
 /**
  * The published pages, not screens in the app.
  *
  * One copy of each, on the web, so a change to either reaches every installed
  * build without a release — and so the version a student agreed to is the
- * version a court could be shown.
+ * version a court could be shown. They live in `lib/legal` because the privacy
+ * screen links to the same page from inside the app.
  */
-const TERMS_URL = "https://als.ardena.co.ke/terms";
-const PRIVACY_URL = "https://als.ardena.co.ke/privacy";
-
-/** Opens in the in-app browser, which keeps the sign-in behind it alive. */
-function openLegal(url) {
-  impact("light");
-  // Nothing is awaited and nothing is caught for a reason: this is a link on a
-  // sign-in screen, and a browser that will not open must not be able to throw
-  // its way into the sign-in flow.
-  WebBrowser.openBrowserAsync(url).catch(() => {});
-}
+import { PRIVACY_URL, TERMS_URL, openLegal } from "@/lib/legal";
+import OfflineGate from "@/components/OfflineGate";
 
 /**
  * Soft colour wash behind the top of the screen.

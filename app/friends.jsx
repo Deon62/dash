@@ -515,8 +515,7 @@ export default function FriendsScreen() {
 
         {onPlan ? null : (
           <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
-            Payment goes through Kora, which takes M-Pesa, Airtel Money and
-            cards.
+            Payment goes through Kora, which takes M-Pesa and Airtel Money.
           </Text>
         )}
 

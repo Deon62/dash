@@ -533,8 +533,8 @@ export default function BillingScreen() {
             + "Nothing you filed has gone anywhere. "
             : ""}
           Questions, quizzes and scans all refill on the 1st of the month.
-          Payment is handled by Kora, which accepts M-Pesa, Airtel Money and
-          cards. Your plan activates once the payment clears.
+          Payment is handled by Kora, which accepts M-Pesa and Airtel Money.
+          Your plan activates once the payment clears.
         </Text>
       </Screen>
 

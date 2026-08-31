@@ -844,7 +844,7 @@ export const useStudyStore = create(
     {
       name: STORE_KEY,
       storage: createJSONStorage(() => AsyncStorage),
-      version: 5,
+      version: 6,
       /**
        * Renames and reshapes carried forward, so nobody loses a timetable to
        * vocabulary or a semester of notes to a schema change.
@@ -864,6 +864,9 @@ export const useStudyStore = create(
        *
        * v5 is the move from daily to monthly allowances. The old day and week
        * counters are dropped rather than converted — see the block itself.
+       *
+       * v6 unsticks material rows left mid-read by a bug in the sync
+       * translation — see the block for why nothing else can clear them.
        */
       migrate: (persisted, version) => {
         if (!persisted) return persisted;
@@ -967,6 +970,36 @@ export const useStudyStore = create(
             // it means the screen draws from the device for one refresh
             // instead of showing a bar with no number behind it.
             serverUsage: null,
+          };
+        }
+
+        if (version < 6) {
+          /**
+           * Rows stuck on "waiting to be read" that were never going to be.
+           *
+           * The pull used to default a material with no `extraction_status` to
+           * `pending`, and a typed note or a link has no file, so the server
+           * reports none for either — every one of them sat under a progress
+           * bar that could not finish. The translation is fixed, but a fix in
+           * the pull cannot reach these: sync only sends back rows that have
+           * changed since the cursor, and a note nobody has edited never comes
+           * down again. So they are healed here, once, on the device.
+           *
+           * Only the kinds that genuinely have no file. A PDF or a photo left
+           * at `pending` might really be in the queue, and the poll and the
+           * server's own answer are what settle those — declaring them ready
+           * here would claim the tutor can quote something it has never read.
+           */
+          const NOTHING_TO_READ = new Set(["note", "link"]);
+
+          state = {
+            ...state,
+            materials: (state.materials ?? []).map((material) =>
+              NOTHING_TO_READ.has(material.kind ?? "note") &&
+              material.uploadStatus !== "ready"
+                ? { ...material, uploadStatus: "ready", extractionError: null }
+                : material,
+            ),
           };
         }
 
