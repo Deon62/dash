@@ -13,6 +13,7 @@ import EmptyState from "@/components/EmptyState";
 import { activeTier } from "@/lib/quota";
 import { useStudyStore } from "@/store/useStudyStore";
 import { fileMaterial } from "@/lib/knowledge";
+import { COLORS, TINTS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 import { pullSync } from "@/lib/sync";
 
@@ -70,6 +71,11 @@ export default function KnowledgeScreen() {
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
   const subscription = useStudyStore((state) => state.subscription);
+  const usage = useStudyStore((state) => state.usage);
+  // The server's scan meter where it has arrived. It is what the server will
+  // actually refuse against, and it knows about a page scanned on another
+  // handset — which the device's own tally, by definition, does not.
+  const ocrMeter = useStudyStore((state) => state.serverUsage?.ocrPages ?? null);
   const events = useStudyStore((state) => state.events);
 
   const [adding, setAdding] = useState(false);
@@ -166,8 +172,23 @@ export default function KnowledgeScreen() {
               accessibilityLabel="Add a unit"
               className="flex-row items-center py-4 active:opacity-60"
             >
-              <Plus size={16} color="#71717A" strokeWidth={1.8} />
-              <Text className="font-jk-med text-muted text-[14px] ml-2.5">
+              {/* Blue, where it was grey. This is the one thing to do on an
+                  empty library, and it was drawn in the same tone as the
+                  captions above it — the primary action reading as a caption
+                  is how a page ends up looking like it has nothing to press. */}
+              <View
+                style={{
+                  width: 26,
+                  height: 26,
+                  borderRadius: 13,
+                  backgroundColor: TINTS.primary,
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Plus size={15} color={COLORS.primary} strokeWidth={2} />
+              </View>
+              <Text className="font-jk-med text-primary text-[14px] ml-2.5">
                 Add a unit
               </Text>
             </Pressable>
@@ -187,6 +208,8 @@ export default function KnowledgeScreen() {
         visible={adding}
         units={units}
         tier={tier}
+        usage={usage}
+        ocrMeter={ocrMeter}
         onBlocked={setBlocked}
         onClose={() => setAdding(false)}
         // No dialog on a failed upload any more. The item is filed either way,

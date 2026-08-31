@@ -20,6 +20,7 @@ import {
 import { useStudyStore } from "@/store/useStudyStore";
 import { useSessionGuard } from "@/lib/useSessionGuard";
 import { useAccountSync } from "@/lib/bootstrap";
+import { useExtractionWatch } from "@/lib/extraction";
 import { usePushRegistration, usePushTaps } from "@/lib/push";
 import AppLock from "@/components/AppLock";
 import UpdateGate from "@/components/UpdateGate";
@@ -49,9 +50,16 @@ function SessionGuard() {
  * Keeps the device level with the account: on sign-in, on cold start, and on
  * coming back from the background. A component for the same reason as the
  * guard — it belongs below the navigator, not in the layout's own body.
+ *
+ * The extraction watch rides along, and belongs here rather than on the screen
+ * that lists documents. Status changes reach the device only through `GET
+ * /sync`, so something has to poll while a file is being read — and a poll
+ * mounted on a list would stop the moment a student switched to the tutor,
+ * leaving the card they come back to exactly as stale as when they left it.
  */
 function AccountSync() {
   useAccountSync();
+  useExtractionWatch();
   return null;
 }
 

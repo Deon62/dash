@@ -1,5 +1,6 @@
 import { useStudyStore } from "@/store/useStudyStore";
 import { uploadMaterial, openMaterial, materialUrl } from "@/lib/materials";
+import { captureScan, pickScan } from "@/lib/scan";
 import { sync } from "@/lib/sync";
 
 /**
@@ -56,3 +57,53 @@ export async function fileMaterial({
 }
 
 export { openMaterial, materialUrl };
+
+/**
+ * Replaces the photo behind a scan that came back unreadable.
+ *
+ * A new photo against the **same material id**, deliberately. The id is the
+ * object path in the bucket and the row the server upserts on, so this
+ * overwrites rather than filing a second copy — the alternative leaves a
+ * student with two rows, one of them permanently broken, and a list that grows
+ * a dead entry every time they try again.
+ *
+ * It exists because "retry" is the wrong offer for this state. The server has
+ * already read these bytes and reached a verdict; sending them again can only
+ * produce the same verdict. The page shot straight, or in better light, is the
+ * only thing that changes the answer.
+ *
+ * Resolves to `{ error }` — null when the student simply backed out.
+ */
+export async function rescanMaterial(material, { take = true } = {}) {
+  const { payload, error } = take
+    ? await captureScan(material.title)
+    : await pickScan(material.title);
+
+  if (error) return { error };
+  if (!payload) return { error: null };
+
+  // The title is the student's, not the file's. They named this when they
+  // filed it, and a retake is the same page — replacing the name with
+  // "scan.jpg" would quietly undo that.
+  useStudyStore.getState().updateMaterial(material.id, {
+    uri: payload.uri,
+    filename: payload.filename,
+    mimeType: payload.mimeType,
+    uploadStatus: "queued",
+    // The old verdict is about bytes that are being replaced. Left in place it
+    // would sit under the new upload's progress bar, explaining a failure that
+    // is no longer the one happening.
+    extractionError: null,
+    pageCount: null,
+  });
+
+  const material_ = useStudyStore
+    .getState()
+    .materials.find((row) => row.id === material.id);
+
+  const upload = await uploadMaterial(material_);
+
+  sync();
+
+  return { error: upload.error };
+}

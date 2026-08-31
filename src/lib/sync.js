@@ -169,22 +169,56 @@ const fromMaterial = (row, existing) => ({
   addedAt: row.updated_at,
   updatedAt: row.updated_at,
   pageCount: row.page_count ?? null,
-  // The server's extraction states, translated so they cannot collide with the
-  // device's own. Both sides have a "failed" and they mean opposite things:
-  // here it is "the bytes never left this phone", there it is "the bytes
-  // arrived and the text could not be read out of them". Only the first can be
-  // retried from a handset, so showing a Retry for the second would be a
-  // button that does nothing.
-  uploadStatus: EXTRACTION[row.extraction_status] ?? "pending",
+  /**
+   * The server's extraction states, translated so they cannot collide with the
+   * device's own. Both sides have a "failed" and they mean opposite things:
+   * here it is "the bytes never left this phone", there it is "the bytes
+   * arrived and the text could not be read out of them". Only the first can be
+   * retried with the same bytes, so showing one Retry for both would be a
+   * button that walks a student round a loop.
+   *
+   * The local state wins while the bytes are still on the handset. The server
+   * cannot have an opinion about an upload that has not reached it, and
+   * without this a pull landing mid-upload — which the extraction poll now
+   * makes likely rather than rare — would overwrite "Uploading…" with the
+   * server's view of a row that has no file against it yet.
+   */
+  uploadStatus: IN_FLIGHT.has(existing?.uploadStatus)
+    ? existing.uploadStatus
+    : EXTRACTION[row.extraction_status] ?? "pending",
+  /**
+   * Why it is not `done`, in the server's own words, written for a student.
+   *
+   * Shown verbatim wherever it exists. It names the fix — which format to
+   * shoot in, which allowance ran out — and replacing it with "something went
+   * wrong" throws away the only part anybody can act on.
+   */
+  extractionError: row.extraction_error ?? null,
 });
 
-/** `pending | running | done | failed` on the server. See `fromMaterial`. */
+/**
+ * The five server states, mapped onto the app's vocabulary.
+ *
+ * `failed` and `skipped` are **terminal**: nothing will ever move them. That is
+ * the whole reason they are distinct here rather than collapsed into "not
+ * ready" — treating either as still-working is a spinner that spins until the
+ * app is uninstalled, which is exactly what students were seeing.
+ *
+ * They are also terminal for different reasons, and that decides what the card
+ * offers. `unreadable` is about the file: another photo, or another PDF, could
+ * succeed. `blocked` is about the plan: the file was fine, so sending that
+ * student back to the camera is a loop that cannot end well.
+ */
 const EXTRACTION = {
   pending: "pending",
-  running: "pending",
+  running: "reading",
   done: "ready",
   failed: "unreadable",
+  skipped: "blocked",
 };
+
+/** Device-side states the server knows nothing about yet. */
+const IN_FLIGHT = new Set(["queued", "uploading"]);
 
 const fromEvent = (row) => ({
   id: row.id,

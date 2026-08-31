@@ -19,6 +19,7 @@ import {
 
 import TextField from "@/components/TextField";
 import Button from "@/components/Button";
+import RowAction from "@/components/RowAction";
 import Dropdown from "@/components/Dropdown";
 import { useStudyStore } from "@/store/useStudyStore";
 import { saveProfile } from "@/lib/account";
@@ -305,18 +306,12 @@ export default function OnboardingScreen() {
                     >
                       {unit.title}
                     </Text>
-                    <Pressable
-                      onPress={() => {
-                        impact("light");
-                        removeUnit(unit.id);
-                      }}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Remove ${unit.code}`}
-                      className="h-8 w-8 items-center justify-center rounded-full active:bg-surface"
-                    >
-                      <X size={15} color="#71717A" strokeWidth={1.8} />
-                    </Pressable>
+                    <RowAction
+                      Icon={X}
+                      tone="danger"
+                      label={`Remove ${unit.code}`}
+                      onPress={() => removeUnit(unit.id)}
+                    />
                   </View>
                 ))}
               </View>

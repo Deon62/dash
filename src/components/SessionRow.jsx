@@ -1,8 +1,8 @@
-import { Pressable, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { X } from "lucide-react-native";
 
 import { formatTime, minutesOf, nowMinutes } from "@/lib/dates";
-import { impact } from "@/lib/haptics";
+import RowAction from "@/components/RowAction";
 
 /**
  * One slot on the timetable.
@@ -60,18 +60,12 @@ export default function SessionRow({ entry, unit, today = false, onRemove, last 
       </View>
 
       {onRemove ? (
-        <Pressable
-          onPress={() => {
-            impact("light");
-            onRemove();
-          }}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={`Remove ${unit?.code ?? "session"} at ${formatTime(entry.start)}`}
-          className="h-8 w-8 items-center justify-center rounded-full active:bg-surface"
-        >
-          <X size={15} color="#71717A" strokeWidth={1.8} />
-        </Pressable>
+        <RowAction
+          Icon={X}
+          tone="danger"
+          label={`Remove ${unit?.code ?? "session"} at ${formatTime(entry.start)}`}
+          onPress={onRemove}
+        />
       ) : null}
     </View>
   );

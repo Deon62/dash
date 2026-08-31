@@ -33,12 +33,12 @@
       "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.VIBRATE",
+        "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",
         "android.permission.USE_BIOMETRIC",
         "android.permission.USE_FINGERPRINT"
       ],
       "blockedPermissions": [
-        "android.permission.CAMERA",
         "android.permission.ACCESS_COARSE_LOCATION",
         "android.permission.ACCESS_FINE_LOCATION",
         "android.permission.ACCESS_BACKGROUND_LOCATION",
@@ -71,7 +71,7 @@
         "expo-image-picker",
         {
           "photosPermission": "ALS needs access to your photos so you can add pictures of your notes.",
-          "cameraPermission": false
+          "cameraPermission": "ALS uses the camera so you can photograph a page of handwritten notes for the tutor to read."
         }
       ],
       [

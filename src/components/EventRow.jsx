@@ -4,6 +4,7 @@ import { Check, X } from "lucide-react-native";
 import { daysUntil, dueLabel } from "@/lib/dates";
 import { eventLabel } from "@/theme/units";
 import { impact, notify } from "@/lib/haptics";
+import RowAction from "@/components/RowAction";
 
 /**
  * One dated thing: an assignment, a CAT, an exam, a meeting.
@@ -63,19 +64,16 @@ export default function EventRow({ event, unit, onToggle, onRemove, last = false
         </Text>
       </View>
 
+      {/* Red, and it means it: a deadline has no archive and does not come
+          back. The tick beside it is the reversible one, which is the whole
+          reason these two must not look alike. */}
       {onRemove ? (
-        <Pressable
-          onPress={() => {
-            impact("light");
-            onRemove();
-          }}
-          hitSlop={10}
-          accessibilityRole="button"
-          accessibilityLabel={`Delete ${event.title}`}
-          className="h-8 w-8 items-center justify-center rounded-full active:bg-surface"
-        >
-          <X size={15} color="#71717A" strokeWidth={1.8} />
-        </Pressable>
+        <RowAction
+          Icon={X}
+          tone="danger"
+          label={`Delete ${event.title}`}
+          onPress={onRemove}
+        />
       ) : null}
     </View>
   );

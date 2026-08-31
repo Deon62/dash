@@ -47,6 +47,34 @@ export const COLORS = {
 };
 
 /**
+ * The soft ground a coloured glyph sits on.
+ *
+ * Every small action in a list used to be the same grey glyph in the same
+ * transparent circle: archive, delete, dismiss, all identical until you read
+ * the shape of a 15px icon. Colour is what tells them apart before anybody
+ * reads anything — and it is the difference between a control that puts
+ * something aside and one that destroys it, which is exactly the pair worth
+ * separating at a glance.
+ *
+ * Low alpha rather than a second set of hex values. A tint mixed against the
+ * page stays right on the white canvas and on the grey wells both, where a
+ * fixed light shade of each colour only matches one of them — and there would
+ * be five more constants here that have to be re-picked whenever a colour
+ * moves.
+ *
+ * They are deliberately faint. These sit inside rows of text, and a saturated
+ * fill at this size reads as an alert rather than as a button.
+ */
+export const TINTS = {
+  primary: "rgba(0, 127, 250, 0.10)",
+  danger: "rgba(220, 38, 38, 0.09)",
+  amber: "rgba(245, 158, 11, 0.13)",
+  teal: "rgba(13, 148, 136, 0.10)",
+  violet: "rgba(124, 58, 237, 0.10)",
+  muted: "rgba(113, 113, 122, 0.10)",
+};
+
+/**
  * What each kind of mark on the calendar is drawn in.
  *
  * One colour per activity, and they are only ever six pixels wide, so they are

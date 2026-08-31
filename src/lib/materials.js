@@ -42,6 +42,23 @@ const MIME = {
 };
 
 /**
+ * The server's extraction vocabulary, as the app spells it.
+ *
+ * A second copy of `sync.js`'s table would be a second place for a state to be
+ * added on one side only — but `/materials/complete` answers once, at upload
+ * time, and in practice only ever with `pending`. The rest are here so that an
+ * unexpected answer lands as something a screen can draw rather than as a
+ * status nothing has copy for.
+ */
+const COMPLETION = {
+  pending: "pending",
+  running: "reading",
+  done: "ready",
+  failed: "unreadable",
+  skipped: "blocked",
+};
+
+/**
  * How long a file has to finish uploading.
  *
  * Generous, because this is a big body on a phone connection — but not
@@ -89,14 +106,18 @@ export async function uploadMaterial(material) {
   if (!material?.uri) return { error: null };
 
   const fail = (error) => {
-    updateMaterial(material.id, { uploadStatus: "failed" });
+    // `extractionError` is the *server's* verdict on bytes it has read. This
+    // failure is about bytes that never arrived, so the old verdict is stale
+    // and leaving it would put the last attempt's reason under this attempt's
+    // state. Cleared here and on the way in, so a retry starts honest.
+    updateMaterial(material.id, { uploadStatus: "failed", extractionError: null });
     return { error };
   };
 
   const mimeType = material.mimeType ?? MIME[material.kind] ?? "application/octet-stream";
   const filename = material.filename ?? material.title;
 
-  updateMaterial(material.id, { uploadStatus: "uploading" });
+  updateMaterial(material.id, { uploadStatus: "uploading", extractionError: null });
 
   // Read before asking for a URL. The size the server checks the plan against
   // has to be the real one, and the picker's own figure is missing often
@@ -163,9 +184,12 @@ export async function uploadMaterial(material) {
 
   updateMaterial(material.id, {
     // `pending` is honest: the file is stored, and its text is not searchable
-    // until the server has read it.
-    uploadStatus: done.data?.extraction_status ?? "pending",
+    // until the server has read it. Mapped through the same table sync uses,
+    // because `/materials/complete` answers in the server's vocabulary and a
+    // raw `running` written here would be a status no screen has copy for.
+    uploadStatus: COMPLETION[done.data?.extraction_status] ?? "pending",
     pageCount: done.data?.page_count ?? null,
+    extractionError: done.data?.extraction_error ?? null,
   });
 
   return { error: null };

@@ -254,18 +254,54 @@ export function canAttachFile(tier, sizeBytes) {
   );
 }
 
-export function canUseOcr(tier, usage) {
+/**
+ * Whether this account may scan a page of handwriting right now.
+ *
+ * Asked **before the camera opens**, never after. The server refuses an
+ * over-allowance scan by marking it `skipped`, which is correct but is a
+ * miserable way to find out: by then the student has framed a page, taken a
+ * photo and paid for the upload.
+ *
+ * `meter` is `serverUsage.ocrPages` where it has arrived, and it wins. It is
+ * the count the server will actually refuse against, and it knows about scans
+ * taken on another handset — which the device's own tally, by definition, does
+ * not. The local counters are the fallback for a first render and for no
+ * connection, which is the whole reason they still exist.
+ *
+ * A `limit` of zero means the plan does not include scanning at all. That is a
+ * different refusal from having spent the allowance and needs a different way
+ * out, so it is answered first and carries no refill promise.
+ */
+export function canUseOcr(tier, usage, meter = null) {
   const { allowOcrScans, monthlyOcrPageLimit } = limitsFor(tier);
-  if (!allowOcrScans) return denied("ocr", "Scanning is a Synapse feature.");
 
-  const used = rollUsage(usage).ocrPagesThisMonth;
-  if (used < monthlyOcrPageLimit) return ALLOWED;
+  const unlimited = Boolean(meter?.unlimited);
+  const limit = meter && !unlimited ? meter.limit : monthlyOcrPageLimit;
+  const allowed = unlimited || (meter ? limit > 0 : allowOcrScans);
 
-  return denied(
-    "ocr",
-    `You have scanned this month's ${monthlyOcrPageLimit} pages.`,
-    { refills: true },
-  );
+  if (!allowed) {
+    return denied("ocr", "Scanning handwritten notes is a Synapse feature.");
+  }
+
+  if (unlimited) return ALLOWED;
+
+  const used = meter ? meter.used : rollUsage(usage).ocrPagesThisMonth;
+  if (used < limit) return ALLOWED;
+
+  return denied("ocr", `You have scanned this month's ${limit} pages.`, {
+    refills: true,
+    // Already on a scanning plan and out of pages: there is nothing to buy that
+    // fixes this, so the sheet must not offer plans. The allowance comes back
+    // on the 1st and the countdown above it is the honest answer.
+    upgradable: false,
+    resetsAt: meter?.resetsAt ?? null,
+  });
+}
+
+/** Whether the plan includes scanning at all, regardless of what is left. */
+export function scanningIncluded(tier, meter = null) {
+  if (meter) return Boolean(meter.unlimited) || meter.limit > 0;
+  return limitsFor(tier).allowOcrScans;
 }
 
 /** Timetable alerts are off on free, which only supports manual entry. */

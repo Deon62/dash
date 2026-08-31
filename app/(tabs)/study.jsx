@@ -33,6 +33,7 @@ import ThinkingLabel from "@/components/ThinkingLabel";
 import Markdown from "@/components/Markdown";
 import OfflineState from "@/components/OfflineState";
 import OfflineGate from "@/components/OfflineGate";
+import Toast from "@/components/Toast";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { askTutor, buildFlashcards, buildQuiz, countCards } from "@/lib/tutor";
 import { NOTE_WORD_LIMIT } from "@/lib/notes";
@@ -44,9 +45,9 @@ import { formatDateTime, greeting } from "@/lib/dates";
 import { getTabBarHeight } from "@/theme/layout";
 import { useKeyboard } from "@/lib/useKeyboardVisible";
 import { activeTier, canAskAi, canStartQuiz, quizSize } from "@/lib/quota";
-import { COLORS } from "@/theme/colors";
+import { COLORS, TINTS } from "@/theme/colors";
 import { useDictation } from "@/lib/useDictation";
-import { MicGlyph, SendGlyph } from "@/components/Glyph";
+import { MicGlyph, SendGlyph, VoiceGlyph } from "@/components/Glyph";
 import { impact, notify } from "@/lib/haptics";
 
 const MODES = [
@@ -238,6 +239,15 @@ export default function StudyScreen() {
   // Dictation writes straight into the draft, so a student can speak a
   // sentence and then fix a word by typing without losing either. Declared
   // above `ask` because sending has to be able to call it off.
+  /**
+   * A one-line note over the composer, for a control that is not finished yet.
+   *
+   * State rather than a constant, because the toast clears itself: it is held
+   * only for as long as it is on screen, and the bar's own timer is what puts
+   * it back to null.
+   */
+  const [soon, setSoon] = useState("");
+
   const dictation = useDictation({ onText: setDraft });
   const listening = dictation.listening;
 
@@ -612,11 +622,17 @@ export default function StudyScreen() {
               }}
               accessibilityRole="button"
               accessibilityLabel={`Scope: ${scopeLabel}. Change unit or mode`}
+              // Shrinkable, and the label truncates. There are three round
+              // buttons to its right now rather than two, and a long scope
+              // label — a unit code and a mode — would otherwise push the send
+              // button off the edge of a narrow handset.
+              style={{ flexShrink: 1 }}
               className="flex-row items-center gap-x-1.5 rounded-full bg-surface px-3 py-1.5 active:opacity-60"
             >
               <Text
+                numberOfLines={1}
                 maxFontSizeMultiplier={CHROME_SCALE}
-                className="font-jk-med text-ink text-[12.5px]"
+                className="font-jk-med text-ink text-[12.5px] shrink"
               >
                 {scopeLabel}
               </Text>
@@ -625,6 +641,41 @@ export default function StudyScreen() {
 
             {mode === "ask" ? (
               <View className="flex-row items-center gap-x-2">
+                {/* Voice: speak the question, hear the answer.
+                
+                    Beside the mic rather than instead of it, and it is a
+                    different glyph on purpose — the mic dictates into the
+                    field and you still read what comes back, this is the
+                    conversation. It is shown before it works because that is
+                    the honest order: the button is where it is going to be,
+                    and tapping it says so in one line rather than doing
+                    nothing, which is how a student decides a screen is
+                    broken. */}
+                <Pressable
+                  onPress={() => {
+                    impact("light");
+                    setSoon(
+                      "Talking with the tutor is coming soon. For now, the mic types what you say.",
+                    );
+                  }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Talk with the tutor"
+                  accessibilityHint="Coming soon"
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    flexGrow: 0,
+                    flexShrink: 0,
+                    alignItems: "center",
+                    justifyContent: "center",
+                    backgroundColor: TINTS.violet,
+                  }}
+                  className="active:opacity-70"
+                >
+                  <VoiceGlyph size={19} color={COLORS.violet} />
+                </Pressable>
+
                 <Pressable
                   onPress={() => {
                     impact("light");
@@ -864,6 +915,17 @@ export default function StudyScreen() {
           );
         })}
       </Sheet>
+
+      {/* Over the composer, clearing the tab bar. It says one thing and takes
+          no tap to get rid of — a dialog for "not built yet" would make the
+          student dismiss something they never asked to see. */}
+      <Toast
+        message={soon}
+        onHide={() => setSoon("")}
+        Icon={VoiceGlyph}
+        iconColor={COLORS.violet}
+        overTabs
+      />
 
       <LimitSheet verdict={blocked} onClose={() => setBlocked(null)} />
 

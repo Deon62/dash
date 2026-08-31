@@ -14,7 +14,6 @@ import {
 import Screen from "@/components/Screen";
 import ScreenHeader from "@/components/ScreenHeader";
 import IconButton from "@/components/IconButton";
-import Disc from "@/components/Disc";
 import Dropdown from "@/components/Dropdown";
 import SessionRow from "@/components/SessionRow";
 import EventRow from "@/components/EventRow";
@@ -26,13 +25,14 @@ import MaterialViewer from "@/components/MaterialViewer";
 import LimitSheet from "@/components/LimitSheet";
 import EventComposer from "@/components/EventComposer";
 import SessionComposer from "@/components/SessionComposer";
-import { activeTier } from "@/lib/quota";
+import { activeTier, canUseOcr, scanningIncluded } from "@/lib/quota";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import UploadStatus from "@/components/UploadStatus";
-import { fileMaterial } from "@/lib/knowledge";
+import RowAction from "@/components/RowAction";
+import { fileMaterial, rescanMaterial } from "@/lib/knowledge";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
-import { COLORS } from "@/theme/colors";
+import { COLORS, TINTS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 import { pullSync } from "@/lib/sync";
 import { useUndoable } from "@/lib/useUndoable";
@@ -51,6 +51,11 @@ export default function UnitScreen() {
   const units = useStudyStore((state) => state.units);
   const materials = useStudyStore((state) => state.materials);
   const subscription = useStudyStore((state) => state.subscription);
+  const usage = useStudyStore((state) => state.usage);
+  // The server's scan meter where it has arrived. It is what the server will
+  // actually refuse against, and it knows about a page scanned on another
+  // handset — which the device's own tally, by definition, does not.
+  const ocrMeter = useStudyStore((state) => state.serverUsage?.ocrPages ?? null);
   const events = useStudyStore((state) => state.events);
   const sessions = useStudyStore((state) => state.sessions);
 
@@ -68,6 +73,26 @@ export default function UnitScreen() {
   const [blocked, setBlocked] = useState(null);
 
   const tier = activeTier(subscription);
+  const scanIncluded = scanningIncluded(tier, ocrMeter);
+
+  /**
+   * A second go at a page the server could not read.
+   *
+   * Checked against the allowance first, because a retake spends a scan like
+   * any other — and being refused after framing the page again, on the row
+   * that already refused you once, is the sort of thing that makes somebody
+   * put the app down.
+   */
+  const retake = async (material) => {
+    const allowance = canUseOcr(tier, usage, ocrMeter);
+    if (!allowance.ok) {
+      setBlocked(allowance);
+      return;
+    }
+
+    const { error } = await rescanMaterial(material);
+    if (error) setBlocked({ ok: false, reason: "scan", detail: error, upgradable: false });
+  };
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   // The material being read full-screen, or null. The row itself is held
   // rather than its id so the viewer's header has a title from the first
@@ -198,10 +223,22 @@ export default function UnitScreen() {
           accessibilityLabel={addLabel}
           className="flex-row items-center gap-x-2 active:opacity-60"
         >
-          <Disc size={32}>
-            <Plus size={16} color={COLORS.ink} strokeWidth={1.8} />
-          </Disc>
-          <Text className="font-jk-med text-ink text-[14px]">{addLabel}</Text>
+          {/* The primary action on the section you are standing in, so it is
+              drawn as one. Grey on grey made "Add a deadline" read as a label
+              for the list rather than as the way to start one. */}
+          <View
+            style={{
+              width: 32,
+              height: 32,
+              borderRadius: 16,
+              backgroundColor: TINTS.primary,
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
+            <Plus size={16} color={COLORS.primary} strokeWidth={2} />
+          </View>
+          <Text className="font-jk-med text-primary text-[14px]">{addLabel}</Text>
         </Pressable>
 
         {/* --- Knowledge --- */}
@@ -250,19 +287,15 @@ export default function UnitScreen() {
                     </Pressable>
 
                     {/* Archive, not delete. A student clearing clutter should
-                        not be one tap from losing a semester of notes. */}
-                    <Pressable
-                      onPress={() => {
-                        impact("light");
-                        filed.remove(material, `Archived “${material.title}”`);
-                      }}
-                      hitSlop={10}
-                      accessibilityRole="button"
-                      accessibilityLabel={`Archive ${material.title}`}
-                      className="h-8 w-8 items-center justify-center rounded-full active:bg-surface"
-                    >
-                      <Archive size={15} color="#71717A" strokeWidth={1.8} />
-                    </Pressable>
+                        not be one tap from losing a semester of notes — and
+                        amber rather than red is the same promise in colour:
+                        this one is held, not destroyed. */}
+                    <RowAction
+                      Icon={Archive}
+                      tone="archive"
+                      label={`Archive ${material.title}`}
+                      onPress={() => filed.remove(material, `Archived “${material.title}”`)}
+                    />
                   </View>
 
                   {/* The thumbnail opens it too. It is the biggest thing in
@@ -298,9 +331,20 @@ export default function UnitScreen() {
                     </Text>
                   ) : null}
 
-                  {/* Where the file has got to. Silent once it is readable —
-                      a line saying "ready" on every item is furniture. */}
-                  <UploadStatus material={material} />
+                  {/* Where the file has got to: a progress track while
+                      something is still going to happen, the server's own
+                      words once nothing is. Silent a few seconds after it
+                      turns ready — a line saying "ready" on every item for
+                      ever is furniture. */}
+                  <UploadStatus
+                    material={material}
+                    scanningAllowed={scanIncluded}
+                    // Only for a photo, and only a fresh one. A PDF the server
+                    // could not read — password protected, no text layer —
+                    // cannot be fixed by sending the same bytes again, and the
+                    // message already says which file to bring instead.
+                    onReplace={material.kind === "image" ? retake : undefined}
+                  />
                 </View>
               ))}
             </View>
@@ -370,6 +414,8 @@ export default function UnitScreen() {
         visible={composer === "knowledge"}
         units={units}
         tier={tier}
+        usage={usage}
+        ocrMeter={ocrMeter}
         onBlocked={setBlocked}
         lockedUnitId={unitId}
         onClose={() => setComposer(null)}
@@ -417,11 +463,13 @@ export default function UnitScreen() {
  * for that resolves to nothing, and a tap that opens an empty browser tab is
  * worse than a tap that does nothing at all.
  */
-const STORED = new Set(["ready", "pending", "unreadable"]);
+const STORED = new Set(["ready", "pending", "reading", "unreadable", "blocked"]);
 
 function hasFile(material) {
   if (material.kind === "note" || material.kind === "link") return false;
-  // `unreadable` counts: the file is in the bucket and opens fine, it is only
-  // its *text* that could not be extracted.
+  // `unreadable` and `blocked` both count: the file is in the bucket and opens
+  // fine either way. Only its *text* is missing — because nothing could be
+  // read out of it, or because the plan did not cover reading it — and a
+  // student who photographed a page can still look at their own photograph.
   return Boolean(material.uri) || STORED.has(material.uploadStatus);
 }

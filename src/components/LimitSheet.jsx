@@ -25,7 +25,10 @@ import { useRefillCountdown } from "@/lib/useRefillCountdown";
  */
 export default function LimitSheet({ verdict, onClose }) {
   const router = useRouter();
-  const refillsIn = useRefillCountdown();
+  // The meter's own reset date where the verdict carries one — an allowance
+  // that refills on the plan's clock rather than the calendar's says a
+  // different date, and this sheet is where somebody decides whether to wait.
+  const refillsIn = useRefillCountdown(verdict?.resetsAt ?? null);
 
   const upgradable = verdict?.upgradable !== false;
 

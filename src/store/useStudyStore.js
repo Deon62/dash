@@ -615,13 +615,28 @@ export const useStudyStore = create(
           addedAt: stamp(),
           ...touched(),
           /**
-           * Where an attached file has got to: `queued` before the bytes have
-           * been sent, `uploading` while they are going, `pending` once they
-           * are in the bucket and the server has yet to read them, `ready`
-           * when its text is searchable, `failed` if the upload did not land.
+           * Where an attached file has got to.
+           *
+           * Three of these are the device's and four are the server's, and the
+           * split matters because only the device's can be retried with the
+           * bytes already in hand:
+           *
+           *  - `queued` — picked, not yet sent
+           *  - `uploading` — the bytes are going
+           *  - `failed` — they never left this phone. Retry sends them again.
+           *  - `pending` — in the bucket, waiting for a worker
+           *  - `reading` — a worker is reading it now
+           *  - `ready` — indexed; the tutor can quote it
+           *  - `unreadable` — read and rejected. **Terminal.** Another file
+           *    might work; the same bytes never will.
+           *  - `blocked` — nothing wrong with the file, the plan does not
+           *    cover it. **Terminal**, and re-uploading is a loop.
+           *
            * A typed note is `ready` immediately — there is nothing to carry.
            */
           uploadStatus: uri ? "queued" : "ready",
+          /** The server's own words for why it is not `ready`. See `sync.js`. */
+          extractionError: null,
         };
 
         set((state) => ({ materials: [material, ...state.materials] }));
