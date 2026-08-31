@@ -145,13 +145,26 @@ export function rollUsage(usage, now = new Date()) {
 
 // --- Checks ----------------------------------------------------------------
 
-export function canAddUnit(tier, unitCount) {
-  const cap = unitCap(tier);
+/**
+ * Units are not something a plan sells, and this refusal must not imply they are.
+ *
+ * It takes no tier for that reason — the cap is the same on every plan, free
+ * included, and no payment lifts it. The wording carries the same weight: it
+ * used to read "Focus covers 4 course units", which named a plan and so read as
+ * a price tag on the one thing here that has none. A student who acts on that
+ * arrives at the paywall to buy something that is not for sale.
+ *
+ * `upgradable: false` is what stops the sheet offering plans at all.
+ */
+export function canAddUnit(unitCount) {
+  const cap = unitCap();
   if (unitCount < cap) return ALLOWED;
 
   return denied(
     "units",
-    `${planName(tier)} covers ${cap} course ${cap === 1 ? "unit" : "units"}.`
+    `You can follow up to ${cap} course units at once, on every plan. ` +
+      "Removing one you have finished frees a slot — along with everything filed under it.",
+    { upgradable: false },
   );
 }
 
@@ -219,10 +232,14 @@ export function quizSize(tier) {
  *
  * Size is checked because the picker reports it. Page count is not: nothing in
  * the app can read a PDF's page count yet, so `maxSingleFilePages` and
- * `totalPdfPagesPool` are carried in the config and shown on the pricing card
- * but cannot be enforced until a parser exists. Pretending to enforce them
- * would be worse than the gap — it would let a 400-page file through while
- * claiming it had been checked.
+ * `monthlyPdfPages` are carried in the config and shown on the pricing card but
+ * cannot be enforced until a parser exists. Pretending to enforce them would be
+ * worse than the gap — it would let a 400-page file through while claiming it
+ * had been checked.
+ *
+ * The server counts the pages it actually extracted, which is why the page
+ * meters on the usage screen only ever come from it: the device has no number
+ * of its own to fall back to.
  */
 export function canAttachFile(tier, sizeBytes) {
   const limitMb = limitsFor(tier).maxSingleFileSizeMb;

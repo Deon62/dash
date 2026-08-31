@@ -307,8 +307,27 @@ export async function loadUsage() {
     aiQueriesTotal: meter(data.ai_queries_total),
     quizzes: meter(data.quizzes),
     quizInterval: data.quiz_interval,
+    /**
+     * The units meter no longer carries a reset date and never reports
+     * unlimited — it is one flat ceiling on every plan. The server builds it by
+     * hand for that reason: it used to borrow the `pdf_pages` metric purely
+     * because that key happened to be a lifetime one, and the moment pages went
+     * monthly the units bar would have started counting down to a refill that
+     * does not happen.
+     */
     courseUnits: meter(data.course_units),
     ocrPages: meter(data.ocr_pages_this_month),
+    /**
+     * Pages, in the same two-meter shape as questions: a monthly pool that
+     * refills, and a lifetime ceiling only the free plan sets.
+     *
+     * Both arrive as null from a server that has not shipped the split yet, and
+     * the usage screen has nothing of its own to fall back on — the device
+     * cannot read a PDF's page count, so there is no local tally. A missing
+     * meter is simply not drawn, which is right: an empty bar would be a claim.
+     */
+    pdfPagesThisMonth: meter(data.pdf_pages_this_month),
+    pdfPagesTotal: meter(data.pdf_pages_total),
   });
 
   return { error: null };

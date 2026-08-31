@@ -16,10 +16,18 @@ import { useRefillCountdown } from "@/lib/useRefillCountdown";
  *
  * There is always a way out that is not "pay": a limit that traps someone on a
  * screen is a bug, not a business model.
+ *
+ * `upgradable: false` on a verdict removes the plans button entirely. Not every
+ * ceiling is for sale — the course-unit cap is the same on every tier and no
+ * payment lifts it — and offering to fix one of those with money is worse than
+ * offering nothing: it takes a student to the paywall for a product that does
+ * not exist, and they only find that out after reading three cards.
  */
 export default function LimitSheet({ verdict, onClose }) {
   const router = useRouter();
   const refillsIn = useRefillCountdown();
+
+  const upgradable = verdict?.upgradable !== false;
 
   return (
     <Sheet
@@ -38,25 +46,34 @@ export default function LimitSheet({ verdict, onClose }) {
           </Text>
         ) : null}
 
-        <Button
-          label="See plans"
-          onPress={() => {
-            onClose();
-            router.push("/billing");
-          }}
-        />
+        {upgradable ? (
+          <Button
+            label="See plans"
+            onPress={() => {
+              onClose();
+              router.push("/billing");
+            }}
+          />
+        ) : null}
 
-        <Pressable
-          onPress={() => {
-            impact("light");
-            onClose();
-          }}
-          accessibilityRole="button"
-          accessibilityLabel="Not now"
-          className="items-center py-3 active:opacity-60"
-        >
-          <Text className="font-jk-med text-muted text-[14px]">Not now</Text>
-        </Pressable>
+        {/* Promoted to the primary control when there is no plans button above
+            it, so the sheet still closes on something that looks pressable
+            rather than on a grey word floating alone. */}
+        {upgradable ? (
+          <Pressable
+            onPress={() => {
+              impact("light");
+              onClose();
+            }}
+            accessibilityRole="button"
+            accessibilityLabel="Not now"
+            className="items-center py-3 active:opacity-60"
+          >
+            <Text className="font-jk-med text-muted text-[14px]">Not now</Text>
+          </Pressable>
+        ) : (
+          <Button label="Got it" variant="outline" onPress={onClose} />
+        )}
       </View>
     </Sheet>
   );

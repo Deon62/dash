@@ -56,15 +56,26 @@ export const BillingPeriod = {
 /** Four months — a semester's length, without borrowing the registrar's word. */
 export const SEASON_MONTHS = 4;
 
-/**
- * `-1` on a limit means unlimited.
- *
- * `maxCourseUnits` is the exception the spec calls out: unlimited there is
- * still capped, because the tutor's retrieval quality falls off long before a
- * student has fifty units filed and an "unlimited" that degrades the product
- * is worse than a stated number.
- */
+/** `-1` on a limit means unlimited. */
 export const UNLIMITED = -1;
+
+/**
+ * The most course units any account may hold. Not a plan limit — a quality one.
+ *
+ * It used to be one: two on Free, four on Focus, ten on Synapse. Rationing the
+ * one resource that costs nothing, at the worst possible moment — a student
+ * building their timetable on the first evening hits it before the tutor has
+ * answered a single question, and reads it as "this app is not built for my
+ * course" rather than as a free tier.
+ *
+ * What survives is a flat ceiling on every plan, Free included, and no plan
+ * lifts it. Retrieval is keyword search across one student's own corpus, and
+ * precision falls off as that corpus grows; an answer assembled from a
+ * fifty-unit haystack is worse than an honest refusal. That reasoning applies
+ * to everybody equally, which is why this is a module constant rather than a
+ * field on each plan — and why nothing that mentions it should send a student
+ * to the paywall to buy something that does not exist.
+ */
 export const UNIT_HARD_CAP = 10;
 
 /**
@@ -77,8 +88,13 @@ export const UNIT_HARD_CAP = 10;
  */
 const LIMITS = {
   free: {
-    maxCourseUnits: 2,
-    totalPdfPagesPool: 100,
+    /**
+     * Free's page pool is the same figure monthly and lifetime, and that is
+     * what keeps it behaving exactly as it always has: the month can never
+     * refill past the total. Nothing about the free plan got more generous.
+     */
+    monthlyPdfPages: 100,
+    lifetimePdfPages: 100,
     maxSingleFileSizeMb: 10,
     // The whole pool in one document, so a single 100-page lecture PDF is
     // uploadable rather than refused for being one file.
@@ -100,8 +116,8 @@ const LIMITS = {
     monthlyOcrPageLimit: 0,
   },
   focus: {
-    maxCourseUnits: 4,
-    totalPdfPagesPool: 400,
+    monthlyPdfPages: 400,
+    lifetimePdfPages: UNLIMITED,
     maxSingleFileSizeMb: 25,
     maxSingleFilePages: 100,
     monthlyAiQueries: 400,
@@ -113,8 +129,8 @@ const LIMITS = {
     monthlyOcrPageLimit: 0,
   },
   synapse: {
-    maxCourseUnits: 10,
-    totalPdfPagesPool: 1500,
+    monthlyPdfPages: 1500,
+    lifetimePdfPages: UNLIMITED,
     maxSingleFileSizeMb: 50,
     maxSingleFilePages: 300,
     monthlyAiQueries: 1200,
@@ -131,8 +147,8 @@ const LIMITS = {
    * held. Nothing is sold on it and nothing new is granted it.
    */
   trial: {
-    maxCourseUnits: 2,
-    totalPdfPagesPool: 100,
+    monthlyPdfPages: 100,
+    lifetimePdfPages: UNLIMITED,
     maxSingleFileSizeMb: 10,
     maxSingleFilePages: 30,
     monthlyAiQueries: 200,
@@ -386,10 +402,16 @@ export function planName(tier) {
   return planFor(tier).name;
 }
 
-/** Resolves `maxCourseUnits`, honouring the hard cap that unlimited carries. */
-export function unitCap(tier) {
-  const limit = limitsFor(tier).maxCourseUnits;
-  return limit === UNLIMITED ? UNIT_HARD_CAP : Math.min(limit, UNIT_HARD_CAP);
+/**
+ * How many course units an account may hold.
+ *
+ * Takes no tier, and that is the signature doing the talking: there is one
+ * answer for everybody. It stays a function rather than becoming a bare
+ * constant at the call sites so that the day a limit here needs a reason
+ * again, there is one place to put it.
+ */
+export function unitCap() {
+  return UNIT_HARD_CAP;
 }
 
 // --- Human-readable feature lines ------------------------------------------
@@ -421,6 +443,10 @@ function count(value, one, many = `${one}s`) {
  * citations and unlimited quizzes come first because they are why anyone moves
  * up to Synapse; the question count is a number every plan has, and leading
  * with it turns three products into one product at three sizes.
+ *
+ * Anything that does not vary by plan is not here at all — the course-unit cap
+ * most of all. A line identical on all three cards is not a feature, and on the
+ * cheapest card it reads as the thing the dearer one gives you more of.
  */
 export function planFeatures(tier) {
   const limits = limitsFor(tier);
@@ -434,6 +460,14 @@ export function planFeatures(tier) {
         : `${count(quiz.count, "quiz", "quizzes")} in total, up to ${count(quiz.maxQuestions, "question")}`;
 
   const seats = seatsFor(tier);
+
+  // Free's pool is the same number twice, so it is stated once, as a total —
+  // "100 PDF pages a month" on a plan that only ever gets 100 is a promise of
+  // a refill that cannot happen.
+  const pages =
+    limits.lifetimePdfPages !== UNLIMITED
+      ? `${limits.lifetimePdfPages} PDF pages in total`
+      : `${limits.monthlyPdfPages} PDF pages a month`;
 
   return [
     // No trial line any more. There is no fortnight to advertise — the free
@@ -453,12 +487,14 @@ export function planFeatures(tier) {
     },
     { text: CITATION_COPY[limits.sourceCitations], available: true },
     { text: quizLine, available: true },
-    { text: count(unitCap(tier), "course unit"), available: true },
+    // No course-unit line. Every plan carries the same ten, so listing it on
+    // three cards sold nothing and implied the opposite — that the card above
+    // has more of them.
     {
       text: `${count(limits.monthlyAiQueries, "AI question")} a month`,
       available: true,
     },
-    { text: `${limits.totalPdfPagesPool} PDF pages of storage`, available: true },
+    { text: pages, available: true },
     {
       text: `Up to ${limits.maxSingleFileSizeMb}MB and ${limits.maxSingleFilePages} pages per file`,
       available: true,

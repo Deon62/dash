@@ -127,10 +127,33 @@ export default function UsageScreen() {
     monthly ? usage.quizzesThisMonth : usage.quizzesEver,
     quiz.count,
   );
-  const courseUnits = meter("courseUnits", units.length, unitCap(tier));
+  // No tier. The cap is the same on every plan and nothing lifts it, so the
+  // local fallback is a constant rather than a lookup.
+  const courseUnits = meter("courseUnits", units.length, unitCap());
+
+  /**
+   * Pages, server-only.
+   *
+   * Every other meter here has a device-side fallback for the first render and
+   * for no connection. This one cannot: nothing in the app reads a PDF's page
+   * count, so the only number that exists is the one the extractor counted.
+   * Undrawn beats invented — a bar with a made-up denominator on the screen a
+   * student opens to find out where they stand is worse than one bar fewer.
+   */
+  const pagesThisMonth = serverUsage?.pdfPagesThisMonth ?? null;
+  const pagesTotal = serverUsage?.pdfPagesTotal ?? null;
+
+  // Only the free plan sets one, and free's two figures are equal — so where a
+  // lifetime ceiling exists it is the whole story and the monthly bar beneath
+  // it would be the same bar drawn twice.
+  const hasPageCeiling = Boolean(pagesTotal) && !pagesTotal.unlimited;
 
   // Ticking, so a screen left open does not sit on "1 day" into the new month.
   const refillsIn = useRefillCountdown(ai.resetsAt);
+  // Its own date rather than the questions' one. They land on the same day
+  // today, and a single shared countdown is exactly the assumption that is
+  // quietly wrong the first time a meter gets its own clock.
+  const pagesRefillIn = useRefillCountdown(pagesThisMonth?.resetsAt ?? null);
 
   // Free is the only plan with a ceiling that does not refill, and it is the
   // number that decides when the app stops answering — so it is drawn, and
@@ -205,10 +228,35 @@ export default function UsageScreen() {
           used={quizzes.used}
           limit={quizzes.limit}
         />
+        {/* Pages are what a document costs us, so they are metered like
+            questions: a pool that comes back on the 1st, and — on free only —
+            a ceiling that does not. Where the ceiling exists it is drawn
+            instead of the monthly bar, not above it: free's two figures are
+            the same 100, so both would be one bar printed twice. */}
+        {hasPageCeiling ? (
+          <UsageMeter
+            label="PDF pages on the free plan"
+            used={pagesTotal.used}
+            limit={pagesTotal.limit}
+          />
+        ) : pagesThisMonth ? (
+          <UsageMeter
+            label="PDF pages this month"
+            used={pagesThisMonth.used}
+            limit={pagesThisMonth.unlimited ? UNLIMITED : pagesThisMonth.limit}
+            note={pagesThisMonth.unlimited ? null : `Refills in ${pagesRefillIn}`}
+          />
+        ) : null}
+
+        {/* No refill note, and there never is one: this is not an allowance
+            that comes back on the 1st. It is the same ten on every plan — said
+            here rather than left as a bare bar, because a meter next to four
+            that do refill reads as one more thing a payment would enlarge. */}
         <UsageMeter
           label="Course units"
           used={courseUnits.used}
           limit={courseUnits.limit}
+          note="The same on every plan"
           last
         />
       </View>

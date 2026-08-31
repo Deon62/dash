@@ -1,5 +1,6 @@
 import { Platform } from "react-native";
 import Constants from "expo-constants";
+import * as Application from "expo-application";
 
 import { account } from "@/api/endpoints";
 import { useStudyStore } from "@/store/useStudyStore";
@@ -18,11 +19,28 @@ import { useStudyStore } from "@/store/useStudyStore";
 export const NOT_SIGNED_IN =
   "You are signed out. Sign in again to reach your account.";
 
-/** What the server records this handset as. */
+/**
+ * What the server records this handset as.
+ *
+ * `nativeApplicationVersion` first, and that ordering matters now that the
+ * server can force a build off the network. Two things read this number and
+ * they have to mean the same thing by it: the adoption report — the count of
+ * students a raised floor locks out, which is built from these device rows —
+ * and the release check, which asks which *binary* is running. An OTA update
+ * carries its own config, so the config's version is what was published rather
+ * than what was installed; measuring the floor against one and reporting the
+ * other is how a forced update turns into an outage nobody sized.
+ *
+ * The config version stays as the fallback for web and for Expo Go, where
+ * there is no installed binary to name.
+ */
 export const DEVICE = {
   platform: Platform.OS,
   appVersion:
-    Constants.expoConfig?.version ?? Constants.manifest2?.extra?.expoClient?.version ?? "",
+    Application.nativeApplicationVersion ??
+    Constants.expoConfig?.version ??
+    Constants.manifest2?.extra?.expoClient?.version ??
+    "",
 };
 
 /**

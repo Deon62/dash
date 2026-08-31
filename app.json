@@ -119,7 +119,9 @@
       "policy": "appVersion"
     },
     "updates": {
-      "url": "https://u.expo.dev/5e47477f-1072-4803-94ca-b977c33f32d1"
+      "url": "https://u.expo.dev/5e47477f-1072-4803-94ca-b977c33f32d1",
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 3000
     },
     "owner": "ardenaprod",
     "androidStatusBar": {

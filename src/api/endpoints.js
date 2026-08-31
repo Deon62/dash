@@ -159,6 +159,36 @@ export const account = {
     ),
 };
 
+// --- The build itself -------------------------------------------------------
+
+export const release = {
+  /**
+   * Is this build out of date, and is it too old to keep running?
+   *
+   * Unauthenticated, deliberately, and that is not an oversight to tidy up
+   * later. The build most likely to need forcing off the network is one that is
+   * broken, and broken often means it cannot sign in — a check behind a token
+   * cannot reach the phones that need it most. Nothing in the answer is
+   * user-specific, so there is nothing to leak.
+   *
+   * `version` is the *store* version of the installed binary, never the OTA
+   * update id. The question this asks is which binary is running, and only an
+   * install from the store changes that.
+   *
+   * Answers `{ latest_version, update_available, update_required, store_url,
+   * notes, minimum_version }`. An empty release table answers "no update" to
+   * everybody, which is the right default: the failure worth designing out is
+   * an update prompt that appears because nothing has been recorded yet.
+   */
+  check: ({ platform, version }) =>
+    api.get(
+      v1(
+        `/app/release?platform=${encodeURIComponent(platform)}` +
+          `&version=${encodeURIComponent(version ?? "")}`,
+      ),
+    ),
+};
+
 // --- Coursework ------------------------------------------------------------
 
 /**

@@ -12,6 +12,7 @@ import DaySheet from "@/components/DaySheet";
 import SessionRow from "@/components/SessionRow";
 import EventComposer from "@/components/EventComposer";
 import EmptyState from "@/components/EmptyState";
+import UpdateCard from "@/components/UpdateCard";
 import { useStudyStore, unitById } from "@/store/useStudyStore";
 import { liveStreak } from "@/lib/streak";
 import { hasSystemAlerts } from "@/lib/systemAlerts";
@@ -128,6 +129,12 @@ export default function HomeScreen() {
             />
           </View>
         </View>
+
+        {/* Under the greeting and above the month: high enough to be seen on
+            the screen everyone lands on, low enough that it is not the first
+            thing between a student and their timetable. It draws nothing at
+            all unless there is genuinely a newer build in the store. */}
+        <UpdateCard />
 
         {/* --- The month --- */}
         <View>

@@ -22,6 +22,7 @@ import { useSessionGuard } from "@/lib/useSessionGuard";
 import { useAccountSync } from "@/lib/bootstrap";
 import { usePushRegistration, usePushTaps } from "@/lib/push";
 import AppLock from "@/components/AppLock";
+import UpdateGate from "@/components/UpdateGate";
 import ErrorBoundary from "@/components/ErrorBoundary";
 import {
   analyticsEnabled,
@@ -211,6 +212,13 @@ export default function RootLayout() {
                 show a lock would throw away every screen's state and drop the
                 student back at the tabs when they unlock. */}
             <AppLock />
+
+            {/* Above the lock, and the only thing that is. A build the server
+                has disowned cannot be usefully unlocked into — and this is the
+                one prompt in the app that has to work for somebody who cannot
+                sign in, which is why the release check it mounts needs no
+                token. */}
+            <UpdateGate />
           </SafeAreaProvider>
         </ErrorBoundary>
       </Analytics>
