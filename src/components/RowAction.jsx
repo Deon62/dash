@@ -1,6 +1,6 @@
 import { Pressable } from "react-native";
 
-import { COLORS, TINTS } from "@/theme/colors";
+import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
 /**
@@ -12,10 +12,12 @@ import { impact } from "@/lib/haptics";
  * was the silhouette of an icon at the size of a full stop. Two controls with
  * opposite consequences should not have to be read to be told apart.
  *
- * So each one is tinted by what it does, and the tint carries the meaning:
- * amber sets something aside and can be undone, red destroys, blue is ordinary.
- * The ground is a wash rather than a fill — these live inside rows of text, and
- * a saturated disc at this size shouts over the title it belongs to.
+ * So the **glyph** is coloured by what it does and the disc behind it stays the
+ * ordinary grey: a warm near-red sets something aside and can be undone, true
+ * red destroys, blue is ordinary. Colouring the disc instead was too loud —
+ * these live inside rows of text, and a tinted circle made a 32px control the
+ * brightest thing on the card, so the eye went to archiving a note rather than
+ * to the note.
  *
  * One component rather than the same fifteen lines in five files, because that
  * is how the grey ones drifted: the same control ended up with three different
@@ -23,14 +25,14 @@ import { impact } from "@/lib/haptics";
  */
 
 const TONES = {
-  /** Reversible. Amber is "held", not "wrong" — nothing has been lost. */
-  archive: { color: COLORS.amber, ground: TINTS.amber },
+  /** Reversible, but not casual. See `ember` in the palette. */
+  archive: COLORS.ember,
   /** Gone. The only tone in the app that means a row will not come back. */
-  danger: { color: COLORS.danger, ground: TINTS.danger },
+  danger: COLORS.danger,
   /** An ordinary action that happens to live at the end of a row. */
-  primary: { color: COLORS.primary, ground: TINTS.primary },
+  primary: COLORS.primary,
   /** Deliberately quiet — a chevron, or anything that only navigates. */
-  muted: { color: COLORS.muted, ground: "transparent" },
+  muted: COLORS.muted,
 };
 
 export default function RowAction({
@@ -42,7 +44,7 @@ export default function RowAction({
   glyph = 15,
   disabled = false,
 }) {
-  const { color, ground } = TONES[tone] ?? TONES.primary;
+  const color = TONES[tone] ?? TONES.primary;
 
   return (
     <Pressable
@@ -63,7 +65,7 @@ export default function RowAction({
         width: size,
         height: size,
         borderRadius: size / 2,
-        backgroundColor: ground,
+        backgroundColor: COLORS.surface,
         alignItems: "center",
         justifyContent: "center",
         opacity: disabled ? 0.4 : 1,

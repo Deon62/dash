@@ -12,6 +12,7 @@ import { MastercardMark, VisaMark } from "@/components/CardMarks";
 import PaymentArt from "@/components/PaymentArt";
 import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS, TINTS } from "@/theme/colors";
+import { getCountry, normalisePhone } from "@/theme/countries";
 import { planFor, planName } from "@/theme/plans";
 import {
   TIMED_OUT,
@@ -46,8 +47,22 @@ import { impact, notify } from "@/lib/haptics";
  * did not work is the worst thing this screen can produce.
  */
 
-/** The number field is only ever used for the one thing Daraja can reach. */
-const DIAL = "+254";
+/**
+ * The number field is only ever used for the one thing Daraja can reach.
+ *
+ * The dialling code is printed beside the field rather than typed into it, so
+ * what the field holds is the *national* number — nine digits, no `+254`, no
+ * leading zero. `normalisePhone` is what keeps it that way whatever gets pasted
+ * or prefilled: the account stores numbers in full international form, and
+ * dropping one straight into the field put a second country code on the screen
+ * ("+254 254712345678") and would have sent one too.
+ *
+ * This is display normalisation, not validation. Nothing is refused here — the
+ * server decides what it can reach, and the whole number is reassembled from
+ * the code beside the field when it is sent.
+ */
+const KE = getCountry("KE");
+const DIAL = KE.dial;
 
 /**
  * Cards, as one button.
@@ -123,7 +138,7 @@ export default function PayScreen() {
    */
   useEffect(() => {
     if (!profile?.phone || phone) return;
-    setPhone(String(profile.phone));
+    setPhone(normalisePhone(profile.phone, KE));
   }, [profile?.phone]);
 
   useEffect(() => {
@@ -140,7 +155,7 @@ export default function PayScreen() {
    * instead is how an app ends up refusing numbers that would have worked, so
    * this is a guard against an empty field rather than a validator.
    */
-  const sendable = phone.replace(/\D/g, "").length >= 9;
+  const sendable = phone.length >= (KE.nsn ?? 9);
 
   const pay = async () => {
     if (!sendable || starting) return;
@@ -150,7 +165,9 @@ export default function PayScreen() {
     setError("");
     setWaiting("");
 
-    const { payment, error: failed } = await startMpesa(tier, phone);
+    // Sent in full international form, which the server lists among the shapes
+    // it normalises — and which is unambiguous about the code shown on screen.
+    const { payment, error: failed } = await startMpesa(tier, `${DIAL}${phone}`);
 
     setStarting(false);
 
@@ -310,12 +327,13 @@ export default function PayScreen() {
 
         <TextInput
           value={phone}
-          onChangeText={setPhone}
+          onChangeText={(next) => setPhone(normalisePhone(next, KE))}
           onFocus={() => setFocused(true)}
           onBlur={() => setFocused(false)}
           placeholder="712 345 678"
           placeholderTextColor={COLORS.faint}
           keyboardType="phone-pad"
+          maxLength={KE.nsn}
           accessibilityLabel="M-Pesa number"
           style={{ flex: 1, paddingVertical: 0 }}
           className="font-jk text-ink text-[16px] ml-2"

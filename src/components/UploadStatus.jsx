@@ -119,6 +119,24 @@ function Track({ to }) {
     return () => loop.stop();
   }, [pulse]);
 
+  /**
+   * Two animated views, not one, and they must stay that way.
+   *
+   * The width and the pulse run on different drivers — width has to be on the
+   * JS one because the native animated module cannot animate a layout property,
+   * and the pulse is on the native one because it loops forever and has no
+   * business waking the JS thread twice a second.
+   *
+   * Put both on a single `Animated.View` and the two drivers collide on one
+   * style node: starting the native loop moves that node to native, the width
+   * animation then refuses to run against it, and React Native says so twice —
+   * "Style property 'width' is not supported by native animated module" and
+   * "Attempting to run JS driven animation on animated node that has been moved
+   * to 'native'". The bar simply stops.
+   *
+   * Splitting them gives each driver a node of its own: the outer view owns the
+   * width, the inner one fills it and owns the opacity.
+   */
   return (
     <View
       style={{ height: 4, borderRadius: 2, backgroundColor: COLORS.surface }}
@@ -128,14 +146,21 @@ function Track({ to }) {
         style={{
           height: 4,
           borderRadius: 2,
-          backgroundColor: COLORS.primary,
+          overflow: "hidden",
           width: width.interpolate({
             inputRange: [0, 1],
             outputRange: ["0%", "100%"],
           }),
-          opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.45] }),
         }}
-      />
+      >
+        <Animated.View
+          style={{
+            flex: 1,
+            backgroundColor: COLORS.primary,
+            opacity: pulse.interpolate({ inputRange: [0, 1], outputRange: [1, 0.45] }),
+          }}
+        />
+      </Animated.View>
     </View>
   );
 }

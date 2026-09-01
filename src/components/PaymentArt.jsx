@@ -47,7 +47,27 @@ const hasVideo = Boolean(requireOptionalNativeModule("ExpoVideo"));
 // eslint-disable-next-line global-require
 const video = hasVideo ? require("expo-video") : null;
 
+/** The space this occupies, so the video and the fallback lay out identically. */
 const HEIGHT = 220;
+
+/**
+ * How large the video is actually drawn.
+ *
+ * `payment.mp4` is **150 × 150**. That is the ceiling on how sharp this can
+ * ever look, and no rendering flag changes it — `contentFit` scales to the box
+ * it is given, so filling a 220dp box meant asking for 660 physical pixels from
+ * a 150-pixel source on a 3× screen, and it read as blurred because it was.
+ *
+ * So the view is sized to the file rather than the file stretched to the view.
+ * It is drawn smaller and centred in the same 220dp slot, which keeps the
+ * layout identical and stops the upscale being the first thing anybody notices.
+ *
+ * If the source is ever re-exported larger — 600 × 600 would be sharp on every
+ * phone, and there is room for it at this bitrate — raise this to match and it
+ * gets better for free. It is deliberately a number and not `"100%"` so that
+ * the next person has to think about the source before stretching it again.
+ */
+const VIDEO_SIZE = 150;
 
 /** The looping animation, where the binary can play one. */
 function VideoArt() {
@@ -64,15 +84,24 @@ function VideoArt() {
   );
 
   return (
-    <video.VideoView
-      player={player}
-      // Not a video anybody scrubs. It is an animation that happens to be a
-      // file, so it gets no controls and no place in the accessibility tree.
-      nativeControls={false}
-      contentFit="contain"
-      style={{ width: "100%", height: HEIGHT, backgroundColor: COLORS.canvas }}
+    <View
+      style={{ height: HEIGHT, alignItems: "center", justifyContent: "center" }}
       accessible={false}
-    />
+    >
+      <video.VideoView
+        player={player}
+        // Not a video anybody scrubs. It is an animation that happens to be a
+        // file, so it gets no controls and no place in the accessibility tree.
+        nativeControls={false}
+        contentFit="contain"
+        style={{
+          width: VIDEO_SIZE,
+          height: VIDEO_SIZE,
+          backgroundColor: COLORS.canvas,
+        }}
+        accessible={false}
+      />
+    </View>
   );
 }
 

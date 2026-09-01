@@ -6,7 +6,6 @@ import {
   CalendarClock,
   FileText,
   ListTodo,
-  Orbit,
   Plus,
   Trash2,
 } from "lucide-react-native";
@@ -211,9 +210,8 @@ export default function UnitScreen() {
           }}
           accessibilityRole="button"
           accessibilityLabel={`Revise ${unit.code}`}
-          className="flex-row items-center justify-center gap-x-2 rounded-full bg-primary py-3.5 active:opacity-85"
+          className="flex-row items-center justify-center rounded-full bg-primary py-3.5 active:opacity-85"
         >
-          <Orbit size={16} color="#FFFFFF" strokeWidth={1.8} />
           <Text className="font-jk-med text-canvas text-[14.5px]">
             Revise this unit
           </Text>

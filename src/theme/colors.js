@@ -43,6 +43,19 @@ export const COLORS = {
    * needing size or a fill behind it. Nothing else should take it.
    */
   flame: "#F97316",
+  /**
+   * Archiving: warm, nearly red, and deliberately not `danger`.
+   *
+   * It needs its own value because the two actions sit in the same place and
+   * mean opposite things. `danger` is for a row that does not come back, and
+   * archiving is the reversible one — but it is still the destructive-feeling
+   * control on the card, so amber read as too casual for it.
+   *
+   * Not `flame`, which is spoken for: that one belongs to the streak and the
+   * tutor's thinking label, and is the only warm colour in the app that means
+   * something on its own.
+   */
+  ember: "#E4552E",
   danger: "#DC2626",
 };
 
@@ -73,6 +86,16 @@ export const TINTS = {
   violet: "rgba(124, 58, 237, 0.10)",
   muted: "rgba(113, 113, 122, 0.10)",
 };
+
+/**
+ * A note on where these are and are not used.
+ *
+ * Row actions do **not** take a tint any more — their disc stays the ordinary
+ * grey `surface` and the colour is carried by the glyph alone. A coloured disc
+ * turned a 32px control into the loudest thing in a row of text, and put the
+ * emphasis on archiving a note rather than on the note. Colour still separates
+ * the actions; it just does it at the size of an icon instead of a button.
+ */
 
 /**
  * What each kind of mark on the calendar is drawn in.
