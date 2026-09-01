@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Pressable, Text, View } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import { Check, Minus } from "lucide-react-native";
 
 import Screen from "@/components/Screen";
@@ -162,6 +162,26 @@ export default function BillingScreen() {
    * would refresh everything except the thing being waited for.
    */
   const refresh = () => Promise.all([pullSync(), loadSubscription()]);
+
+  /**
+   * Re-read the plan whenever this screen comes back to the front.
+   *
+   * `loadSubscription` above runs on mount, and this screen does not unmount
+   * when `/pay` is pushed over it — so without this, returning from a payment
+   * shows whatever the store held when the screen first opened.
+   *
+   * A payment that finishes normally does not need this: both the card verify
+   * and the M-Pesa poll write the subscription through `applySubscription`, and
+   * this screen renders from that store. What it covers is the payment that
+   * finished somewhere this app was not watching — a student who backed out of
+   * the prompt, or closed the card page, with the server's own sweep settling
+   * it a minute later. They come back here to check, and this is the check.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      loadSubscription();
+    }, []),
+  );
 
   // Only the person who paid has a code to see. A friend they invited is on
   // the same tier and lands on the same screen, but there is nothing there for

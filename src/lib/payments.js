@@ -5,6 +5,7 @@ import { billing } from "@/api/endpoints";
 import { authed } from "@/lib/session";
 import { applySubscription, ensureGroup } from "@/lib/billing";
 import { openCheckoutPage, confirmCheckout } from "@/lib/checkout";
+import { recordFailure } from "@/lib/diagnostics";
 
 /**
  * Taking a payment: a phone number, or a card.
@@ -45,6 +46,29 @@ export async function startMpesa(tier, phone) {
   );
 
   if (error) return { payment: null, error };
+
+  /**
+   * A fallback is not an error, but it is worth being able to see.
+   *
+   * `mode: "redirect"` means the server could not reach M-Pesa and opened a
+   * hosted page instead — the student is never told, and should not be, but it
+   * costs a processor's fee and it is invisible from the app otherwise. Two of
+   * these in a row is a Daraja outage or a misconfiguration, and without a
+   * record the only symptom is "it keeps sending me to a web page".
+   *
+   * `provider` is logged and never shown. It is the server's word for which
+   * processor took it, and it is the field that answers the question.
+   */
+  if (data?.mode === "redirect") {
+    recordFailure({
+      source: "billing",
+      method: "POST",
+      path: "/billing/mpesa",
+      status: 200,
+      message: "M-Pesa unavailable — fell back to a hosted page.",
+      detail: `provider=${data.provider ?? "?"} reference=${data.reference ?? "?"} message=${data.message ?? ""}`,
+    });
+  }
 
   return {
     payment: {

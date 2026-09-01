@@ -165,9 +165,20 @@ export default function PayScreen() {
     setError("");
     setWaiting("");
 
-    // Sent in full international form, which the server lists among the shapes
-    // it normalises — and which is unambiguous about the code shown on screen.
-    const { payment, error: failed } = await startMpesa(tier, `${DIAL}${phone}`);
+    /**
+     * Sent as `254712345678` — no `+`, no leading zero.
+     *
+     * The server normalises every shape people type, so in principle any of
+     * them would do. This one is chosen because it is the form Daraja itself
+     * wants for an STK push, so it is the shape that survives the most naive
+     * pass-through on the way there. A `+` is the only character in the set
+     * that a downstream API can reject outright, and a rejected push looks
+     * from here exactly like M-Pesa being unreachable.
+     */
+    const { payment, error: failed } = await startMpesa(
+      tier,
+      `${DIAL.replace("+", "")}${phone}`,
+    );
 
     setStarting(false);
 
