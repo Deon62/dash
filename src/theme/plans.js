@@ -38,7 +38,7 @@ export const SubscriptionTier = {
   /**
    * The four-month lengths — a Season. Separate tier ids rather than a flag on
    * the tiers above, because `durationDays` already carries the length and a
-   * distinct id is what keeps a Kora charge unambiguous about what was bought.
+   * distinct id is what keeps a charge unambiguous about what was bought.
    */
   STANDARD_SEASON: "standard_season",
   PRO_SEASON: "pro_season",
@@ -316,10 +316,9 @@ export function savingPercent(family) {
  * have. And the price lives on the provider's dashboard rather than in the
  * plan table, so the two drift silently.
  *
- * `billing.checkout()` in `src/api/endpoints.js` asks the server for a Kora
- * checkout minted for one student and one plan. A build with no backend
- * configured therefore cannot take a payment at all, which is the honest
- * outcome: it could never have credited one either.
+ * `app/pay.jsx` asks the server to start a payment for one student and one
+ * plan. A build with no backend configured therefore cannot take a payment at
+ * all, which is the honest outcome: it could never have credited one either.
  */
 export const PLAN_CARDS = [
   {

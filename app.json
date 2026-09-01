@@ -104,7 +104,8 @@
           "color": "#007FFA",
           "defaultChannel": "reminders"
         }
-      ]
+      ],
+      "expo-video"
     ],
     "experiments": {
       "typedRoutes": false

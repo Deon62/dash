@@ -5,6 +5,7 @@ import { CircleAlert, CircleCheck, Lock } from "lucide-react-native";
 
 import { uploadMaterial } from "@/lib/materials";
 import { pullSync } from "@/lib/sync";
+import { canPrepareScans } from "@/lib/scan";
 import { COLORS } from "@/theme/colors";
 import { impact } from "@/lib/haptics";
 
@@ -263,7 +264,13 @@ export default function UploadStatus({ material, onReplace, scanningAllowed = tr
           {onReplace ? (
             <View className="mt-1.5">
               <Action
-                label={material.kind === "image" ? "Take another photo" : "Choose another file"}
+                label={
+                  material.kind !== "image"
+                    ? "Choose another file"
+                    : canPrepareScans
+                      ? "Take another photo"
+                      : "Choose another photo"
+                }
                 onPress={() => onReplace(material)}
               />
             </View>

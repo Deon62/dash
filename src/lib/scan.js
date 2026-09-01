@@ -1,5 +1,5 @@
 import * as ImagePicker from "expo-image-picker";
-import { ImageManipulator, SaveFormat } from "expo-image-manipulator";
+import { requireOptionalNativeModule } from "expo-modules-core";
 
 /**
  * Photographing a page of handwritten notes.
@@ -31,6 +31,34 @@ const LONG_EDGE = 2000;
 const QUALITY = 0.8;
 
 /**
+ * Whether this binary can actually resize an image.
+ *
+ * `expo-image-manipulator` is native, and an over-the-air update can deliver
+ * JavaScript that calls it but cannot add native code to a build already on a
+ * phone. Importing it unconditionally would therefore crash every existing
+ * install on launch — the one failure that cannot be fixed from the server.
+ *
+ * `requireOptionalNativeModule` rather than a `try/catch` around the import,
+ * because importing the package evaluates its native module and throws at
+ * import time, before anything of ours runs. Asking first, by name, is the only
+ * version of this check that can answer "no".
+ */
+const manipulator = requireOptionalNativeModule("ExpoImageManipulator");
+
+/**
+ * True where a photo can be downscaled and re-encoded before it is uploaded.
+ *
+ * Exported because the capture UI has to know: on a build without it, the
+ * camera is not offered at all. That is not squeamishness about quality — the
+ * camera permission arrives in the same store build as this module, so on any
+ * binary missing one the other cannot work either.
+ */
+export const canPrepareScans = Boolean(manipulator);
+
+// eslint-disable-next-line global-require
+const imageManipulator = manipulator ? require("expo-image-manipulator") : null;
+
+/**
  * Normalises whatever the camera produced into something the server can read.
  *
  * Two jobs, and the second one is the quiet killer. iPhones shoot HEIC by
@@ -44,8 +72,20 @@ const QUALITY = 0.8;
  * exactly the two failures this exists to prevent.
  */
 export async function prepareScan(uri) {
+  /**
+   * Nothing to prepare with, so the picked file goes as it is.
+   *
+   * Reached only on a build that predates the module — an over-the-air update
+   * running on an older binary. The picker's own compression has already been
+   * applied, which usually lands under the server's 12MB ceiling, and where it
+   * does not the server refuses with a sentence written for a student that the
+   * card then shows. Degraded, and honest about it: the alternative is refusing
+   * to file the photo at all on grounds the student cannot act on.
+   */
+  if (!imageManipulator) return { uri, error: null };
+
   try {
-    const context = ImageManipulator.manipulate(uri);
+    const context = imageManipulator.ImageManipulator.manipulate(uri);
 
     // Width only. `height: null` keeps the ratio, and a page shot in portrait
     // and one shot in landscape both come out with their long edge bounded —
@@ -54,7 +94,7 @@ export async function prepareScan(uri) {
 
     const rendered = await context.renderAsync();
     const saved = await rendered.saveAsync({
-      format: SaveFormat.JPEG,
+      format: imageManipulator.SaveFormat.JPEG,
       compress: QUALITY,
     });
 
@@ -67,14 +107,30 @@ export async function prepareScan(uri) {
   }
 }
 
-/** The material payload a prepared photo becomes. */
-function scanPayload(uri, title) {
+/**
+ * The material payload a prepared photo becomes.
+ *
+ * `.jpg` and `image/jpeg` only where `prepareScan` actually made that true. On
+ * a build that could not convert, the original type is reported instead — the
+ * server checks the declared type against the bytes, and claiming JPEG over a
+ * HEIC would turn a clear refusal ("Most Compatible saves photos as JPEG") into
+ * a confusing one.
+ */
+function scanPayload(uri, title, asset) {
+  if (!canPrepareScans) {
+    return {
+      kind: "image",
+      title,
+      filename: asset?.fileName ?? "photo.jpg",
+      mimeType: asset?.mimeType ?? "image/jpeg",
+      uri,
+      body: "",
+    };
+  }
+
   return {
     kind: "image",
     title,
-    // Always `.jpg` and `image/jpeg`, because `prepareScan` has just made that
-    // true whatever the camera produced. Reporting the original's type here
-    // would describe a file that no longer exists.
     filename: "scan.jpg",
     mimeType: "image/jpeg",
     uri,
@@ -96,19 +152,21 @@ function scanPayload(uri, title) {
 export async function captureScan(title = "Scanned page") {
   const result = await ImagePicker.launchCameraAsync({
     mediaTypes: ["images"],
-    // Full quality out of the camera, because `prepareScan` is what decides the
-    // final size. Compressing twice is visibly worse than compressing once, and
-    // handwriting is exactly the sort of fine detail that shows it.
-    quality: 1,
+    // Full quality only where `prepareScan` is going to re-encode anyway —
+    // compressing twice is visibly worse than once, and handwriting is exactly
+    // the fine detail that shows it. Without the manipulator this is the only
+    // compression there will be, so it has to do the job itself.
+    quality: canPrepareScans ? 1 : 0.7,
     exif: false,
   });
 
   if (result.canceled || !result.assets?.length) return { payload: null, error: null };
 
-  const { uri, error } = await prepareScan(result.assets[0].uri);
+  const asset = result.assets[0];
+  const { uri, error } = await prepareScan(asset.uri);
   if (error) return { payload: null, error };
 
-  return { payload: scanPayload(uri, title), error: null };
+  return { payload: scanPayload(uri, title, asset), error: null };
 }
 
 /**
@@ -122,7 +180,7 @@ export async function captureScan(title = "Scanned page") {
 export async function pickScan(title = "Scanned page") {
   const result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
-    quality: 1,
+    quality: canPrepareScans ? 1 : 0.7,
     exif: false,
   });
 
@@ -133,7 +191,11 @@ export async function pickScan(title = "Scanned page") {
   if (error) return { payload: null, error };
 
   return {
-    payload: scanPayload(uri, asset.fileName ? stripExtension(asset.fileName) : title),
+    payload: scanPayload(
+      uri,
+      asset.fileName ? stripExtension(asset.fileName) : title,
+      asset,
+    ),
     error: null,
   };
 }

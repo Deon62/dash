@@ -6,11 +6,28 @@ import { useStudyStore } from "@/store/useStudyStore";
  * The plan, the payment and the group, as the server sees them.
  *
  * Nothing on the device grants a plan. A payment is a fact the server
- * establishes — from Kora's webhook, or from verifying the reference when the
+ * establishes — from polling an M-Pesa payment, or from verifying the reference when the
  * browser closes — and every screen here reads that answer rather than writing
  * one of its own. `src/lib/checkout.js` is the half that opens the payment
  * page; this is the half that says what happened afterwards.
  */
+
+/**
+ * Takes the server's word for the plan.
+ *
+ * Exported because three things now hand over a subscription row — the
+ * subscription endpoint, a card verification, and the success of an M-Pesa
+ * poll — and each one used to map the same eight fields itself. A row mapped in
+ * three places is a field renamed in two of them.
+ *
+ * Nothing on the device ever *writes* a plan. `verified` and `tier` are the
+ * server's answers; an app that grants itself a subscription optimistically is
+ * how you get one that reads as active on the phone and inactive on the
+ * account, which is a support thread rather than a bug report.
+ */
+export function applySubscription(row) {
+  useStudyStore.getState().setSubscription(fromSubscription(row));
+}
 
 const fromSubscription = (row) => ({
   tier: row.tier,
@@ -119,6 +136,26 @@ export async function createGroup() {
   if (error) return { error };
 
   return loadGroup();
+}
+
+/**
+ * The group a Friends payment is owed, whether or not it exists yet.
+ *
+ * Paying and having a group are separate facts on the server: the payment
+ * grants six seats, and a group is the thing that hands them out. So this reads
+ * first and creates only if there is genuinely nothing there — calling create
+ * blind would be a second group for somebody who already had one, and the
+ * invite code they had given to five friends would stop being the live one.
+ *
+ * Called from the payment path rather than from the Friends screen, because a
+ * Friends plan can now be bought from either screen and the seats have to exist
+ * afterwards regardless of which one was used.
+ */
+export async function ensureGroup() {
+  await loadGroup();
+  if (useStudyStore.getState().group) return { error: null };
+
+  return createGroup();
 }
 
 /**

@@ -252,21 +252,63 @@ export const billing = {
   subscription: (token) => api.get(v1("/billing/subscription"), { token }),
 
   /**
-   * Opens a payment page for this student and this plan.
+   * Starts an M-Pesa payment. The one nearly every student uses.
    *
-   * The link comes from the server rather than being shipped in the app, and
-   * that is the whole point: a fixed, shareable payment link is the same
-   * page for everyone, so the charge it produces names no account. The server
-   * initialises the transaction with the caller's user id in the metadata, so
-   * the payment arrives already tied to a student — otherwise there is nothing
-   * to reconcile against but an email most accounts do not have.
+   * `phone` is sent **exactly as the student typed it**. `0712…`, `+254712…`,
+   * `254 712 345 678`, spaced, hyphenated — the server normalises all of them
+   * and refuses only a number that genuinely cannot receive a prompt, with a
+   * message written for a student. Validating the format in the app instead
+   * means refusing numbers that would have worked.
    *
-   * Returns `{ checkout_url, reference }`. Open the URL, then hand the
-   * reference to `verifyPayment` when the browser closes.
+   * **There is no amount.** The price is read from the server's plan table,
+   * because a price the client can influence is a price the client can choose.
    *
-   * `authorization_url` is also present and identical — the old name, kept by
-   * the server for one release so a build already on a phone keeps working.
-   * Read `checkout_url`.
+   * Answers `{ mode, reference, message, phone, amount_ksh, checkout_url }`.
+   * Branch on `mode`: `stk` means a PIN prompt is ringing and the app should
+   * poll `mpesaStatus`; `redirect` means M-Pesa was unreachable and the server
+   * opened a fallback page, which is handled exactly like a card payment.
+   */
+  mpesa: (tier, phone, token) =>
+    api.post(v1("/billing/mpesa"), { tier, phone }, { token }),
+
+  /**
+   * Where an STK payment has got to.
+   *
+   * Answers `{ status, message, pending, subscription }`. **Poll on `pending`,
+   * never on `status`** — they disagree in the one case that matters, where a
+   * slow answer from Safaricom comes back `pending: true` and must keep the
+   * spinner up rather than drawing as a failure to somebody mid-PIN.
+   *
+   * `subscription` arrives with the success, so the screen does not have to
+   * make a second call at the one moment the student is watching it.
+   */
+  mpesaStatus: (reference, token) =>
+    api.get(
+      v1(`/billing/mpesa/status?reference=${encodeURIComponent(reference)}`),
+      { token },
+    ),
+
+  /**
+   * Starts a card payment. Answers `{ checkout_url, reference }`.
+   *
+   * Open the URL, and call `verifyPayment` when the browser closes — **for any
+   * reason at all**, including what looks like a cancellation. There is no
+   * webhook for this account (the Paystack dashboard is shared with another
+   * product and must not be touched), so that call is the settlement path
+   * rather than a confirmation step. Skip it and the payment settles only when
+   * a server-side sweep notices, minutes later, with the student sitting on a
+   * screen that has not changed.
+   *
+   * `503` means card payments are not configured. Point at M-Pesa.
+   */
+  card: (tier, token) => api.post(v1("/billing/card"), { tier }, { token }),
+
+  /**
+   * The Kora checkout. Superseded by `mpesa` and `card` above.
+   *
+   * Kept because a build already on a phone still calls it and this file is a
+   * record of what the server serves — not because anything here should reach
+   * for it. Nothing in the app does any more.
    */
   checkout: (tier, token) => api.post(v1("/billing/checkout"), { tier }, { token }),
 
@@ -274,9 +316,15 @@ export const billing = {
    * Confirms a payment server-side.
    *
    * Safe to call repeatedly — the reference is unique, so a second call
-   * returns the same subscription rather than extending it again. Kora's
-   * webhook is what makes a payment true; this is the fast path so a student
-   * who has just paid does not wait on it.
+   * returns the same subscription rather than extending it again. There is no
+   * webhook on this account, so this call is what makes a card payment true —
+   * a server-side sweep is the backstop for the ones the app never sees.
+   */
+  /**
+   * Settles a card payment. **Never an M-Pesa reference** — that answers `409`
+   * and points at `mpesaStatus`, because the two providers do not know each
+   * other's references and asking the wrong one reports "no such transaction",
+   * which reaches a just-charged student as "your payment did not go through".
    */
   verifyPayment: (reference, token) =>
     api.post(v1("/billing/verify"), { reference }, { token }),

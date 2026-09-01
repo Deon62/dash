@@ -6,7 +6,7 @@ import { confirmCheckout, pendingCheckout } from "@/lib/checkout";
 import { cardFor } from "@/theme/plans";
 
 /**
- * Where Kora's redirect lands.
+ * Where the payment processor's redirect lands.
  *
  * The payment page ends by sending the browser to `PAYMENT_RETURN_URL` — see
  * `src/lib/checkout.js` — and the OS hands that URL to the app. Two things
@@ -23,11 +23,11 @@ import { cardFor } from "@/theme/plans";
  *
  * The reference is preferred from `pendingCheckout` — held outside the tree
  * and on disk for exactly that case — because it also carries the tier, which
- * decides where the student goes next. Kora appends `?reference=` of its own,
+ * decides where the student goes next. The processor appends `?reference=` of its own,
  * which is the fallback: it is the same value, but on its own it says nothing
  * about what was being bought.
  *
- * Kora redirects here on *any* ending — paid, closed, abandoned — so arriving
+ * The processor redirects here on *any* ending — paid, closed, abandoned — so arriving
  * proves nothing and the answer always comes from the server.
  * `confirmCheckout` is single-flight per reference, so the screen asking at
  * the same moment costs nothing and cannot produce a second, contradictory

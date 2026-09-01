@@ -67,9 +67,9 @@ export function systemAlerts(state) {
     });
   }
 
-  // A plan bought but not yet confirmed. Kora's webhook usually settles this
-  // within a minute or two, so it is worth saying rather than leaving someone
-  // wondering whether their money went anywhere.
+  // A plan bought but not yet confirmed. The server's sweep usually settles
+  // this within a minute or two, so it is worth saying rather than leaving
+  // someone wondering whether their money went anywhere.
   if (state.subscription && state.subscription.verified === false) {
     alerts.push({
       id: "system-payment",

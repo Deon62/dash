@@ -22,8 +22,7 @@ import Notice, { toneForError } from "@/components/Notice";
 import Disc from "@/components/Disc";
 import { useStudyStore } from "@/store/useStudyStore";
 import { activeTier } from "@/lib/quota";
-import { confirmCheckout, startCheckout } from "@/lib/checkout";
-import { createGroup, loadGroup, removeMember } from "@/lib/billing";
+import { ensureGroup, loadGroup, removeMember } from "@/lib/billing";
 import {
   SubscriptionTier,
   cardFor,
@@ -93,9 +92,6 @@ export default function FriendsScreen() {
   const subscription = useStudyStore((state) => state.subscription);
   const group = useStudyStore((state) => state.group);
 
-  const [confirming, setConfirming] = useState(false);
-  /** The reference the server minted, so the sheet can verify rather than ask. */
-  const [paymentReference, setPaymentReference] = useState(null);
   /** `{ tone, title, message, retry }`, or null. See `Notice`. */
   const [notice, setNotice] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -136,105 +132,49 @@ export default function FriendsScreen() {
   const invite = group?.inviteCode ?? "";
   const payer = members.find((member) => member.isOwner);
 
-  // The code and the seat list are the server's. Re-read on open so a friend
-  // who joined an hour ago is on the list rather than appearing at the next
-  // cold start.
+  /**
+   * The code and the seat list are the server's, re-read on open — and the
+   * group is opened here if the payment bought one and nothing has.
+   *
+   * Paying and having a group are separate facts. `ensureGroup` runs on the
+   * payment path, but not every payment finishes there: a card page left open
+   * on a phone Android then kills is settled minutes later by the server's own
+   * sweep, with the app nowhere near it. That student is on a Friends plan with
+   * six seats and no way to hand any of them out, and this screen is exactly
+   * where they come looking.
+   *
+   * Safe to run every time. `ensureGroup` reads before it creates, so an
+   * account that already has a code keeps the one it gave to five friends.
+   */
+  const owedGroup =
+    cardFor(activeTier(subscription))?.family === "friends" && !group?.inviteCode;
+
   useEffect(() => {
-    loadGroup();
-  }, []);
+    if (owedGroup) ensureGroup();
+    else loadGroup();
+  }, [owedGroup]);
 
   // The seat list is the server's, and it is the thing a student pulls down to
   // check — a friend who redeemed the code an hour ago should appear on the
   // gesture rather than at the next cold start.
   const refresh = () => Promise.all([pullSync(), loadGroup()]);
 
-  const pay = async () => {
+  /**
+   * Into the payment screen, rather than straight out to a browser.
+   *
+   * The same route the plans screen uses, and for the same reason: paying is no
+   * longer one hosted page. M-Pesa is an STK prompt this app requests and polls;
+   * only a card leaves for a browser. Neither belongs on a screen about seats.
+   *
+   * The group is not created here any more either. `ensureGroup` runs on the
+   * payment path itself, so six seats and an invite code exist however the
+   * Friends plan was bought — including from the plans screen, which could
+   * always sell it and never opened a group afterwards.
+   */
+  const pay = () => {
     impact("medium");
     setNotice(null);
-
-    // Minted by the server for this student — see `src/lib/checkout.js`. The
-    // fixed payment link this replaced produced a charge that named nobody.
-    const { reference, returned, error } = await startCheckout(FRIENDS);
-
-    if (error) {
-      setNotice({
-        tone: toneForError(error),
-        title: "We couldn't open the payment page",
-        message: `${error} Nothing has been charged.`,
-        retry: pay,
-      });
-      return;
-    }
-
-    setPaymentReference(reference);
-
-    // Kora redirected back, so the payment page reached an ending of some
-    // kind. Which ending is the server's to say, not the student's. The
-    // reference goes in by argument because the state above has not settled.
-    if (returned) {
-      startGroup(reference);
-      return;
-    }
-
-    // They closed the tab themselves, which says nothing either way.
-    setConfirming(true);
-  };
-
-  /**
-   * Confirms the payment, then asks the server for the group.
-   *
-   * The invite code comes from the server, not from this device. A code minted
-   * here would be one nobody else could redeem — the seats it claims to give
-   * away live on the account, and only the server can hand them out.
-   */
-  const startGroup = async (ref = paymentReference) => {
-    setBusy(true);
-    const { error, pending } = await confirmCheckout(ref);
-
-    if (error) {
-      setBusy(false);
-      // The sheet closes over the answer otherwise, and a student would have to
-      // dismiss the question to read the reply to it.
-      setConfirming(false);
-
-      setNotice(
-        pending
-          ? {
-              tone: "waiting",
-              title: "Your payment is still clearing",
-              message:
-                "Mobile money can take a minute or two to confirm. Nothing has gone wrong. Check again shortly and the group is yours as soon as it lands.",
-              retry: () => startGroup(ref),
-            }
-          : {
-              tone: toneForError(error),
-              title: "We couldn't confirm that payment",
-              message: `${error} If you were charged, the payment is safe and the group will appear on its own once it reaches us.`,
-              retry: () => startGroup(ref),
-            }
-      );
-      return;
-    }
-
-    // Creating the group is separate from paying for it: the payment grants
-    // the seats, this is what produces the code that gives them out.
-    const created = await createGroup();
-    setBusy(false);
-
-    if (created.error) {
-      setConfirming(false);
-      setNotice({
-        tone: toneForError(created.error),
-        title: "Your payment went through, but the group didn't open",
-        message: `${created.error} You have not lost anything. Try again and your seats will be there.`,
-        retry: () => startGroup(ref),
-      });
-      return;
-    }
-
-    setPaymentReference(null);
-    notify("success");
-    setConfirming(false);
+    router.push(`/pay?tier=${FRIENDS}`);
   };
 
   const copy = async () => {
@@ -515,42 +455,11 @@ export default function FriendsScreen() {
 
         {onPlan ? null : (
           <Text className="font-jk text-muted text-[11.5px] leading-[17px]">
-            Payment goes through Kora, which takes M-Pesa and Airtel Money.
+            Pay with M-Pesa or a card.
           </Text>
         )}
 
       </Screen>
-
-      {/* --- Did the payment land? ------------------------------------ */}
-      <Sheet
-        visible={confirming}
-        onClose={() => setConfirming(false)}
-        title="Did the payment go through?"
-        subtitle={`Tap below and we will check it against our records. If Kora took KES ${plan.priceKsh}, the group and its code are yours.`}
-      >
-        <View className="gap-y-3">
-          <Button
-            label="Yes, give me the code"
-            busyLabel="Checking…"
-            busy={busy}
-            disabled={busy}
-            /* Wrapped, not passed: `startGroup` now takes a reference, and a
-               bare handler would hand it the press event instead. */
-            onPress={() => startGroup()}
-          />
-          <Pressable
-            onPress={() => {
-              impact("light");
-              setConfirming(false);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel="Not yet"
-            className="items-center py-3 active:opacity-60"
-          >
-            <Text className="font-jk-med text-muted text-[14px]">Not yet</Text>
-          </Pressable>
-        </View>
-      </Sheet>
 
       {/* --- Invite by email ------------------------------------------ */}
       <Sheet

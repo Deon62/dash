@@ -438,7 +438,7 @@ export const useStudyStore = create(
        * The plan, exactly as `/billing/subscription` reported it.
        *
        * Nothing on this device grants a plan any more. A payment is a fact the
-       * server establishes — from Kora's webhook or from verifying the
+       * server establishes — from polling a payment or from verifying the
        * reference — and the app's job is to read it, not to claim it.
        */
       setSubscription: (subscription) => set({ subscription }),

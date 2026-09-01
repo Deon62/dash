@@ -7,7 +7,7 @@ import Sheet from "@/components/Sheet";
 import Button from "@/components/Button";
 import Disc from "@/components/Disc";
 import { canAttachFile, canUseOcr, scanningIncluded } from "@/lib/quota";
-import { captureScan, pickScan } from "@/lib/scan";
+import { canPrepareScans, captureScan, pickScan } from "@/lib/scan";
 import { COLORS } from "@/theme/colors";
 import TextField from "@/components/TextField";
 import { NOTE_WORD_LIMIT, countWords } from "@/lib/notes";
@@ -356,16 +356,28 @@ export default function AddKnowledge({
             </Text>
           ) : null}
 
-          <Option
-            Icon={Camera}
-            label="Take a photo"
-            hint="Opens the camera"
-            onPress={() => leaveFor(true)}
-          />
+          {/* The camera needs a permission and an image resizer that both
+              arrive in the same store build. On a binary without them this
+              would open a camera that cannot be granted and produce a photo
+              nothing can shrink — so the library, which works everywhere, is
+              the whole offer until that build lands. */}
+          {canPrepareScans ? (
+            <Option
+              Icon={Camera}
+              label="Take a photo"
+              hint="Opens the camera"
+              onPress={() => leaveFor(true)}
+            />
+          ) : null}
+
           <Option
             Icon={Images}
-            label="Choose an existing photo"
-            hint="One you have already taken"
+            label={canPrepareScans ? "Choose an existing photo" : "Choose a photo"}
+            hint={
+              canPrepareScans
+                ? "One you have already taken"
+                : "A photo of the page from your library"
+            }
             onPress={() => leaveFor(false)}
           />
         </View>

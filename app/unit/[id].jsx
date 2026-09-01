@@ -1,6 +1,6 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Image, Pressable, Text, View } from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useFocusEffect, useLocalSearchParams, useRouter } from "expo-router";
 import {
   Archive,
   CalendarClock,
@@ -30,6 +30,8 @@ import { useStudyStore, unitById } from "@/store/useStudyStore";
 import UploadStatus from "@/components/UploadStatus";
 import RowAction from "@/components/RowAction";
 import { fileMaterial, rescanMaterial } from "@/lib/knowledge";
+import { canPrepareScans } from "@/lib/scan";
+import { setViewingUnit } from "@/lib/push";
 import { DAYS, kindLabel, weekOrder } from "@/theme/units";
 import { formatDateTime, minutesOf } from "@/lib/dates";
 import { COLORS, TINTS } from "@/theme/colors";
@@ -76,6 +78,24 @@ export default function UnitScreen() {
   const scanIncluded = scanningIncluded(tier, ocrMeter);
 
   /**
+   * Tells push that this unit is on screen, so it does not banner over it.
+   *
+   * "CS201: 4 pages are ready" is worth a buzz in a lecture hall and is noise
+   * dropped on top of the four cards the student just watched turn ready. The
+   * server sends it either way — it cannot know what is being shown — so this
+   * is the only place the difference can be known.
+   *
+   * `useCallback` on the effect, and cleared on blur: a stale id left behind
+   * here would silence a notification for a unit nobody is looking at.
+   */
+  useFocusEffect(
+    useCallback(() => {
+      setViewingUnit(unitId);
+      return () => setViewingUnit(null);
+    }, [unitId]),
+  );
+
+  /**
    * A second go at a page the server could not read.
    *
    * Checked against the allowance first, because a retake spends a scan like
@@ -90,7 +110,9 @@ export default function UnitScreen() {
       return;
     }
 
-    const { error } = await rescanMaterial(material);
+    // From the library where the camera is not available on this binary. The
+    // student still gets a second attempt, which is the point of the action.
+    const { error } = await rescanMaterial(material, { take: canPrepareScans });
     if (error) setBlocked({ ok: false, reason: "scan", detail: error, upgradable: false });
   };
   const [confirmingDelete, setConfirmingDelete] = useState(false);

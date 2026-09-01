@@ -26,7 +26,7 @@ import {
   seatsFor,
 } from "@/theme/plans";
 import { activeTier, daysRemaining, hasEverPaid, isExpired } from "@/lib/quota";
-import { confirmCheckout, pendingCheckout, startCheckout } from "@/lib/checkout";
+import { confirmCheckout, pendingCheckout } from "@/lib/checkout";
 import { loadPlans, loadSubscription } from "@/lib/billing";
 import { COLORS } from "@/theme/colors";
 import { impact, notify } from "@/lib/haptics";
@@ -128,10 +128,13 @@ export default function BillingScreen() {
     /**
      * Picks up a payment this screen never saw the end of.
      *
-     * Android is free to kill a backgrounded app while the student is at Kora,
-     * and it does, on the phones this is written for. The reference outlives
-     * that — `src/lib/checkout.js` keeps it on disk — so the way back is to
-     * offer the check rather than to pretend the payment never happened.
+     * Android is free to kill a backgrounded app while the student is on a
+     * card page, and it does, on the phones this is written for. The reference
+     * outlives that — `src/lib/checkout.js` keeps it on disk — so the way back
+     * is to offer the check rather than to pretend the payment never happened.
+     *
+     * Only card payments land here. An STK payment never leaves the app, so
+     * there is no browser to be killed behind and `/pay` polls it to an end.
      */
     pendingCheckout().then((payment) => {
       if (cancelled || !payment) return;
@@ -153,8 +156,8 @@ export default function BillingScreen() {
    * Pull to refresh.
    *
    * The most likely reason anyone pulls this page down is a payment that has
-   * not shown up yet — Kora's webhook lands seconds to minutes after the
-   * charge, and until it does the plan on screen is the old one. So this asks
+   * not shown up yet — a card settles on the server's sweep seconds to minutes
+   * after the charge, and until it does the plan on screen is the old one. So this asks
    * the server for the subscription rather than only syncing coursework, which
    * would refresh everything except the thing being waited for.
    */
@@ -166,41 +169,22 @@ export default function BillingScreen() {
   const paysForGroup =
     (group?.members ?? []).find((member) => member.isMe)?.isOwner ?? true;
 
-  const checkout = async (buying) => {
+  /**
+   * Into the payment screen, rather than straight out to a browser.
+   *
+   * This used to mint a link and open a tab, because the old processor was one
+   * hosted page that took every method. It is not one page any more: M-Pesa is an STK
+   * prompt this app requests with a number the student types and then polls,
+   * and only a card leaves for a browser. Neither of those is a thing a plan
+   * card can do on its own, so the card's job stops at naming the tier.
+   *
+   * `/pay` owns everything after this — the number, the prompt, the poll, the
+   * card hand-off and the verification.
+   */
+  const checkout = (buying) => {
     impact("medium");
-    setBusy(true);
     setNotice(null);
-
-    // The link is minted by the server for this student and this plan — see
-    // `src/lib/checkout.js`. There is no hardcoded payment page any more, and
-    // the toggle decides nothing except which tier id goes with the request.
-    const { reference: opened, returned, error } = await startCheckout(buying);
-    setBusy(false);
-
-    if (error) {
-      setNotice({
-        tone: toneForError(error),
-        title: "We couldn't open the payment page",
-        message: `${error} Nothing has been charged.`,
-        retry: () => checkout(buying),
-      });
-      return;
-    }
-
-    setReference(opened);
-
-    // Kora redirected back, so the payment page reached an ending of some
-    // kind. Which ending is the server's to say, not the student's — so this
-    // checks rather than asking them. The reference goes in by argument
-    // because the state set above has not settled yet.
-    if (returned) {
-      unlock(buying, opened);
-      return;
-    }
-
-    // They closed the tab themselves, which says nothing either way — so this
-    // asks before spending a verification on it.
-    setConfirming(buying);
+    router.push(`/pay?tier=${buying}`);
   };
 
   /**
@@ -533,20 +517,20 @@ export default function BillingScreen() {
             + "Nothing you filed has gone anywhere. "
             : ""}
           Questions, quizzes and scans all refill on the 1st of the month.
-          Payment is handled by Kora, which accepts M-Pesa and Airtel Money.
-          Your plan activates once the payment clears.
+          Pay with M-Pesa or a card. Your plan activates once the payment
+          clears.
         </Text>
       </Screen>
 
-      {/* The device cannot see a charge, so it asks the server — which has
-          either had Kora's webhook or can verify the reference itself. */}
+      {/* The device cannot see a charge, so it asks the server, which is the
+          only side that can check the reference with the processor. */}
       <Sheet
         visible={Boolean(confirming)}
         onClose={() => setConfirming(null)}
         title="Did the payment go through?"
         subtitle={
           confirming
-            ? `If Kora charged you for ${planName(confirming)}, tap below and we will check it against our records.`
+            ? `If you were charged for ${planName(confirming)}, tap below and we will check it against our records.`
             : undefined
         }
       >

@@ -6,6 +6,7 @@ import * as Notifications from "expo-notifications";
 
 import { account } from "@/api/endpoints";
 import { authed, deviceId, registerDevice } from "@/lib/session";
+import { sync } from "@/lib/sync";
 import { useStudyStore } from "@/store/useStudyStore";
 import { COLORS } from "@/theme/colors";
 
@@ -37,13 +38,48 @@ import { COLORS } from "@/theme/colors";
  * Set at module scope so it is in place before any notification can arrive,
  * including one that woke the app.
  */
+/**
+ * The unit currently on screen, or null.
+ *
+ * Module scope rather than store state because it is not the student's data and
+ * nothing renders from it — it exists for one decision, taken inside a handler
+ * that runs outside React and cannot read a hook.
+ *
+ * The server cannot make this decision for us. It has no idea what the app is
+ * showing, so it sends the notification and leaves the suppression to the only
+ * side that knows.
+ */
+let viewingUnit = null;
+
+/** Called by the unit screen on focus, and with `null` on blur. */
+export function setViewingUnit(unitId) {
+  viewingUnit = unitId;
+}
+
 Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowBanner: true,
-    shouldShowList: true,
-    shouldPlaySound: false,
-    shouldSetBadge: false,
-  }),
+  handleNotification: async (notification) => {
+    const data = notification?.request?.content?.data;
+
+    /**
+     * "Four pages are ready", banner-ed over the four cards that just turned
+     * ready in front of them.
+     *
+     * The only notification worth swallowing, and only in this exact case: the
+     * student is looking at the unit, the polling has already moved the cards,
+     * and the banner is announcing something they watched happen. Silent, not
+     * dropped — it still lands in the notification list, because "your notes
+     * are ready" is worth finding later even when it was not worth interrupting
+     * for.
+     */
+    const redundant = data?.kind === "material" && data?.id === viewingUnit;
+
+    return {
+      shouldShowBanner: !redundant,
+      shouldShowList: true,
+      shouldPlaySound: false,
+      shouldSetBadge: false,
+    };
+  },
 });
 
 /**
@@ -207,6 +243,14 @@ function destinationFor(data) {
 
   if (kind === "class") return { pathname: "/timetable" };
 
+  /**
+   * A document the server has finished reading. `id` is the **unit**, not the
+   * material, and that is deliberate on the server's side: one notification
+   * covers every document that settled in that unit, so it has no single
+   * subject. Opening the unit puts the whole batch on screen.
+   */
+  if (kind === "material" && id) return { pathname: `/unit/${id}` };
+
   // `test` carries no id, and anything unrecognised is a payload from a newer
   // server than this build. The list of what has been sent is the honest
   // destination for both.
@@ -234,6 +278,19 @@ export function usePushTaps(router) {
 
       const to = destinationFor(data);
       router.push(to);
+
+      /**
+       * The notification is a nudge, not the data.
+       *
+       * It says four documents are ready; the cards come from sync as they
+       * always do. Without this the unit opens showing whatever the last pull
+       * left behind — which, for a tap that arrived while the app was closed,
+       * is the "waiting to be read" state the notification just contradicted.
+       *
+       * Unawaited, and after the push: the screen should appear now and fill
+       * in, not wait on a request before it will draw.
+       */
+      if (data.kind === "material") sync();
     };
 
     Notifications.getLastNotificationResponseAsync()
